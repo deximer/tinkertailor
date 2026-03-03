@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Brief — Tinker Tailor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+  :root {
+    --color-bg: #fafaf9;
+    --color-surface: #ffffff;
+    --color-text: #1c1917;
+    --color-muted: #57534e;
+    --color-border: #d6d3d1;
+    --color-accent: #292524;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Source Serif 4', Georgia, serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.75;
+    font-size: 16px;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+
+  /* Title block */
+  .title-block {
+    margin-bottom: 48px;
+    padding-bottom: 32px;
+    border-bottom: 2px solid var(--color-accent);
+  }
+
+  .title-block h1 {
+    font-family: 'Inter', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 28px;
+  }
+
+  .title-block .meta {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--color-muted);
+    line-height: 1.6;
+  }
+
+  .title-block .meta .row {
+    display: flex;
+    margin-bottom: 6px;
+  }
+
+  .title-block .meta .label {
+    width: 120px;
+    flex-shrink: 0;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .title-block .meta .value {
+    color: var(--color-text);
+  }
+
+  /* Headings */
+  h2 {
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    margin-top: 40px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  h3 {
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 24px;
+    margin-bottom: 10px;
+  }
+
+  h4 {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 8px;
+  }
+
+  p { margin-bottom: 14px; }
+
+  ul, ol {
+    margin: 10px 0 14px 28px;
+  }
+
+  li { margin-bottom: 8px; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+
+  th {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--color-accent);
+    color: white;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #f5f5f4; }
+
+
+  /* Table of Contents */
+  .toc {
+    margin: 0 0 36px 0;
+    padding: 24px 28px;
+    background: #f5f5f4;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+  }
+
+  .toc h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 12px 0;
+    padding: 0;
+    border: none;
+  }
+
+  .toc ol {
+    margin: 0;
+    padding-left: 20px;
+    list-style: none;
+    counter-reset: toc;
+  }
+
+  .toc > ol > li {
+    counter-increment: toc;
+    margin-bottom: 4px;
+  }
+
+  .toc > ol > li::before {
+    content: counter(toc) ".";
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    margin-right: 6px;
+  }
+
+  .toc a {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .toc a:hover {
+    text-decoration: underline;
+  }
+
+  .toc ol ol {
+    margin: 2px 0 4px 18px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toc ol ol li {
+    margin-bottom: 2px;
+  }
+
+  .toc ol ol li::before {
+    content: none;
+  }
+
+  .toc ol ol a {
+    font-weight: 400;
+    color: var(--color-muted);
+    font-size: 12px;
+  }
+
+  /* Section divider */
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 36px 0;
+  }
+
+  /* Print */
+  .page-break { page-break-before: always; }
+
+  @media print {
+    body { font-size: 14px; }
+    .container { padding: 20px; max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Title Block -->
+<div class="title-block">
+  <h1>Tinker Tailor &mdash; Technical Brief</h1>
+  <div class="meta">
+    <div class="row"><span class="label">Prepared by:</span><span class="value">Jeremy Stark</span></div>
+    <div class="row"><span class="label">Date:</span><span class="value">February 2026</span></div>
+    <div class="row"><span class="label">Version:</span><span class="value">1.2</span></div>
+  </div>
+</div>
+
+<!-- Table of Contents -->
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#executive-summary">Executive Summary</a></li>
+    <li><a href="#mvp-definition">MVP Definition</a>
+      <ol>
+        <li><a href="#scope">Scope</a></li>
+        <li><a href="#whats-in">What&rsquo;s In</a></li>
+        <li><a href="#whats-deferred">What&rsquo;s Deferred</a></li>
+        <li><a href="#constraints">Constraints &amp; Assumptions</a></li>
+      </ol>
+    </li>
+    <li><a href="#platform-deployment">Platform &amp; Deployment</a>
+      <ol>
+        <li><a href="#deployment-target">Deployment Target</a></li>
+        <li><a href="#path-to-aws">Path to AWS</a></li>
+        <li><a href="#infrastructure-sizing">Infrastructure Sizing</a></li>
+        <li><a href="#scaling">Scaling Strategy</a></li>
+      </ol>
+    </li>
+    <li><a href="#technology-stack">Technology Stack</a>
+      <ol>
+        <li><a href="#frontend-layer">Frontend Layer</a></li>
+        <li><a href="#backend-layer">Backend Layer</a></li>
+        <li><a href="#infrastructure-deployment">Infrastructure &amp; Deployment</a></li>
+      </ol>
+    </li>
+    <li><a href="#platform-capabilities">Platform Capabilities</a>
+      <ol>
+        <li><a href="#tara">TARA: The AI Design Assistant</a></li>
+        <li><a href="#design-modes">Imagine &amp; Atelier</a></li>
+        <li><a href="#marketplace">Creator &amp; Influencer Marketplace</a></li>
+        <li><a href="#ecommerce">E-Commerce &amp; Checkout</a></li>
+        <li><a href="#factory">Factory Integration &amp; Fulfillment</a></li>
+        <li><a href="#compatibility-graph">Component Compatibility Graph</a></li>
+      </ol>
+    </li>
+    <li><a href="#integration-points">Integration Points</a></li>
+    <li><a href="#engineering-approach">Engineering Approach</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<!-- 1. EXECUTIVE SUMMARY -->
+<!-- ============================================================ -->
+<h2 id="executive-summary">1. Executive Summary</h2>
+
+<p>Tinker Tailor (TT) is an AI-powered fashion design platform that enables consumers and creators to design custom garments through natural language conversation, visualize them in real-time 3D, and have them manufactured on-demand. The platform connects a structured pattern library, an AI design assistant (TARA), 3D rendering, e-commerce, influencer revenue sharing, and factory fulfillment into a single end-to-end experience.</p>
+
+<p>This brief defines the technical architecture, technology choices, deployment strategy, and MVP scope for the initial build. It is intended as a companion to the Engineering Services Agreement and establishes shared understanding of what will be built, how, and in what order.</p>
+
+<hr class="section-divider">
+
+<!-- ============================================================ -->
+<!-- 2. MVP DEFINITION -->
+<!-- ============================================================ -->
+<h2 id="mvp-definition">2. MVP Definition</h2>
+
+<h3 id="scope">2.1 Scope</h3>
+
+<p>The MVP is a closed, invite-only pilot with 10&ndash;15 influencer/creator accounts producing capsule collections. Their followers and other invited users will have full access to the platform as shoppers&mdash;browsing designs, using the design tools, and purchasing garments. The platform is expected to support thousands of concurrent shoppers during the pilot period. The goal is to prove the core design loop end-to-end:</p>
+
+<p><strong>Design it &rarr; Post it &rarr; Share it &rarr; Sell it &rarr; Ship it</strong></p>
+
+<h3 id="whats-in">2.2 What&rsquo;s In</h3>
+
+<table>
+  <thead>
+    <tr><th>Capability</th><th>MVP Scope</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Authentication</td><td>Email/password, invitation codes, membership application form</td></tr>
+    <tr><td>TARA (AI Assistant)</td><td>Conversational design via natural language prompts; rule-based tag matching with LLM orchestration layer</td></tr>
+    <tr><td>Pattern Library</td><td>Full silhouettes and component-level assembly (mix bodice + skirt + sleeves); ~300 pre-authorized components with compatibility graph; standard sizing (0&ndash;16). MVP garment categories: dresses, tops, and skirts. Jumpsuit support deferred.</td></tr>
+    <tr><td>3D Visualization</td><td>Pre-rendered Clo 3D assets displayed in-browser; composite rendering of multiple components into a single garment view; fabric texture layering on front end</td></tr>
+    <tr><td>E-Commerce</td><td>Custom checkout (not Shopify&mdash;millions of variations from pattern/fabric/color combinations); dynamic pricing based on components and materials; order confirmation flow</td></tr>
+    <tr><td>Influencer Integration</td><td>Shareable product links; attribution tracking; 20% net sales payout tracking</td></tr>
+    <tr><td>Factory Fulfillment</td><td>Order push to MVP factory via iCreate; ShipStation integration for shipping notifications</td></tr>
+    <tr><td>Portfolio</td><td>Save designs for later (wishlist-style)</td></tr>
+    <tr><td>Admin Backend</td><td>Upload patterns, components, 3D renderings, fabrics; define component compatibility edges and connection types; assign tags across the full taxonomy; associate rendering variants with fabric behaviors; manage orders and inventory</td></tr>
+  </tbody>
+</table>
+
+<h3 id="whats-deferred">2.3 What&rsquo;s Deferred (Post-MVP)</h3>
+
+<ul>
+  <li>Custom sizing / body measurements</li>
+  <li>Cornate color printing (hex-code fabric coloring)</li>
+  <li>Tech pack download / purchase</li>
+  <li>Photo-realistic rendering from 3D models</li>
+  <li>Multi-factory routing / supply chain telemetry</li>
+  <li>Image upload for AI pattern matching</li>
+  <li>Personalized body avatars / virtual try-on</li>
+  <li>Promotional credits system</li>
+  <li>Embellishments (buttons, zippers, decorative items)&mdash;layering on 3D renderings</li>
+  <li>AI usage credits / metering (free tier initially; usage-based pricing to be defined)</li>
+  <li>Influencer stream scanning and aesthetic-aligned style suggestions</li>
+  <li>AI-driven pattern adjustments without human involvement</li>
+  <li>Jumpsuit and additional garment category support beyond dresses, tops, and skirts</li>
+</ul>
+
+<h3 id="constraints">2.4 Constraints &amp; Assumptions</h3>
+
+<ul>
+  <li>3D renderings are pre-created in Clo 3D by an external artist and ingested into the system; the app does not generate or modify 3D models at runtime</li>
+  <li>Fabric rendering on the front end is texture overlay on existing 3D assets, not real-time physics simulation</li>
+  <li>Component-level assembly composites pre-rendered 3D parts; the app does not procedurally generate new 3D geometry from component combinations</li>
+  <li>A Python codebase from the original Tinker Tailor application will be made available for analysis; this contains the prior silhouette composition logic and will serve as a reference for implementing component assembly, compatibility validation, and related business rules in the new system</li>
+  <li>The pattern library ships with a finite catalog (~300 components) with pre-defined compatibility rules</li>
+  <li>Factory integration targets a single MVP factory using iCreate; multi-factory routing is post-MVP</li>
+  <li>Color is constrained to available factory fabric stock for MVP (no on-demand printing)</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- ============================================================ -->
+<!-- 3. PLATFORM & DEPLOYMENT -->
+<!-- ============================================================ -->
+<h2 id="platform-deployment">3. Platform &amp; Deployment</h2>
+
+<h3 id="deployment-target">3.1 Deployment Target: Fly.io + Managed Services</h3>
+
+<table>
+  <thead>
+    <tr><th>Concern</th><th>Choice</th><th>Rationale</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Application Hosting</td><td>Fly.io</td><td>Next.js runs as a long-lived container process; no cold starts, no function duration limits, native WebSocket support, global edge deployment across 30+ regions</td></tr>
+    <tr><td>Database</td><td>Supabase (PostgreSQL)</td><td>Relational model fits the pattern/component compatibility graph well; built-in auth, row-level security, real-time subscriptions, and storage for 3D assets</td></tr>
+    <tr><td>File/Asset Storage</td><td>Supabase Storage</td><td>3D renderings, fabric textures, tech pack files</td></tr>
+    <tr><td>Webhooks &amp; Async Flows</td><td>Next.js API Routes + Fly Machines</td><td>Stripe and ShipStation webhooks handled in API routes; factory push, email notifications, and payout tracking triggered inline. Background workers can be added as separate Fly Machines if pipeline complexity grows&mdash;no separate job infrastructure required.</td></tr>
+    <tr><td>LLM Provider</td><td>One LLM to be selected</td><td>The Vercel AI SDK supports multiple providers (Claude, GPT-4o/4.1, Gemini, open-source models) and runs as a standard Node.js library independent of hosting platform; provider selection deferred to implementation based on persona adherence and tool-calling performance</td></tr>
+    <tr><td>CI/CD</td><td>GitHub Actions + Fly.io</td><td>Automated deployments on push to main; preview deployments per pull request via Fly Machines</td></tr>
+  </tbody>
+</table>
+
+<h4>Why Not Vercel?</h4>
+
+<p>Vercel was evaluated and is the default deployment target for Next.js applications. It offers excellent developer experience with zero-config CI/CD, automatic preview deployments, and native framework integration. However, it was decided against for the following reasons:</p>
+
+<ul>
+  <li><strong>Serverless ceiling:</strong> Vercel&rsquo;s serverless model imposes function duration limits (60 seconds on Pro) that constrain LLM orchestration with multi-step tool-calling, factory order assembly, and webhook processing chains. The platform&rsquo;s post-MVP roadmap&mdash;background job processing, multi-factory routing, real-time collaboration&mdash;pushes further beyond what stateless functions support well.</li>
+  <li><strong>Replatforming risk:</strong> Vercel deploys code into a proprietary runtime that splits the application across edge functions, serverless functions, and static assets. Migrating off Vercel requires reassembling these pieces into a conventional application&mdash;an engineering project, not a configuration change. With Fly.io, the application runs in a standard Docker container that can be deployed to AWS ECS, GCP Cloud Run, or any container platform with minimal effort.</li>
+  <li><strong>Portability:</strong> A Docker-based deployment ensures the application is never locked to a single hosting provider. If infrastructure needs scale massively post-MVP, migration to AWS, GCP, or multi-cloud is a DevOps task (days) rather than an application rewrite (weeks).</li>
+</ul>
+
+<h4 id="path-to-aws">Path to AWS</h4>
+
+<p>Fly.io is the right platform for MVP velocity, but the architecture is designed so that migrating to AWS is straightforward if scale or compliance requirements demand it. Because the application runs as a standard Docker container, the migration path is:</p>
+
+<ol>
+  <li>Push the same Docker image to AWS Elastic Container Registry (ECR)</li>
+  <li>Run it on ECS Fargate (serverless containers) or EKS (Kubernetes)&mdash;no application code changes required</li>
+  <li>Replace Fly.io secrets with AWS Secrets Manager or Parameter Store</li>
+  <li>Swap the GitHub Actions deploy step from <code>fly deploy</code> to <code>aws ecs update-service</code></li>
+  <li>Add an Application Load Balancer for SSL termination and routing</li>
+</ol>
+
+<p>Supabase (database, auth, storage) remains unchanged&mdash;it connects over standard PostgreSQL and HTTPS regardless of where the application runs. The total migration effort is measured in days of DevOps work, not weeks of engineering, and can be executed without modifying application code.</p>
+
+<h3 id="infrastructure-sizing">3.2 Infrastructure Sizing</h3>
+
+<p>The MVP pilot targets 10&ndash;15 influencer/creator accounts but expects thousands of shoppers (creators&rsquo; followers and other invitees). The application runs as a containerized process on Fly.io and scales horizontally by adding machines in additional regions as demand requires:</p>
+
+<ul>
+  <li><strong>Fly.io:</strong> Shared-CPU machines initially, scaling to dedicated-CPU as traffic warrants; multiple machines across regions for availability and latency; no function invocation limits or duration ceilings</li>
+  <li><strong>Supabase:</strong> Pro plan minimum; connection pooling enabled for concurrent database access; storage sized for 3D asset catalog</li>
+  <li><strong>Asset Delivery:</strong> 3D renderings and fabric textures served from Supabase Storage</li>
+  <li><strong>Database:</strong> Query optimization and indexing for the compatibility graph, tag resolution, and product catalog queries under concurrent load</li>
+</ul>
+
+<p>If traffic volume grows beyond what Supabase Storage handles efficiently, a CDN layer (e.g., Cloudflare, AWS CloudFront) can be introduced in front of asset storage to reduce latency and offload bandwidth. This is a configuration change, not an architectural one.</p>
+
+<p>Infrastructure costs scale with user volume. Hosting and third-party service costs are Client&rsquo;s responsibility and are not included in the project fee.</p>
+
+<h3 id="scaling">3.3 Scaling Strategy</h3>
+
+<p>The platform launches with a minimal footprint and scales incrementally as traffic data dictates. Each lever below is independent&mdash;pull the one that addresses the actual bottleneck rather than scaling everything at once.</p>
+
+<h4>Vertical Scaling &mdash; Bigger Machines</h4>
+<p>The simplest first move. Fly.io machine size is a single configuration change with no downtime:</p>
+<table>
+  <thead>
+    <tr><th>Machine Type</th><th>RAM</th><th>Use Case</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>shared-cpu-1x</td><td>2GB</td><td>Development / staging</td></tr>
+    <tr><td>shared-cpu-2x</td><td>4GB</td><td>MVP launch</td></tr>
+    <tr><td>dedicated-cpu-2x</td><td>8GB</td><td>Sustained concurrent load</td></tr>
+    <tr><td>dedicated-cpu-4x</td><td>16GB</td><td>Heavy traffic / LLM processing</td></tr>
+  </tbody>
+</table>
+
+<h4>Horizontal Scaling &mdash; More Machines</h4>
+<p>Run multiple instances of the application simultaneously. Fly.io load-balances across them automatically. Because Next.js is stateless&mdash;session state lives in Supabase, design state in the browser&mdash;additional machines require no application changes:</p>
+<ul>
+  <li>Scale from 1 to N machines with a single command (<code>fly scale count N</code>)</li>
+  <li>Enable autoscaling to handle traffic spikes automatically&mdash;machines start in ~2 seconds and spin down during quiet periods; keep at least one machine warm at all times to avoid cold starts</li>
+</ul>
+
+<h4>Geographic Scaling &mdash; More Regions</h4>
+<p>Deploy machines in additional Fly.io regions to reduce latency for international users. Fly routes each request to the nearest healthy machine. Relevant as the creator/shopper base grows outside the initial launch market.</p>
+
+<h4>Service Splitting &mdash; Isolate Heavy Work</h4>
+<p>As backend complexity grows, resource-intensive workloads can be moved to dedicated Fly Machines that scale independently from the main web application:</p>
+<table>
+  <thead>
+    <tr><th>Service</th><th>Rationale</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>TARA / LLM worker</td><td>LLM calls are slow and CPU-heavy; isolating them prevents blocking web request handling</td></tr>
+    <tr><td>Background job worker</td><td>Factory order assembly, payout calculations, and ShipStation polling are long-running and should not compete with HTTP traffic</td></tr>
+  </tbody>
+</table>
+
+<h4>Database Scaling &mdash; Supabase</h4>
+<p>The database is often the first bottleneck under load. Steps in order of effort:</p>
+<ul>
+  <li><strong>Connection pooling:</strong> Enabled from day one via Supabase&rsquo;s built-in PgBouncer</li>
+  <li><strong>Query optimization:</strong> Indexes on compatibility graph traversal, tag resolution, and order lookups before adding hardware</li>
+  <li><strong>Read replicas:</strong> Route catalog browsing and read-heavy queries to replicas, reserving the primary for writes; available on Supabase Pro</li>
+  <li><strong>Plan upgrade:</strong> More connections and compute via Supabase plan tier</li>
+</ul>
+
+<h4>Asset Delivery &mdash; CDN</h4>
+<p>If 3D asset delivery becomes a bandwidth or latency bottleneck, a CDN layer (Cloudflare or AWS CloudFront) can be placed in front of Supabase Storage. This is a configuration change with no application code impact.</p>
+
+<h4>Realistic Scaling Sequence</h4>
+<table>
+  <thead>
+    <tr><th>Stage</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>MVP launch</td><td>1&ndash;2 shared-CPU machines; Supabase Pro with connection pooling</td></tr>
+    <tr><td>Traffic spike (influencer post)</td><td>Enable autoscaling; increase machine count</td></tr>
+    <tr><td>Sustained growth</td><td>Upgrade to dedicated-CPU machines; add Supabase read replica</td></tr>
+    <tr><td>International users</td><td>Add Fly.io regions nearest to user concentration</td></tr>
+    <tr><td>Backend complexity grows</td><td>Split TARA worker and job processor into separate services</td></tr>
+    <tr><td>Massive scale</td><td>Migrate to AWS ECS using the same Docker image (see Section 3.1)</td></tr>
+  </tbody>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================================ -->
+<!-- 4. TECHNOLOGY STACK -->
+<!-- ============================================================ -->
+<h2 id="technology-stack">4. Technology Stack</h2>
+
+<h3 id="frontend-layer">4.1 Frontend Layer</h3>
+
+<table>
+  <thead>
+    <tr><th>Technology</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Framework</td><td>Next.js 15 (App Router). Server components for catalog/SEO pages; client components for interactive design experience</td></tr>
+    <tr><td>Language</td><td>TypeScript. End-to-end type safety</td></tr>
+    <tr><td>Styling</td><td>Tailwind CSS + Radix UI primitives. Rapid iteration; accessible component foundations</td></tr>
+    <tr><td>3D Rendering</td><td>Three.js via React Three Fiber. Display Clo 3D exports (glTF/glb); fabric texture mapping; orbit controls for garment inspection</td></tr>
+    <tr><td>State Management</td><td>Zustand. Lightweight; good fit for design session state (selected silhouette, fabric, modifications)</td></tr>
+    <tr><td>Chat Interface</td><td>Vercel AI SDK or LangChain.js. Streaming LLM responses for TARA; structured tool-call handling. See Section 4.2 for trade-offs.</td></tr>
+    <tr><td>Payments</td><td>Stripe (Payment Intents API + Stripe Connect). Dynamic line items without pre-defined SKUs, variable pricing, marketplace-style creator payouts. Standard Shopify checkout ruled out. See Section 5.5.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="backend-layer">4.2 Backend Layer</h3>
+
+<table>
+  <thead>
+    <tr><th>Technology</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>API</td><td>Next.js Route Handlers + tRPC or Server Actions. Type-safe API layer; co-located with frontend for development velocity</td></tr>
+    <tr><td>Database</td><td>PostgreSQL (Supabase). Pattern catalog, component compatibility graph, user profiles, orders, influencer attribution</td></tr>
+    <tr><td>ORM</td><td>Drizzle ORM. Type-safe schema, lightweight, excellent PostgreSQL support</td></tr>
+    <tr><td>Auth</td><td>Supabase Auth. Email/password, invitation codes, role-based access (admin, creator, shopper)</td></tr>
+    <tr><td>LLM Orchestration</td><td>Vercel AI SDK or LangChain.js (TBD at implementation). Both are provider-agnostic and support streaming, tool calling, and structured output. See trade-off note below.</td></tr>
+    <tr><td>Search</td><td>PostgreSQL full-text search (MVP). Tag-based pattern matching; upgrade path to dedicated vector search post-MVP</td></tr>
+    <tr><td>Email</td><td>Resend. Transactional emails (order confirmation, shipping updates, invitation codes)</td></tr>
+    <tr><td>Webhooks</td><td>Next.js API Routes. Stripe payment confirmation and ShipStation shipping updates handled as webhook endpoints; factory push and email notifications triggered directly from these handlers</td></tr>
+  </tbody>
+</table>
+
+<h4>LLM Orchestration: Vercel AI SDK vs LangChain.js</h4>
+
+<p>The SDK choice will be finalised at implementation. Both options are provider-agnostic and support streaming and tool calling. The deciding factor is TARA&rsquo;s conversational requirements:</p>
+
+<table>
+  <thead>
+    <tr><th></th><th>Vercel AI SDK</th><th>LangChain.js</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Streaming</td><td>First-class</td><td>Supported</td></tr>
+    <tr><td>Tool calling</td><td>Clean, TypeScript-native</td><td>Verbose but flexible</td></tr>
+    <tr><td>Structured output</td><td>Zod-native via <code>generateObject()</code></td><td>Available, less ergonomic</td></tr>
+    <tr><td>Conversation memory</td><td>DIY &mdash; you manage the messages array</td><td>Built-in memory modules including summarization</td></tr>
+    <tr><td>Long conversation handling</td><td>Manual windowing or summarization</td><td><code>ConversationSummaryMemory</code> built-in</td></tr>
+    <tr><td>Complexity</td><td>Low</td><td>Higher</td></tr>
+    <tr><td>Next.js fit</td><td>Native</td><td>Works, not optimized</td></tr>
+  </tbody>
+</table>
+
+<p>TARA requires multi-turn conversational continuity&mdash;users explore ideas across many messages, refining as they go, with earlier context (occasion, mood, constraints) informing later suggestions. For shorter conversations, passing the full message history each turn is sufficient and favors the Vercel AI SDK. If conversations grow long enough to approach context limits, LangChain&rsquo;s built-in summarization memory becomes a meaningful advantage. The final choice will be made once the expected conversation depth is better understood.</p>
+
+<h3 id="infrastructure-deployment">4.3 Infrastructure &amp; Deployment</h3>
+
+<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through GitHub Actions, with automated deployments on merge and preview environments per pull request.</p>
+
+<table>
+  <thead>
+    <tr><th>Environment</th><th>Trigger</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Preview</td><td>Every pull request deploys a unique preview URL via Fly Machines</td><td>Feature review and QA; each PR gets its own isolated deployment</td></tr>
+    <tr><td>Production</td><td>Merge to main</td><td>Live invite-only MVP; connected to production database, payment processor, and factory integration</td></tr>
+  </tbody>
+</table>
+
+<p>The Docker-based deployment ensures full portability. The same container image that runs on Fly.io can be deployed to AWS ECS/Fargate, GCP Cloud Run, or any container orchestration platform without application changes. This de-risks infrastructure decisions and preserves flexibility as the platform scales.</p>
+
+<hr class="section-divider">
+
+<!-- ============================================================ -->
+<!-- 5. CORE VALUE PROPOSITIONS -->
+<!-- ============================================================ -->
+<h2 id="platform-capabilities">5. Platform Capabilities</h2>
+
+<h3 id="tara">5.1 TARA: The AI Design Assistant</h3>
+
+<p>TARA is a conversational AI assistant that guides customers from a vague idea (&ldquo;I need a dress for a New York winter wedding&rdquo;) to a specific, manufacturable garment selection. She maps natural language to the structured tag taxonomy (13 categories: silhouette, length, waist, neckline, sleeve, mood, era, occasion, etc.), queries the pattern library for matching silhouettes and component combinations, validates against the compatibility graph, and presents 3D-rendered options. Users refine iteratively through conversation. TARA is powered by a pluggable LLM via the Vercel AI SDK; provider selection will be based on persona consistency and tool-calling quality.</p>
+
+<h3 id="design-modes">5.2 Imagine &amp; Atelier: Two Design Modes</h3>
+
+<p><strong>Imagine</strong> is the conversational design mode&mdash;users describe what they want in natural language, TARA presents options, and the user refines through dialogue. <strong>Atelier</strong> is a manual design mode for users who want direct control&mdash;browsing and selecting components by type, with the compatibility graph filtering options in real-time. Users can switch freely between modes; the design state is shared.</p>
+
+<h3 id="marketplace">5.3 Creator &amp; Influencer Marketplace</h3>
+
+<p>Creators design garments, share them via social media with tracked attribution links, and earn 20% of net sales from purchases driven through their links. Stripe Connect handles marketplace-style payout splitting. A creator dashboard provides visibility into designs, shares, sales, and earnings.</p>
+
+<h3 id="ecommerce">5.4 E-Commerce &amp; Checkout</h3>
+
+<p>The checkout handles millions of possible product variations (pattern &times; fabric &times; color &times; size) that cannot be pre-enumerated as SKUs. Products are assembled at checkout from the user&rsquo;s design session, with dynamic pricing based on components and materials. Stripe&rsquo;s Payment Intents API supports the custom checkout flow; Stripe Connect provides creator payout infrastructure.</p>
+
+<h3 id="factory">5.5 Factory Integration &amp; Fulfillment</h3>
+
+<p>On payment confirmation, the system assembles a factory-readable order (mapping the design to pattern files, fabric stock codes, sizing, and shipping), pushes it to the factory via iCreate, and tracks fulfillment through ShipStation. iCreate API format and factory order specification are client dependencies (see ESA Section 1.2).</p>
+
+<h3 id="compatibility-graph">5.6 Component Compatibility Graph</h3>
+
+<p>The compatibility graph is the central data structure: it defines which components (bodice, sleeves, skirt) can be combined, by what connection type (empire waist, natural waist, sleeve cap, etc.), and with which fabrics. It drives design validation, TARA&rsquo;s suggestions, Atelier UI filtering, and factory order specifications. The graph ships pre-populated from the existing compatibility spreadsheet and legacy Python codebase.</p>
+
+<hr class="section-divider">
+
+<!-- ============================================================ -->
+<!-- 6. INTEGRATION POINTS -->
+<!-- ============================================================ -->
+<h2 id="integration-points">6. Integration Points</h2>
+
+<table>
+  <thead>
+    <tr><th>System</th><th>Integration</th><th>Protocol</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>LLM Provider</td><td>TARA AI assistant</td><td>REST API via Vercel AI SDK (provider-agnostic)</td></tr>
+    <tr><td>Stripe</td><td>Checkout + Creator payouts</td><td>Payment Intents API + Stripe Connect</td></tr>
+    <tr><td>Supabase</td><td>Auth, database, file storage</td><td>SDK</td></tr>
+    <tr><td>iCreate</td><td>Factory order submission</td><td>Per factory coordination (see ESA Section 1.2)</td></tr>
+    <tr><td>ShipStation</td><td>Shipping/tracking</td><td>REST API + Webhooks</td></tr>
+    <tr><td>Resend</td><td>Transactional email</td><td>REST API</td></tr>
+    <tr><td>Instagram/TikTok</td><td>Social sharing</td><td>Open Graph meta tags + deep links</td></tr>
+  </tbody>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================================ -->
+<!-- 7. ENGINEERING APPROACH -->
+<!-- ============================================================ -->
+<h2 id="engineering-approach">7. Engineering Approach</h2>
+
+<p>Engineering will be iterative, focusing on the most challenging, highest-value capabilities first. Rather than a sequential phase plan with fixed deliverables and dates, the team will deliver working, demonstrable capabilities incrementally. Each delivery is an opportunity for the Tinker Tailor team to validate direction and provide feedback that shapes what comes next.</p>
+
+<p>The highest-risk work comes first&mdash;TARA&rsquo;s AI design experience, 3D component compositing, the compatibility graph, factory integration&mdash;because that is where early feedback has the most leverage. These are the capabilities that only the Tinker Tailor team can validate: Does TARA feel right with real pattern data? Does the 3D quality meet the bar? Does the factory pipeline produce a correct order? Getting working versions of these into the client&rsquo;s hands early reduces risk and improves outcomes far more than completing lower-risk work (auth, admin, checkout) on a predetermined schedule.</p>
+
+<p>The Tinker Tailor team&rsquo;s role in this process is to provide signal&mdash;reacting to working software, identifying gaps, and steering priorities based on what they see. This produces a tighter feedback loop and a better product than a milestone-approval model.</p>
+
+
+</div>
+</body>
+</html>
