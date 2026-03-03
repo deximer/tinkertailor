@@ -49,9 +49,9 @@ else
   flyctl apps create "$APP_NAME" --org personal
 fi
 
-# Step 2: Import secrets
+# Step 2: Import secrets (skip blank values to avoid overwriting existing secrets)
 echo "==> Importing secrets from ${SECRETS_FILE}"
-flyctl secrets import --app "$APP_NAME" < "$SECRETS_FILE"
+grep -E '^[A-Za-z_][A-Za-z0-9_]*=.+' "$SECRETS_FILE" | flyctl secrets import --app "$APP_NAME"
 
 # Step 3: Deploy
 echo "==> Deploying with ${FLY_TOML}"
