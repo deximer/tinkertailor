@@ -55,7 +55,7 @@ flyctl secrets import --app "$APP_NAME" < "$SECRETS_FILE"
 
 # Step 3: Deploy
 echo "==> Deploying with ${FLY_TOML}"
-flyctl deploy --config "$FLY_TOML" --app "$APP_NAME" --region "$REGION" --local-only
+flyctl deploy --config "$FLY_TOML" --app "$APP_NAME" --local-only
 
 # Step 4: Scale
 echo "==> Scaling to ${MACHINE_COUNT} x ${MACHINE_SIZE}"
