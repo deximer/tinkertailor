@@ -1,4 +1,4 @@
-app = "app-frosty-pine-3964"
+app = "tinker-tailor"
 primary_region = "iad"
 
 [build]
@@ -24,3 +24,8 @@ primary_region = "iad"
   grace_period = "10s"
   method = "GET"
   path = "/api/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
