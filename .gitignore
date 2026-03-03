@@ -22,3 +22,6 @@ next-env.d.ts
 
 # telora
 .telora/
+
+# local assets (not tracked in git)
+nogit/
