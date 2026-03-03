@@ -1085,6 +1085,10 @@ export default function ModelViewer() {
     return () => {
       window.removeEventListener("resize", onResize);
       cancelAnimationFrame(animFrameRef.current);
+      for (const tex of Object.values(textureCacheRef.current)) {
+        tex.dispose();
+      }
+      textureCacheRef.current = {};
       renderer.dispose();
       if (container && renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
