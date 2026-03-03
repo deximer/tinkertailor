@@ -5,6 +5,13 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
 
 // ── Constants ──
 
@@ -914,6 +921,10 @@ export default function ModelViewer() {
   const pmremRef = useRef<THREE.PMREMGenerator | null>(null);
   const envMapRef = useRef<THREE.Texture | null>(null);
   const shadowGroundRef = useRef<THREE.Mesh | null>(null);
+  const composerRef = useRef<EffectComposer | null>(null);
+  const bokehPassRef = useRef<BokehPass | null>(null);
+  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
+  const vignettePassRef = useRef<ShaderPass | null>(null);
 
   const [activeVariant, setActiveVariant] = useState("heavy");
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
@@ -930,6 +941,19 @@ export default function ModelViewer() {
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Post-processing state
+  const [dofEnabled, setDofEnabled] = useState(false);
+  const [dofFocus, setDofFocus] = useState(80);
+  const [dofAperture, setDofAperture] = useState(0.0008);
+  const [dofMaxBlur, setDofMaxBlur] = useState(0.005);
+  const [bloomEnabled, setBloomEnabled] = useState(false);
+  const [bloomThreshold, setBloomThreshold] = useState(0.85);
+  const [bloomStrength, setBloomStrength] = useState(0.3);
+  const [bloomRadius, setBloomRadius] = useState(0.4);
+  const [vignetteEnabled, setVignetteEnabled] = useState(true);
+  const [vignetteOffset, setVignetteOffset] = useState(1.0);
+  const [vignetteDarkness, setVignetteDarkness] = useState(1.4);
 
   // Material controls state — initialised from first fabric's defaults
   const [matSheen, setMatSheen] = useState(FABRICS[0].sheen ?? 0);
@@ -1194,11 +1218,47 @@ export default function ModelViewer() {
     });
     garmentMatRef.current = garmentMat;
 
+    // Post-processing pipeline
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+
+    const bokehPass = new BokehPass(scene, camera, {
+      focus: 80,
+      aperture: 0.0008,
+      maxblur: 0.005,
+    });
+    bokehPass.enabled = false;
+    composer.addPass(bokehPass);
+    bokehPassRef.current = bokehPass;
+
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.3,  // strength
+      0.4,  // radius
+      0.85, // threshold
+    );
+    bloomPass.enabled = false;
+    composer.addPass(bloomPass);
+    bloomPassRef.current = bloomPass;
+
+    const vignettePass = new ShaderPass(VignetteShader);
+    vignettePass.uniforms["offset"].value = 1.0;
+    vignettePass.uniforms["darkness"].value = 1.4;
+    vignettePass.enabled = true;
+    composer.addPass(vignettePass);
+    vignettePassRef.current = vignettePass;
+
+    composer.addPass(new OutputPass());
+    composerRef.current = composer;
+
     // Resize handler
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
     };
     window.addEventListener("resize", onResize);
 
@@ -1206,7 +1266,7 @@ export default function ModelViewer() {
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
       controls.update();
-      renderer.render(scene, camera);
+      composer.render();
     }
     animate();
 
@@ -1221,6 +1281,7 @@ export default function ModelViewer() {
       textureCacheRef.current = {};
       if (envMapRef.current) envMapRef.current.dispose();
       if (pmremRef.current) pmremRef.current.dispose();
+      composer.dispose();
       renderer.dispose();
       if (container && renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
@@ -1290,6 +1351,36 @@ export default function ModelViewer() {
       controlsRef.current.autoRotate = turntable;
     }
   }, [turntable]);
+
+  // Sync DoF pass
+  useEffect(() => {
+    const pass = bokehPassRef.current;
+    if (!pass) return;
+    pass.enabled = dofEnabled;
+    const u = pass.uniforms as Record<string, { value: number }>;
+    u["focus"].value = dofFocus;
+    u["aperture"].value = dofAperture;
+    u["maxblur"].value = dofMaxBlur;
+  }, [dofEnabled, dofFocus, dofAperture, dofMaxBlur]);
+
+  // Sync bloom pass
+  useEffect(() => {
+    const pass = bloomPassRef.current;
+    if (!pass) return;
+    pass.enabled = bloomEnabled;
+    pass.threshold = bloomThreshold;
+    pass.strength = bloomStrength;
+    pass.radius = bloomRadius;
+  }, [bloomEnabled, bloomThreshold, bloomStrength, bloomRadius]);
+
+  // Sync vignette pass
+  useEffect(() => {
+    const pass = vignettePassRef.current;
+    if (!pass) return;
+    pass.enabled = vignetteEnabled;
+    pass.uniforms["offset"].value = vignetteOffset;
+    pass.uniforms["darkness"].value = vignetteDarkness;
+  }, [vignetteEnabled, vignetteOffset, vignetteDarkness]);
 
   // Sync HDR background toggle
   useEffect(() => {
@@ -1509,6 +1600,47 @@ export default function ModelViewer() {
           >
             {hdriBackground ? "Hide HDR BG" : "Show HDR BG"}
           </SidebarButton>
+        </ControlGroup>
+
+        {/* Post FX */}
+        <ControlGroup label="Post FX">
+          <div className="flex flex-col gap-2">
+            <div>
+              <SidebarButton active={dofEnabled} onClick={() => setDofEnabled(!dofEnabled)}>
+                DoF {dofEnabled ? "On" : "Off"}
+              </SidebarButton>
+              {dofEnabled && (
+                <div className="mt-1 flex flex-col gap-1">
+                  <SliderRow label="Focus" value={dofFocus} min={0} max={200} step={1} onChange={setDofFocus} />
+                  <SliderRow label="Aperture" value={dofAperture} min={0} max={0.003} step={0.0001} onChange={setDofAperture} />
+                  <SliderRow label="Max blur" value={dofMaxBlur} min={0} max={0.01} step={0.001} onChange={setDofMaxBlur} />
+                </div>
+              )}
+            </div>
+            <div>
+              <SidebarButton active={bloomEnabled} onClick={() => setBloomEnabled(!bloomEnabled)}>
+                Bloom {bloomEnabled ? "On" : "Off"}
+              </SidebarButton>
+              {bloomEnabled && (
+                <div className="mt-1 flex flex-col gap-1">
+                  <SliderRow label="Threshold" value={bloomThreshold} min={0} max={1} step={0.01} onChange={setBloomThreshold} />
+                  <SliderRow label="Strength" value={bloomStrength} min={0} max={2} step={0.01} onChange={setBloomStrength} />
+                  <SliderRow label="Radius" value={bloomRadius} min={0} max={1} step={0.01} onChange={setBloomRadius} />
+                </div>
+              )}
+            </div>
+            <div>
+              <SidebarButton active={vignetteEnabled} onClick={() => setVignetteEnabled(!vignetteEnabled)}>
+                Vignette {vignetteEnabled ? "On" : "Off"}
+              </SidebarButton>
+              {vignetteEnabled && (
+                <div className="mt-1 flex flex-col gap-1">
+                  <SliderRow label="Offset" value={vignetteOffset} min={0} max={2} step={0.01} onChange={setVignetteOffset} />
+                  <SliderRow label="Darkness" value={vignetteDarkness} min={0} max={3} step={0.01} onChange={setVignetteDarkness} />
+                </div>
+              )}
+            </div>
+          </div>
         </ControlGroup>
 
         {/* Turntable */}
