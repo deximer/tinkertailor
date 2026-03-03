@@ -32,6 +32,13 @@ fi
 # shellcheck source=/dev/null
 source "$CONF_FILE"
 
+# Ensure flyctl is available
+if ! command -v flyctl &>/dev/null; then
+  echo "==> flyctl not found, installing..."
+  curl -sL https://fly.io/install.sh | sh
+  export PATH="$HOME/.fly/bin:$PATH"
+fi
+
 echo "==> Provisioning ${ENV} environment: ${APP_NAME}"
 
 # Step 1: Create app if it doesn't exist
