@@ -1,0 +1,37 @@
+name: Provision Staging
+
+on:
+  workflow_dispatch:
+
+jobs:
+  provision:
+    name: Provision Fly.io Staging
+    runs-on: [self-hosted, linux, amd64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Assemble secrets file
+        run: |
+          cat > .env.staging << 'SECRETS_EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          STRIPE_SECRET_KEY=${{ secrets.STAGING_STRIPE_SECRET_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STAGING_STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.STAGING_STRIPE_WEBHOOK_SECRET }}
+          ANTHROPIC_API_KEY=${{ secrets.STAGING_ANTHROPIC_API_KEY }}
+          ICREATE_API_KEY=${{ secrets.STAGING_ICREATE_API_KEY }}
+          ICREATE_API_URL=${{ secrets.STAGING_ICREATE_API_URL }}
+          SHIPSTATION_API_KEY=${{ secrets.STAGING_SHIPSTATION_API_KEY }}
+          SHIPSTATION_API_SECRET=${{ secrets.STAGING_SHIPSTATION_API_SECRET }}
+          RESEND_API_KEY=${{ secrets.STAGING_RESEND_API_KEY }}
+          AUTH_SECRET=${{ secrets.STAGING_AUTH_SECRET }}
+          NEXT_PUBLIC_APP_URL=${{ secrets.STAGING_APP_URL }}
+          SECRETS_EOF
+      - name: Run provision script
+        run: ./infra/provision.sh staging
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Clean up secrets file
+        if: always()
+        run: rm -f .env.staging
