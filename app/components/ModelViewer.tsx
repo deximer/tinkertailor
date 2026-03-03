@@ -89,14 +89,17 @@ function texSilk(): THREE.CanvasTexture {
 }
 
 function texSatin(): THREE.CanvasTexture {
-  const c = createCanvas(256);
+  const size = 256;
+  const c = createCanvas(size);
   const ctx = c.getContext("2d")!;
-  for (let y = 0; y < 256; y++) {
-    const wave = Math.sin(y * 0.08) * 0.15 + 0.75;
-    const v = Math.round(wave * 220);
-    ctx.fillStyle = `rgb(${v},${v},${v})`;
-    ctx.fillRect(0, y, 256, 1);
+  const rng = seeded(303);
+  const img = ctx.createImageData(size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 200 + Math.round(rng() * 12);
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
   }
+  ctx.putImageData(img, 0, 0);
   return canvasToTexture(c, 10);
 }
 
