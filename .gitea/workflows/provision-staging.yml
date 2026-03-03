@@ -9,7 +9,7 @@ jobs:
     runs-on: [self-hosted, linux, amd64]
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@v1.5
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
       - name: Assemble secrets file
         run: |
           cat > .env.staging << 'SECRETS_EOF'
