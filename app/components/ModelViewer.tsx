@@ -976,6 +976,7 @@ export default function ModelViewer() {
     uWindDirection: { value: THREE.Vector2 };
   } | null>(null);
   const seamOverlayRef = useRef<THREE.Mesh | null>(null);
+  const seamTextureRef = useRef<THREE.CanvasTexture | null>(null);
   const windEnabledRef = useRef(false);
   const turntableRef = useRef(false);
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
@@ -1126,10 +1127,66 @@ export default function ModelViewer() {
       if (currentModelRef.current) {
         scene.remove(currentModelRef.current);
       }
+      // Dispose old seam overlay resources before creating a new one
       if (seamOverlayRef.current) {
         scene.remove(seamOverlayRef.current);
+        const oldMat = seamOverlayRef.current.material as THREE.MeshBasicMaterial;
+        oldMat.dispose();
         seamOverlayRef.current = null;
       }
+
+      // Create shared seam texture once, reuse across variant switches
+      if (!seamTextureRef.current) {
+        seamTextureRef.current = texSeamOverlay();
+      }
+
+      // Helper: create seam overlay mesh with wind shader matching the garment
+      const createSeamOverlay = (srcMesh: THREE.Mesh) => {
+        const wUniforms = windUniformsRef.current;
+        const seamMat = new THREE.MeshBasicMaterial({
+          color: 0x222222,
+          alphaMap: seamTextureRef.current,
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        // Inject same wind vertex shader so seam overlay moves with garment
+        if (wUniforms) {
+          seamMat.onBeforeCompile = (shader) => {
+            shader.uniforms.uTime = wUniforms.uTime;
+            shader.uniforms.uWindSpeed = wUniforms.uWindSpeed;
+            shader.uniforms.uWindIntensity = wUniforms.uWindIntensity;
+            shader.uniforms.uWindDirection = wUniforms.uWindDirection;
+
+            shader.vertexShader = shader.vertexShader.replace(
+              "void main() {",
+              `uniform float uTime;
+uniform float uWindSpeed;
+uniform float uWindIntensity;
+uniform vec2 uWindDirection;
+
+void main() {`,
+            );
+
+            shader.vertexShader = shader.vertexShader.replace(
+              "#include <begin_vertex>",
+              `#include <begin_vertex>
+float heightFactor = max(0.0, (position.y - 20.0) / 80.0);
+float wave = sin(position.x * 0.08 + uTime * uWindSpeed)
+           + sin(position.z * 0.06 + uTime * uWindSpeed * 0.7);
+transformed.x += uWindDirection.x * wave * heightFactor * uWindIntensity;
+transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
+            );
+          };
+        }
+        const seamMesh = new THREE.Mesh(srcMesh.geometry, seamMat);
+        seamMesh.position.copy(srcMesh.position);
+        seamMesh.rotation.copy(srcMesh.rotation);
+        seamMesh.scale.copy(srcMesh.scale).multiplyScalar(1.001);
+        seamMesh.visible = false;
+        scene.add(seamMesh);
+        seamOverlayRef.current = seamMesh;
+      };
 
       if (modelCacheRef.current[variant]) {
         const cached = modelCacheRef.current[variant];
@@ -1138,21 +1195,7 @@ export default function ModelViewer() {
         // Recreate seam overlay for cached model
         cached.traverse((child) => {
           if ((child as THREE.Mesh).isMesh && !seamOverlayRef.current) {
-            const srcMesh = child as THREE.Mesh;
-            const seamMat = new THREE.MeshBasicMaterial({
-              color: 0x222222,
-              alphaMap: texSeamOverlay(),
-              transparent: true,
-              depthWrite: false,
-              side: THREE.DoubleSide,
-            });
-            const seamMesh = new THREE.Mesh(srcMesh.geometry, seamMat);
-            seamMesh.position.copy(srcMesh.position);
-            seamMesh.rotation.copy(srcMesh.rotation);
-            seamMesh.scale.copy(srcMesh.scale).multiplyScalar(1.001);
-            seamMesh.visible = false;
-            scene.add(seamMesh);
-            seamOverlayRef.current = seamMesh;
+            createSeamOverlay(child as THREE.Mesh);
           }
         });
         setLoading(false);
@@ -1188,21 +1231,7 @@ export default function ModelViewer() {
           // Create seam overlay clone
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh && !seamOverlayRef.current) {
-              const srcMesh = child as THREE.Mesh;
-              const seamMat = new THREE.MeshBasicMaterial({
-                color: 0x222222,
-                alphaMap: texSeamOverlay(),
-                transparent: true,
-                depthWrite: false,
-                side: THREE.DoubleSide,
-              });
-              const seamMesh = new THREE.Mesh(srcMesh.geometry, seamMat);
-              seamMesh.position.copy(srcMesh.position);
-              seamMesh.rotation.copy(srcMesh.rotation);
-              seamMesh.scale.copy(srcMesh.scale).multiplyScalar(1.001);
-              seamMesh.visible = false;
-              scene.add(seamMesh);
-              seamOverlayRef.current = seamMesh;
+              createSeamOverlay(child as THREE.Mesh);
             }
           });
 
@@ -1446,6 +1475,10 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
       textureCacheRef.current = {};
       if (envMapRef.current) envMapRef.current.dispose();
       if (pmremRef.current) pmremRef.current.dispose();
+      if (seamTextureRef.current) seamTextureRef.current.dispose();
+      if (seamOverlayRef.current) {
+        (seamOverlayRef.current.material as THREE.MeshBasicMaterial).dispose();
+      }
       composer.dispose();
       renderer.dispose();
       if (container && renderer.domElement.parentNode === container) {
