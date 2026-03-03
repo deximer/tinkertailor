@@ -51,7 +51,12 @@ fi
 
 # Step 2: Import secrets (skip blank values to avoid overwriting existing secrets)
 echo "==> Importing secrets from ${SECRETS_FILE}"
-grep -E '^[A-Za-z_][A-Za-z0-9_]*=.+' "$SECRETS_FILE" | flyctl secrets import --app "$APP_NAME"
+POPULATED=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=.+' "$SECRETS_FILE" || true)
+if [[ -n "$POPULATED" ]]; then
+  echo "$POPULATED" | flyctl secrets import --app "$APP_NAME"
+else
+  echo "==> No non-empty secrets found, skipping import"
+fi
 
 # Step 3: Deploy
 echo "==> Deploying with ${FLY_TOML}"
