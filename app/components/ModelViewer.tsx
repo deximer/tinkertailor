@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 
 // ── Constants ──
 
@@ -259,6 +260,20 @@ const COLORS: ColorDef[] = [
   { name: "Camel", hex: "#c4a878" },
   { name: "Slate", hex: "#6a7a8a" },
   { name: "Black", hex: "#121212" },
+];
+
+// ── HDR environment presets ──
+
+interface HdriPreset {
+  name: string;
+  file: string;
+}
+
+const HDRI_PRESETS: HdriPreset[] = [
+  { name: "Studio", file: "/hdri/studio.hdr" },
+  { name: "Sunset", file: "/hdri/sunset.hdr" },
+  { name: "Overcast", file: "/hdri/overcast.hdr" },
+  { name: "Ballroom", file: "/hdri/ballroom.hdr" },
 ];
 
 // ── Lighting preset types ──
@@ -896,6 +911,9 @@ export default function ModelViewer() {
   const modelCacheRef = useRef<Record<string, THREE.Group>>({});
   const textureCacheRef = useRef<Record<number, THREE.CanvasTexture>>({});
   const animFrameRef = useRef<number>(0);
+  const pmremRef = useRef<THREE.PMREMGenerator | null>(null);
+  const envMapRef = useRef<THREE.Texture | null>(null);
+  const shadowGroundRef = useRef<THREE.Mesh | null>(null);
 
   const [activeVariant, setActiveVariant] = useState("heavy");
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
@@ -907,6 +925,8 @@ export default function ModelViewer() {
   const [sliderIntensity, setSliderIntensity] = useState(120);
   const [sliderWarmth, setSliderWarmth] = useState(50);
   const [turntable, setTurntable] = useState(false);
+  const [activeHdriIdx, setActiveHdriIdx] = useState(0);
+  const [hdriBackground, setHdriBackground] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -948,6 +968,34 @@ export default function ModelViewer() {
     setSliderHeight(Math.round(preset.key.pos[1]));
     setSliderIntensity(Math.round(preset.key.intensity * 100));
     setSliderWarmth(50);
+  }, []);
+
+  // Load HDR environment map
+  const loadHDR = useCallback((path: string) => {
+    const scene = sceneRef.current;
+    const renderer = rendererRef.current;
+    if (!scene || !renderer) return;
+
+    if (!pmremRef.current) {
+      pmremRef.current = new THREE.PMREMGenerator(renderer);
+      pmremRef.current.compileEquirectangularShader();
+    }
+
+    const loader = new RGBELoader();
+    loader.load(path, (hdr) => {
+      // Dispose previous env map
+      if (envMapRef.current) {
+        envMapRef.current.dispose();
+      }
+      const envMap = pmremRef.current!.fromEquirectangular(hdr).texture;
+      scene.environment = envMap;
+      envMapRef.current = envMap;
+      // Update background if HDR background is currently showing
+      if (scene.background && !(scene.background as THREE.Color).isColor) {
+        scene.background = envMap;
+      }
+      hdr.dispose();
+    });
   }, []);
 
   // Apply material
@@ -1018,6 +1066,8 @@ export default function ModelViewer() {
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               (child as THREE.Mesh).material = mat;
+              (child as THREE.Mesh).castShadow = true;
+              (child as THREE.Mesh).receiveShadow = true;
             }
           });
           modelCacheRef.current[variant] = obj;
@@ -1063,6 +1113,8 @@ export default function ModelViewer() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -1079,17 +1131,26 @@ export default function ModelViewer() {
     scene.add(ambient);
     ambientRef.current = ambient;
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.7);
     keyLight.position.set(30, 80, 60);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
+    keyLight.shadow.camera.left = -60;
+    keyLight.shadow.camera.right = 60;
+    keyLight.shadow.camera.top = 100;
+    keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 200;
     scene.add(keyLight);
     keyLightRef.current = keyLight;
 
-    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.5);
+    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.3);
     fillLight.position.set(-40, 60, -30);
     scene.add(fillLight);
     fillLightRef.current = fillLight;
 
-    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.3);
+    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.2);
     rimLight.position.set(0, 30, -80);
     scene.add(rimLight);
     rimLightRef.current = rimLight;
@@ -1105,7 +1166,19 @@ export default function ModelViewer() {
       groundMat,
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
     scene.add(ground);
+
+    // Shadow-receiving ground plane (transparent shadow)
+    const shadowGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(400, 400),
+      new THREE.ShadowMaterial({ opacity: 0.35 }),
+    );
+    shadowGround.rotation.x = -Math.PI / 2;
+    shadowGround.position.y = 0.01; // slightly above main ground to avoid z-fighting
+    shadowGround.receiveShadow = true;
+    scene.add(shadowGround);
+    shadowGroundRef.current = shadowGround;
 
     // Scene props group
     const sceneProps = new THREE.Group();
@@ -1146,6 +1219,8 @@ export default function ModelViewer() {
         tex.dispose();
       }
       textureCacheRef.current = {};
+      if (envMapRef.current) envMapRef.current.dispose();
+      if (pmremRef.current) pmremRef.current.dispose();
       renderer.dispose();
       if (container && renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
@@ -1169,6 +1244,8 @@ export default function ModelViewer() {
       applyLighting(sceneDef.lighting[0]);
     }
     loadModel(activeVariant);
+    // Load initial HDR environment
+    loadHDR(HDRI_PRESETS[0].file);
     // Only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1214,7 +1291,23 @@ export default function ModelViewer() {
     }
   }, [turntable]);
 
+  // Sync HDR background toggle
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    if (hdriBackground && envMapRef.current) {
+      scene.background = envMapRef.current;
+    } else {
+      scene.background = new THREE.Color(0x1a1a1a);
+    }
+  }, [hdriBackground]);
+
   // Handlers
+  const handleHdri = (idx: number) => {
+    setActiveHdriIdx(idx);
+    loadHDR(HDRI_PRESETS[idx].file);
+  };
+
   const handleVariant = (variant: string) => {
     setActiveVariant(variant);
     loadModel(variant);
@@ -1395,6 +1488,27 @@ export default function ModelViewer() {
               Reset
             </button>
           </div>
+        </ControlGroup>
+
+        {/* Environment */}
+        <ControlGroup label="Environment">
+          <div className="flex flex-wrap gap-1">
+            {HDRI_PRESETS.map((preset, i) => (
+              <SidebarButton
+                key={preset.name}
+                active={activeHdriIdx === i}
+                onClick={() => handleHdri(i)}
+              >
+                {preset.name}
+              </SidebarButton>
+            ))}
+          </div>
+          <SidebarButton
+            active={hdriBackground}
+            onClick={() => setHdriBackground(!hdriBackground)}
+          >
+            {hdriBackground ? "Hide HDR BG" : "Show HDR BG"}
+          </SidebarButton>
         </ControlGroup>
 
         {/* Turntable */}
