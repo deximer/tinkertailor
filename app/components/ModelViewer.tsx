@@ -7,14 +7,37 @@ import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 
 // ── Constants ──
 
-const SUPABASE_MODELS_BASE =
-  (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "") +
-  "/storage/v1/object/public/models/";
-
-const MODELS: Record<string, string> = {
-  heavy: SUPABASE_MODELS_BASE + "TT-PAT-SIL-038-000-000-140709-heavy.obj",
-  light: SUPABASE_MODELS_BASE + "TT-PAT-SIL-038-000-000-140709-light.obj",
+const MODEL_FILES: Record<string, string> = {
+  heavy: "TT-PAT-SIL-038-000-000-140709-heavy.obj",
+  light: "TT-PAT-SIL-038-000-000-140709-light.obj",
 };
+
+// Cache signed URLs so we don't re-fetch for the same variant
+const signedUrlCache: Record<string, { url: string; expiresAt: number }> = {};
+
+async function getModelUrl(variant: string): Promise<string> {
+  const filename = MODEL_FILES[variant];
+  if (!filename) throw new Error(`Unknown variant: ${variant}`);
+
+  const cached = signedUrlCache[variant];
+  // Use cached URL if it expires more than 5 minutes from now
+  if (cached && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
+    return cached.url;
+  }
+
+  const res = await fetch(
+    `/api/models/signed-url?name=${encodeURIComponent(filename)}`,
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(
+      (body as Record<string, string>).error ?? `HTTP ${res.status}`,
+    );
+  }
+  const { url } = (await res.json()) as { url: string };
+  signedUrlCache[variant] = { url, expiresAt: Date.now() + 3600 * 1000 };
+  return url;
+}
 
 // ── Procedural fabric texture helpers ──
 
@@ -934,7 +957,7 @@ export default function ModelViewer() {
 
   // Load model
   const loadModel = useCallback(
-    (variant: string) => {
+    async (variant: string) => {
       const scene = sceneRef.current;
       const mat = garmentMatRef.current;
       if (!scene || !mat) return;
@@ -954,9 +977,20 @@ export default function ModelViewer() {
         return;
       }
 
+      let modelUrl: string;
+      try {
+        modelUrl = await getModelUrl(variant);
+      } catch (err) {
+        setLoadError(
+          `Failed to get model URL: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        setLoading(false);
+        return;
+      }
+
       const loader = new OBJLoader();
       loader.load(
-        MODELS[variant],
+        modelUrl,
         (obj) => {
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
