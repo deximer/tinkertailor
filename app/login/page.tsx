@@ -95,9 +95,6 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#1a1a1a]">
       <div className="w-full max-w-sm rounded-lg border border-gray-700 bg-[#222] p-8">
-        <h1 className="mb-1 text-center text-2xl font-bold tracking-tight text-white">
-          Tinker Tailor
-        </h1>
         <p className="mb-6 text-center text-sm text-gray-400">
           Sign in to continue
         </p>
