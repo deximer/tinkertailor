@@ -14,6 +14,7 @@ const supabase = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+// Create seed user
 const { data, error } = await supabase.auth.admin.createUser({
   email,
   password,
@@ -29,4 +30,26 @@ if (error) {
   }
 } else {
   console.log(`Created user ${data.user.email} (${data.user.id})`);
+}
+
+// Create models storage bucket (public read, authenticated write)
+const { error: bucketError } = await supabase.storage.createBucket('models', {
+  public: true,
+  fileSizeLimit: 52428800, // 50 MB
+  allowedMimeTypes: [
+    'application/octet-stream',  // OBJ/MTL files
+    'text/plain',                // OBJ/MTL as text
+    'model/obj',
+  ],
+});
+
+if (bucketError) {
+  if (bucketError.message.includes('already exists')) {
+    console.log('Storage bucket "models" already exists, skipping.');
+  } else {
+    console.error('Failed to create models bucket:', bucketError.message);
+    process.exit(1);
+  }
+} else {
+  console.log('Created storage bucket "models" (public read).');
 }
