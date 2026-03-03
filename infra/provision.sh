@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 CONF_FILE="$SCRIPT_DIR/envs/${ENV}.conf"
-FLY_TOML="$SCRIPT_DIR/fly.${ENV}.toml"
+FLY_TOML="$REPO_ROOT/fly.toml"
 SECRETS_FILE="$REPO_ROOT/.env.${ENV}"
 
 # Validate required files exist

@@ -551,7 +551,7 @@
   </thead>
   <tbody>
     <tr><td><code>main</code></td><td>None</td><td>All feature work merges here</td><td>Integration branch; CI runs typecheck + lint but does not deploy</td></tr>
-    <tr><td><code>staging</code></td><td>Fly.io staging</td><td><code>git push origin main:staging</code></td><td>Client review; deploys to <code>tinker-tailor-staging</code> on Fly.io</td></tr>
+    <tr><td><code>staging</code></td><td>Fly.io staging</td><td><code>git push origin main:staging</code></td><td>Client review; deploys to <code>tinker-tailor</code> on Fly.io</td></tr>
     <tr><td><code>prod</code></td><td>Fly.io production (future)</td><td>Promote from staging when ready</td><td>Live invite-only MVP; connected to production database, payment processor, and factory integration</td></tr>
   </tbody>
 </table>
@@ -580,7 +580,7 @@
     <tr><th>Workflow</th><th>Trigger</th><th>What it does</th></tr>
   </thead>
   <tbody>
-    <tr><td>Deploy</td><td>Push to main</td><td>Type-check + lint, then <code>flyctl deploy</code>. Secrets are already on the Fly app; only <code>FLY_API_TOKEN</code> is needed in Gitea.</td></tr>
+    <tr><td>Deploy</td><td>Push to staging branch</td><td>Type-check + lint, then <code>flyctl deploy</code>. Secrets are already on the Fly app; only <code>FLY_API_TOKEN</code> is needed in Gitea.</td></tr>
     <tr><td>Provision</td><td>Manual (<code>workflow_dispatch</code>)</td><td>Assembles <code>.env.staging</code> from Gitea secrets, calls <code>infra/provision.sh staging</code>, removes the temp file. Run once when standing up a fresh environment.</td></tr>
   </tbody>
 </table>
@@ -595,7 +595,7 @@
   </thead>
   <tbody>
     <tr><td><code>infra/envs/staging.conf</code></td><td>Defines the environment: <code>APP_NAME</code>, <code>REGION</code>, <code>MACHINE_SIZE</code>, <code>MACHINE_COUNT</code>. The mapping from environment name to Fly.io app.</td></tr>
-    <tr><td><code>infra/fly.staging.toml</code></td><td>Fly app configuration for staging: internal port, health checks, env vars (non-secret).</td></tr>
+    <tr><td><code>fly.toml</code></td><td>Fly app configuration (shared across environments): app name, internal port, health checks, VM sizing, env vars (non-secret). Required at the repo root for the Fly.io GitHub integration.</td></tr>
     <tr><td><code>infra/provision.sh</code></td><td>Idempotent bootstrap script. Takes environment name as argument (<code>./infra/provision.sh staging</code>). Sources the conf, creates the Fly app if absent, imports secrets from <code>.env.&lt;env&gt;</code>, deploys, and scales.</td></tr>
     <tr><td><code>secrets.example</code></td><td>Canonical list of every required secret key with empty values. Serves as documentation for what to enter into Gitea secrets and what to populate in <code>.env.local</code>.</td></tr>
   </tbody>
@@ -606,7 +606,7 @@
   <li><strong>Manually:</strong> copy <code>secrets.example</code> to <code>.env.staging</code>, fill in values, run <code>./infra/provision.sh staging</code>.</li>
   <li><strong>Via Gitea:</strong> trigger the Provision workflow; it assembles <code>.env.staging</code> from Gitea secrets and calls the same script.</li>
 </ul>
-<p><code>provision.sh</code> does not know or care which path provided the secrets file. Adding a new environment (e.g., production) requires a new <code>envs/prod.conf</code>, a new <code>fly.prod.toml</code>, and corresponding entries in Gitea secrets&mdash;no changes to the script itself.</p>
+<p><code>provision.sh</code> does not know or care which path provided the secrets file. Adding a new environment (e.g., production) requires a new <code>envs/prod.conf</code> and corresponding entries in Gitea secrets&mdash;no changes to the script itself. The root <code>fly.toml</code> is shared; environment-specific overrides (app name, scale) live in the <code>.conf</code> file.</p>
 
 <h4>Secrets Management</h4>
 
