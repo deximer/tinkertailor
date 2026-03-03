@@ -7,7 +7,6 @@ import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
@@ -218,30 +217,6 @@ function texWool(): THREE.CanvasTexture {
   return canvasToTexture(c, 6);
 }
 
-function texSeamOverlay(): THREE.CanvasTexture {
-  const size = 256;
-  const c = createCanvas(size);
-  const ctx = c.getContext("2d")!;
-  ctx.clearRect(0, 0, size, size);
-  ctx.strokeStyle = "rgba(255,255,255,0.6)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 6]);
-  // Horizontal stitch lines
-  for (let y = 0; y < size; y += 32) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(size, y);
-    ctx.stroke();
-  }
-  // Vertical stitch lines
-  for (let x = 0; x < size; x += 32) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, size);
-    ctx.stroke();
-  }
-  return canvasToTexture(c, 6);
-}
 
 // ── Data definitions ──
 
@@ -255,13 +230,12 @@ interface FabricDef {
   sheenColor?: string;
   transmission?: number;
   thickness?: number;
-  clearcoat?: number;
-  clearcoatRoughness?: number;
+
 }
 
 const FABRICS: FabricDef[] = [
   { name: "Silk", roughness: 0.5, metalness: 0.0, texture: texSilk, sheen: 0.3, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
-  { name: "Satin", roughness: 0.4, metalness: 0.0, texture: texSatin, clearcoat: 0.3, clearcoatRoughness: 0.15 },
+  { name: "Satin", roughness: 0.4, metalness: 0.0, texture: texSatin },
   { name: "Cotton", roughness: 0.65, metalness: 0.0, texture: texCotton },
   { name: "Linen", roughness: 0.75, metalness: 0.0, texture: texLinen },
   { name: "Chiffon", roughness: 0.55, metalness: 0.0, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.1 },
@@ -276,22 +250,22 @@ interface ColorDef {
 }
 
 const COLORS: ColorDef[] = [
-  { name: "Ivory", hex: "#f0ead6" },
-  { name: "Blush", hex: "#d4a0a0" },
-  { name: "Rose", hex: "#c45070" },
-  { name: "Red", hex: "#cc2233" },
-  { name: "Coral", hex: "#e8774a" },
-  { name: "Marigold", hex: "#d4a030" },
-  { name: "Sage", hex: "#7a9a6a" },
-  { name: "Forest", hex: "#2a5a3a" },
-  { name: "Sky", hex: "#6a9ec0" },
-  { name: "Navy", hex: "#1e3050" },
-  { name: "Plum", hex: "#6a3060" },
-  { name: "Charcoal", hex: "#3a3a3a" },
-  { name: "Espresso", hex: "#3a2820" },
-  { name: "Camel", hex: "#c4a878" },
-  { name: "Slate", hex: "#6a7a8a" },
-  { name: "Black", hex: "#121212" },
+  { name: "Champagne", hex: "#f5e6c8" },
+  { name: "Blush", hex: "#e8b4b8" },
+  { name: "Petal", hex: "#d4788a" },
+  { name: "Crimson", hex: "#9b1a2a" },
+  { name: "Garnet", hex: "#6e1423" },
+  { name: "Bordeaux", hex: "#4a0e1a" },
+  { name: "Mauve", hex: "#b07a8a" },
+  { name: "Orchid", hex: "#8b3a6b" },
+  { name: "Plum", hex: "#4a1040" },
+  { name: "Midnight", hex: "#0e0e24" },
+  { name: "Sapphire", hex: "#1a2a6e" },
+  { name: "Emerald", hex: "#1a4a30" },
+  { name: "Cognac", hex: "#8b4a20" },
+  { name: "Gold", hex: "#c4943a" },
+  { name: "Slate", hex: "#4a5060" },
+  { name: "Noir", hex: "#0a0a0a" },
 ];
 
 // ── HDR environment presets ──
@@ -622,17 +596,6 @@ function buildKeynote(
   podium.position.set(35, 23, -5);
   g.add(podium);
 
-  const spotMat = { color: 0xffffff, transparent: true, opacity: 0.03 };
-  ([0, -25, 25] as number[]).forEach((x) => {
-    const cone = mesh(
-      new THREE.ConeGeometry(15, 90, 16, 1, true),
-      spotMat,
-    );
-    cone.position.set(x, 48, -10);
-    cone.rotation.x = Math.PI;
-    g.add(cone);
-  });
-
   sceneProps.add(g);
 }
 
@@ -842,7 +805,7 @@ function buildConcert(
   });
 
   const stageColors = [0xff2288, 0x4422ff, 0x22ffcc, 0xffcc22, 0xff2288];
-  ([-40, -20, 0, 20, 40] as number[]).forEach((x, i) => {
+  ([-40, -20, 20, 40] as number[]).forEach((x, i) => {
     const housing = mesh(new THREE.CylinderGeometry(2, 3, 5, 8), {
       color: 0x333333,
       roughness: 0.4,
@@ -857,7 +820,6 @@ function buildConcert(
       side: THREE.DoubleSide,
     });
     beam.position.set(x, 43, -10);
-    beam.rotation.x = Math.PI;
     g.add(beam);
   });
 
@@ -963,28 +925,18 @@ export default function ModelViewer() {
   const envMapRef = useRef<THREE.Texture | null>(null);
   const shadowGroundRef = useRef<THREE.Mesh | null>(null);
   const composerRef = useRef<EffectComposer | null>(null);
-  const bokehPassRef = useRef<BokehPass | null>(null);
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
   const vignettePassRef = useRef<ShaderPass | null>(null);
   const targetCameraPosRef = useRef<THREE.Vector3 | null>(null);
   const targetLookAtRef = useRef<THREE.Vector3 | null>(null);
   const isAnimatingCameraRef = useRef(false);
-  const windUniformsRef = useRef<{
-    uTime: { value: number };
-    uWindSpeed: { value: number };
-    uWindIntensity: { value: number };
-    uWindDirection: { value: THREE.Vector2 };
-  } | null>(null);
-  const seamOverlayRef = useRef<THREE.Mesh | null>(null);
-  const seamTextureRef = useRef<THREE.CanvasTexture | null>(null);
-  const windEnabledRef = useRef(false);
   const turntableRef = useRef(false);
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
   const [activeVariant, setActiveVariant] = useState("heavy");
   const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
-  const [activeColorIdx, setActiveColorIdx] = useState(0);
+  const [activeColorIdx, setActiveColorIdx] = useState(3);
   const [activeSceneIdx, setActiveSceneIdx] = useState(0);
   const [activeLightingIdx, setActiveLightingIdx] = useState(0);
   const [sliderAngle, setSliderAngle] = useState(27);
@@ -993,22 +945,17 @@ export default function ModelViewer() {
   const [sliderWarmth, setSliderWarmth] = useState(50);
   const [turntable, setTurntable] = useState(false);
   const [activeHdriIdx, setActiveHdriIdx] = useState(0);
-  const [hdriBackground, setHdriBackground] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Post-processing state
-  const [dofEnabled, setDofEnabled] = useState(false);
-  const [dofFocus, setDofFocus] = useState(80);
-  const [dofAperture, setDofAperture] = useState(0.0008);
-  const [dofMaxBlur, setDofMaxBlur] = useState(0.005);
   const [bloomEnabled, setBloomEnabled] = useState(false);
   const [bloomThreshold, setBloomThreshold] = useState(0.85);
   const [bloomStrength, setBloomStrength] = useState(0.3);
   const [bloomRadius, setBloomRadius] = useState(0.4);
   const [vignetteEnabled, setVignetteEnabled] = useState(true);
-  const [vignetteOffset, setVignetteOffset] = useState(1.0);
+  const [vignetteOffset, setVignetteOffset] = useState(0.2);
   const [vignetteDarkness, setVignetteDarkness] = useState(1.4);
 
   // Material controls state — initialised from first fabric's defaults
@@ -1017,15 +964,8 @@ export default function ModelViewer() {
   const [matSheenColor, setMatSheenColor] = useState(FABRICS[0].sheenColor ?? "#ffffff");
   const [matTransmission, setMatTransmission] = useState(FABRICS[0].transmission ?? 0);
   const [matThickness, setMatThickness] = useState(FABRICS[0].thickness ?? 0);
-  const [matClearcoat, setMatClearcoat] = useState(FABRICS[0].clearcoat ?? 0);
-  const [matClearcoatRoughness, setMatClearcoatRoughness] = useState(FABRICS[0].clearcoatRoughness ?? 0);
 
-  // Wind animation state
-  const [windEnabled, setWindEnabled] = useState(false);
-  const [windSpeed, setWindSpeed] = useState(1.0);
-  const [windIntensity, setWindIntensity] = useState(1.5);
-  const [windDirection, setWindDirection] = useState<[number, number]>([0, 1]); // N
-  const [seamVisible, setSeamVisible] = useState(false);
+
 
   // Apply lighting preset
   const applyLighting = useCallback((preset: LightingPreset) => {
@@ -1077,10 +1017,6 @@ export default function ModelViewer() {
       const envMap = pmremRef.current!.fromEquirectangular(hdr).texture;
       scene.environment = envMap;
       envMapRef.current = envMap;
-      // Update background if HDR background is currently showing
-      if (scene.background && !(scene.background as THREE.Color).isColor) {
-        scene.background = envMap;
-      }
       hdr.dispose();
     });
   }, []);
@@ -1106,8 +1042,7 @@ export default function ModelViewer() {
       mat.sheenColor.set(fab.sheenColor ?? "#ffffff");
       mat.transmission = fab.transmission ?? 0;
       mat.thickness = fab.thickness ?? 0;
-      mat.clearcoat = fab.clearcoat ?? 0;
-      mat.clearcoatRoughness = fab.clearcoatRoughness ?? 0;
+
       mat.needsUpdate = true;
     },
     [],
@@ -1127,77 +1062,11 @@ export default function ModelViewer() {
       if (currentModelRef.current) {
         scene.remove(currentModelRef.current);
       }
-      // Dispose old seam overlay resources before creating a new one
-      if (seamOverlayRef.current) {
-        scene.remove(seamOverlayRef.current);
-        const oldMat = seamOverlayRef.current.material as THREE.MeshBasicMaterial;
-        oldMat.dispose();
-        seamOverlayRef.current = null;
-      }
-
-      // Create shared seam texture once, reuse across variant switches
-      if (!seamTextureRef.current) {
-        seamTextureRef.current = texSeamOverlay();
-      }
-
-      // Helper: create seam overlay mesh with wind shader matching the garment
-      const createSeamOverlay = (srcMesh: THREE.Mesh) => {
-        const wUniforms = windUniformsRef.current;
-        const seamMat = new THREE.MeshBasicMaterial({
-          color: 0x222222,
-          alphaMap: seamTextureRef.current,
-          transparent: true,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        });
-        // Inject same wind vertex shader so seam overlay moves with garment
-        if (wUniforms) {
-          seamMat.onBeforeCompile = (shader) => {
-            shader.uniforms.uTime = wUniforms.uTime;
-            shader.uniforms.uWindSpeed = wUniforms.uWindSpeed;
-            shader.uniforms.uWindIntensity = wUniforms.uWindIntensity;
-            shader.uniforms.uWindDirection = wUniforms.uWindDirection;
-
-            shader.vertexShader = shader.vertexShader.replace(
-              "void main() {",
-              `uniform float uTime;
-uniform float uWindSpeed;
-uniform float uWindIntensity;
-uniform vec2 uWindDirection;
-
-void main() {`,
-            );
-
-            shader.vertexShader = shader.vertexShader.replace(
-              "#include <begin_vertex>",
-              `#include <begin_vertex>
-float heightFactor = max(0.0, (position.y - 20.0) / 80.0);
-float wave = sin(position.x * 0.08 + uTime * uWindSpeed)
-           + sin(position.z * 0.06 + uTime * uWindSpeed * 0.7);
-transformed.x += uWindDirection.x * wave * heightFactor * uWindIntensity;
-transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
-            );
-          };
-        }
-        const seamMesh = new THREE.Mesh(srcMesh.geometry, seamMat);
-        seamMesh.position.copy(srcMesh.position);
-        seamMesh.rotation.copy(srcMesh.rotation);
-        seamMesh.scale.copy(srcMesh.scale).multiplyScalar(1.001);
-        seamMesh.visible = false;
-        scene.add(seamMesh);
-        seamOverlayRef.current = seamMesh;
-      };
 
       if (modelCacheRef.current[variant]) {
         const cached = modelCacheRef.current[variant];
         currentModelRef.current = cached;
         scene.add(cached);
-        // Recreate seam overlay for cached model
-        cached.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh && !seamOverlayRef.current) {
-            createSeamOverlay(child as THREE.Mesh);
-          }
-        });
         setLoading(false);
         return;
       }
@@ -1227,13 +1096,6 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
           modelCacheRef.current[variant] = obj;
           currentModelRef.current = obj;
           scene.add(obj);
-
-          // Create seam overlay clone
-          obj.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh && !seamOverlayRef.current) {
-              createSeamOverlay(child as THREE.Mesh);
-            }
-          });
 
           setLoading(false);
         },
@@ -1354,55 +1216,12 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
       metalness: 0.02,
       side: THREE.DoubleSide,
     });
-    // Wind animation uniforms
-    const windUniforms = {
-      uTime: { value: 0 },
-      uWindSpeed: { value: 1.0 },
-      uWindIntensity: { value: 1.5 },
-      uWindDirection: { value: new THREE.Vector2(0, 1) },
-    };
-    windUniformsRef.current = windUniforms;
-
-    garmentMat.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = windUniforms.uTime;
-      shader.uniforms.uWindSpeed = windUniforms.uWindSpeed;
-      shader.uniforms.uWindIntensity = windUniforms.uWindIntensity;
-      shader.uniforms.uWindDirection = windUniforms.uWindDirection;
-
-      shader.vertexShader = shader.vertexShader.replace(
-        "void main() {",
-        `uniform float uTime;
-uniform float uWindSpeed;
-uniform float uWindIntensity;
-uniform vec2 uWindDirection;
-
-void main() {`,
-      );
-
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <begin_vertex>",
-        `#include <begin_vertex>
-float heightFactor = max(0.0, (position.y - 20.0) / 80.0);
-float wave = sin(position.x * 0.08 + uTime * uWindSpeed)
-           + sin(position.z * 0.06 + uTime * uWindSpeed * 0.7);
-transformed.x += uWindDirection.x * wave * heightFactor * uWindIntensity;
-transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
-      );
-    };
     garmentMatRef.current = garmentMat;
 
     // Post-processing pipeline
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
 
-    const bokehPass = new BokehPass(scene, camera, {
-      focus: 80,
-      aperture: 0.0008,
-      maxblur: 0.005,
-    });
-    bokehPass.enabled = false;
-    composer.addPass(bokehPass);
-    bokehPassRef.current = bokehPass;
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -1415,7 +1234,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     bloomPassRef.current = bloomPass;
 
     const vignettePass = new ShaderPass(VignetteShader);
-    vignettePass.uniforms["offset"].value = 1.0;
+    vignettePass.uniforms["offset"].value = 0.2;
     vignettePass.uniforms["darkness"].value = 1.4;
     vignettePass.enabled = true;
     composer.addPass(vignettePass);
@@ -1438,11 +1257,6 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     // Render loop
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
-
-      // Wind animation time increment
-      if (windEnabledRef.current && windUniformsRef.current) {
-        windUniformsRef.current.uTime.value += 0.016; // ~60fps
-      }
 
       // Smooth camera transition
       if (isAnimatingCameraRef.current && targetCameraPosRef.current && targetLookAtRef.current) {
@@ -1475,10 +1289,6 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
       textureCacheRef.current = {};
       if (envMapRef.current) envMapRef.current.dispose();
       if (pmremRef.current) pmremRef.current.dispose();
-      if (seamTextureRef.current) seamTextureRef.current.dispose();
-      if (seamOverlayRef.current) {
-        (seamOverlayRef.current.material as THREE.MeshBasicMaterial).dispose();
-      }
       composer.dispose();
       renderer.dispose();
       if (container && renderer.domElement.parentNode === container) {
@@ -1540,9 +1350,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     mat.sheenColor.set(matSheenColor);
     mat.transmission = matTransmission;
     mat.thickness = matThickness;
-    mat.clearcoat = matClearcoat;
-    mat.clearcoatRoughness = matClearcoatRoughness;
-  }, [matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness, matClearcoat, matClearcoatRoughness]);
+  }, [matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness]);
 
   // Turntable
   useEffect(() => {
@@ -1552,16 +1360,6 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     }
   }, [turntable]);
 
-  // Sync DoF pass
-  useEffect(() => {
-    const pass = bokehPassRef.current;
-    if (!pass) return;
-    pass.enabled = dofEnabled;
-    const u = pass.uniforms as Record<string, { value: number }>;
-    u["focus"].value = dofFocus;
-    u["aperture"].value = dofAperture;
-    u["maxblur"].value = dofMaxBlur;
-  }, [dofEnabled, dofFocus, dofAperture, dofMaxBlur]);
 
   // Sync bloom pass
   useEffect(() => {
@@ -1582,33 +1380,8 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     pass.uniforms["darkness"].value = vignetteDarkness;
   }, [vignetteEnabled, vignetteOffset, vignetteDarkness]);
 
-  // Sync HDR background toggle
-  useEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene) return;
-    if (hdriBackground && envMapRef.current) {
-      scene.background = envMapRef.current;
-    } else {
-      scene.background = sceneBackgroundRef.current ?? new THREE.Color(0x1a1a1a);
-    }
-  }, [hdriBackground]);
 
-  // Sync wind uniforms
-  useEffect(() => {
-    windEnabledRef.current = windEnabled;
-    const u = windUniformsRef.current;
-    if (!u) return;
-    u.uWindSpeed.value = windSpeed;
-    u.uWindIntensity.value = windEnabled ? windIntensity : 0;
-    u.uWindDirection.value.set(windDirection[0], windDirection[1]);
-  }, [windEnabled, windSpeed, windIntensity, windDirection]);
 
-  // Sync seam overlay visibility
-  useEffect(() => {
-    if (seamOverlayRef.current) {
-      seamOverlayRef.current.visible = seamVisible;
-    }
-  }, [seamVisible]);
 
   // Camera preset handler
   const handleCameraPreset = useCallback((idx: number) => {
@@ -1684,8 +1457,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     setMatSheenColor(fab.sheenColor ?? "#ffffff");
     setMatTransmission(fab.transmission ?? 0);
     setMatThickness(fab.thickness ?? 0);
-    setMatClearcoat(fab.clearcoat ?? 0);
-    setMatClearcoatRoughness(fab.clearcoatRoughness ?? 0);
+
   };
 
   const handleColor = (idx: number) => {
@@ -1741,7 +1513,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
       )}
 
       {/* Controls sidebar */}
-      <div className="fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto pr-2 scrollbar-thin">
+      <div className="fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin">
         {/* Variant */}
         <ControlGroup label="Variant">
           {(["heavy", "light"] as const).map((v) => (
@@ -1814,10 +1586,8 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
                 ))}
               </div>
             </div>
-            <SliderRow label="Transmit" value={matTransmission} min={0} max={1} step={0.01} onChange={setMatTransmission} />
-            <SliderRow label="Thickness" value={matThickness} min={0} max={2} step={0.01} onChange={setMatThickness} />
-            <SliderRow label="Clearcoat" value={matClearcoat} min={0} max={1} step={0.01} onChange={setMatClearcoat} />
-            <SliderRow label="CC Rgh" value={matClearcoatRoughness} min={0} max={1} step={0.01} onChange={setMatClearcoatRoughness} />
+            <SliderRow label="Sheerness" value={matTransmission} min={0} max={1} step={0.01} onChange={setMatTransmission} />
+            <SliderRow label="Radiance" value={matThickness} min={0} max={2} step={0.01} onChange={setMatThickness} />
           </div>
         </ControlGroup>
 
@@ -1888,29 +1658,11 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
               </SidebarButton>
             ))}
           </div>
-          <SidebarButton
-            active={hdriBackground}
-            onClick={() => setHdriBackground(!hdriBackground)}
-          >
-            {hdriBackground ? "Hide HDR BG" : "Show HDR BG"}
-          </SidebarButton>
         </ControlGroup>
 
         {/* Post FX */}
         <ControlGroup label="Post FX">
           <div className="flex flex-col gap-2">
-            <div>
-              <SidebarButton active={dofEnabled} onClick={() => setDofEnabled(!dofEnabled)}>
-                DoF {dofEnabled ? "On" : "Off"}
-              </SidebarButton>
-              {dofEnabled && (
-                <div className="mt-1 flex flex-col gap-1">
-                  <SliderRow label="Focus" value={dofFocus} min={0} max={200} step={1} onChange={setDofFocus} />
-                  <SliderRow label="Aperture" value={dofAperture} min={0} max={0.003} step={0.0001} onChange={setDofAperture} />
-                  <SliderRow label="Max blur" value={dofMaxBlur} min={0} max={0.01} step={0.001} onChange={setDofMaxBlur} />
-                </div>
-              )}
-            </div>
             <div>
               <SidebarButton active={bloomEnabled} onClick={() => setBloomEnabled(!bloomEnabled)}>
                 Bloom {bloomEnabled ? "On" : "Off"}
@@ -1937,48 +1689,6 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
           </div>
         </ControlGroup>
 
-        {/* Wind */}
-        <ControlGroup label="Wind">
-          <SidebarButton active={windEnabled} onClick={() => setWindEnabled(!windEnabled)}>
-            {windEnabled ? "On" : "Off"}
-          </SidebarButton>
-          {windEnabled && (
-            <div className="mt-1 flex flex-col gap-1.5">
-              <SliderRow label="Speed" value={windSpeed} min={0} max={3} step={0.1} onChange={setWindSpeed} />
-              <SliderRow label="Intensity" value={windIntensity} min={0} max={5} step={0.1} onChange={setWindIntensity} />
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <span className="w-14">Dir</span>
-                <div className="flex gap-1">
-                  {([
-                    { label: "\u2191 N", dir: [0, 1] as [number, number] },
-                    { label: "\u2192 E", dir: [1, 0] as [number, number] },
-                    { label: "\u2193 S", dir: [0, -1] as [number, number] },
-                    { label: "\u2190 W", dir: [-1, 0] as [number, number] },
-                  ]).map((d) => (
-                    <button
-                      key={d.label}
-                      onClick={() => setWindDirection(d.dir)}
-                      className={`px-2 py-1 border rounded text-xs cursor-pointer transition-colors ${
-                        windDirection[0] === d.dir[0] && windDirection[1] === d.dir[1]
-                          ? "border-white bg-[#3a3a3a] text-white"
-                          : "border-gray-600 bg-[#2a2a2a] text-gray-400 hover:bg-[#3a3a3a]"
-                      }`}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </ControlGroup>
-
-        {/* Seams */}
-        <ControlGroup label="Seams">
-          <SidebarButton active={seamVisible} onClick={() => setSeamVisible(!seamVisible)}>
-            {seamVisible ? "On" : "Off"}
-          </SidebarButton>
-        </ControlGroup>
 
         {/* Turntable */}
         <ControlGroup label="Turntable">
@@ -2058,7 +1768,7 @@ function SliderRow({
 }) {
   return (
     <div className="flex items-center gap-2 text-xs text-gray-400">
-      <span className="w-14">{label}</span>
+      <span className="w-20 shrink-0">{label}</span>
       <input
         type="range"
         min={min}
