@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "seed": "tsx scripts/seed.ts",
     "test": "echo \"No tests configured yet\" && exit 0"
   },
   "dependencies": {
