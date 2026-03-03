@@ -909,6 +909,7 @@ const SCENES: SceneDef[] = [
 
 export default function ModelViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1225,7 +1226,6 @@ export default function ModelViewer() {
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
 
-
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
       0.3,  // strength
@@ -1246,14 +1246,23 @@ export default function ModelViewer() {
     composer.addPass(new OutputPass());
     composerRef.current = composer;
 
+    // Offset the camera frustum so the model centers in the content area (right of sidebar)
+    const applySidebarOffset = () => {
+      const sidebarW = sidebarRef.current?.offsetWidth ?? 0;
+      const fullW = window.innerWidth;
+      const fullH = window.innerHeight;
+      camera.setViewOffset(fullW, fullH, -sidebarW / 2, 0, fullW, fullH);
+      camera.updateProjectionMatrix();
+    };
+    applySidebarOffset();
+
     // Resize handler
     const onResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
       const w = window.innerWidth;
       const h = window.innerHeight;
       renderer.setSize(w, h);
       composer.setSize(w, h);
+      applySidebarOffset();
     };
     window.addEventListener("resize", onResize);
 
@@ -1277,6 +1286,7 @@ export default function ModelViewer() {
       }
 
       controls.update();
+
       composer.render();
     }
     animate();
@@ -1516,7 +1526,7 @@ export default function ModelViewer() {
       )}
 
       {/* Controls sidebar */}
-      <div className="fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin">
+      <div ref={sidebarRef} className="fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin">
         {/* Variant */}
         <ControlGroup label="Variant">
           {(["heavy", "light"] as const).map((v) => (
