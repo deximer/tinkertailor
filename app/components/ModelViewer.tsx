@@ -227,14 +227,14 @@ interface FabricDef {
 }
 
 const FABRICS: FabricDef[] = [
-  { name: "Silk", roughness: 0.2, metalness: 0.02, texture: texSilk },
-  { name: "Satin", roughness: 0.12, metalness: 0.05, texture: texSatin },
+  { name: "Silk", roughness: 0.2, metalness: 0.02, texture: texSilk, sheen: 0.3, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
+  { name: "Satin", roughness: 0.12, metalness: 0.05, texture: texSatin, clearcoat: 0.3, clearcoatRoughness: 0.15 },
   { name: "Cotton", roughness: 0.65, metalness: 0.0, texture: texCotton },
   { name: "Linen", roughness: 0.75, metalness: 0.0, texture: texLinen },
-  { name: "Chiffon", roughness: 0.3, metalness: 0.0, texture: texChiffon },
-  { name: "Velvet", roughness: 0.85, metalness: 0.0, texture: texVelvet },
+  { name: "Chiffon", roughness: 0.3, metalness: 0.0, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.1 },
+  { name: "Velvet", roughness: 0.85, metalness: 0.0, texture: texVelvet, sheen: 0.9, sheenRoughness: 0.6, sheenColor: "#6a4a6a" },
   { name: "Denim", roughness: 0.7, metalness: 0.0, texture: texDenim },
-  { name: "Wool", roughness: 0.8, metalness: 0.0, texture: texWool },
+  { name: "Wool", roughness: 0.8, metalness: 0.0, texture: texWool, sheen: 0.5, sheenRoughness: 0.8 },
 ];
 
 interface ColorDef {
@@ -911,6 +911,15 @@ export default function ModelViewer() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Material controls state — initialised from first fabric's defaults
+  const [matSheen, setMatSheen] = useState(FABRICS[0].sheen ?? 0);
+  const [matSheenRoughness, setMatSheenRoughness] = useState(FABRICS[0].sheenRoughness ?? 0);
+  const [matSheenColor, setMatSheenColor] = useState(FABRICS[0].sheenColor ?? "#ffffff");
+  const [matTransmission, setMatTransmission] = useState(FABRICS[0].transmission ?? 0);
+  const [matThickness, setMatThickness] = useState(FABRICS[0].thickness ?? 0);
+  const [matClearcoat, setMatClearcoat] = useState(FABRICS[0].clearcoat ?? 0);
+  const [matClearcoatRoughness, setMatClearcoatRoughness] = useState(FABRICS[0].clearcoatRoughness ?? 0);
+
   // Apply lighting preset
   const applyLighting = useCallback((preset: LightingPreset) => {
     const ambient = ambientRef.current;
@@ -957,6 +966,13 @@ export default function ModelViewer() {
       mat.color.set(col.hex);
       mat.roughness = fab.roughness;
       mat.metalness = fab.metalness;
+      mat.sheen = fab.sheen ?? 0;
+      mat.sheenRoughness = fab.sheenRoughness ?? 0;
+      mat.sheenColor.set(fab.sheenColor ?? "#ffffff");
+      mat.transmission = fab.transmission ?? 0;
+      mat.thickness = fab.thickness ?? 0;
+      mat.clearcoat = fab.clearcoat ?? 0;
+      mat.clearcoatRoughness = fab.clearcoatRoughness ?? 0;
       mat.needsUpdate = true;
     },
     [],
@@ -1178,6 +1194,19 @@ export default function ModelViewer() {
     keyLight.color.setRGB(r, g, b, THREE.SRGBColorSpace);
   }, [sliderAngle, sliderHeight, sliderIntensity, sliderWarmth]);
 
+  // Sync material controls to the Three.js material
+  useEffect(() => {
+    const mat = garmentMatRef.current;
+    if (!mat) return;
+    mat.sheen = matSheen;
+    mat.sheenRoughness = matSheenRoughness;
+    mat.sheenColor.set(matSheenColor);
+    mat.transmission = matTransmission;
+    mat.thickness = matThickness;
+    mat.clearcoat = matClearcoat;
+    mat.clearcoatRoughness = matClearcoatRoughness;
+  }, [matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness, matClearcoat, matClearcoatRoughness]);
+
   // Turntable
   useEffect(() => {
     if (controlsRef.current) {
@@ -1194,6 +1223,14 @@ export default function ModelViewer() {
   const handleFabric = (idx: number) => {
     setActiveFabricIdx(idx);
     applyMaterial(idx, activeColorIdx);
+    const fab = FABRICS[idx];
+    setMatSheen(fab.sheen ?? 0);
+    setMatSheenRoughness(fab.sheenRoughness ?? 0);
+    setMatSheenColor(fab.sheenColor ?? "#ffffff");
+    setMatTransmission(fab.transmission ?? 0);
+    setMatThickness(fab.thickness ?? 0);
+    setMatClearcoat(fab.clearcoat ?? 0);
+    setMatClearcoatRoughness(fab.clearcoatRoughness ?? 0);
   };
 
   const handleColor = (idx: number) => {
@@ -1290,6 +1327,34 @@ export default function ModelViewer() {
                 onClick={() => handleColor(i)}
               />
             ))}
+          </div>
+        </ControlGroup>
+
+        {/* Material */}
+        <ControlGroup label="Material">
+          <div className="flex flex-col gap-1.5">
+            <SliderRow label="Sheen" value={matSheen} min={0} max={1} step={0.01} onChange={setMatSheen} />
+            <SliderRow label="Sheen Rgh" value={matSheenRoughness} min={0} max={1} step={0.01} onChange={setMatSheenRoughness} />
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span className="w-14">Sheen Clr</span>
+              <div className="flex gap-1">
+                {["#ffffff", "#d4a0a0", "#8a6a8a", "#9a9090", "#c48a8a", "#121212"].map((c) => (
+                  <div
+                    key={c}
+                    title={c}
+                    className={`w-5 h-5 rounded cursor-pointer border transition-colors ${
+                      matSheenColor === c ? "border-white" : "border-gray-600 hover:border-gray-400"
+                    }`}
+                    style={{ background: c }}
+                    onClick={() => setMatSheenColor(c)}
+                  />
+                ))}
+              </div>
+            </div>
+            <SliderRow label="Transmit" value={matTransmission} min={0} max={1} step={0.01} onChange={setMatTransmission} />
+            <SliderRow label="Thickness" value={matThickness} min={0} max={2} step={0.01} onChange={setMatThickness} />
+            <SliderRow label="Clearcoat" value={matClearcoat} min={0} max={1} step={0.01} onChange={setMatClearcoat} />
+            <SliderRow label="CC Rgh" value={matClearcoatRoughness} min={0} max={1} step={0.01} onChange={setMatClearcoatRoughness} />
           </div>
         </ControlGroup>
 
@@ -1398,12 +1463,14 @@ function SliderRow({
   value,
   min,
   max,
+  step,
   onChange,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
+  step?: number;
   onChange: (v: number) => void;
 }) {
   return (
@@ -1413,6 +1480,7 @@ function SliderRow({
         type="range"
         min={min}
         max={max}
+        step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="flex-1 accent-white"
