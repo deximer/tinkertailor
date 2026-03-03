@@ -55,7 +55,12 @@ flyctl secrets import --app "$APP_NAME" < "$SECRETS_FILE"
 
 # Step 3: Deploy
 echo "==> Deploying with ${FLY_TOML}"
-flyctl deploy --config "$FLY_TOML" --app "$APP_NAME"
+# NEXT_PUBLIC_* vars must be baked in at build time (Next.js Edge middleware inlines them)
+BUILD_ARGS=()
+while IFS='=' read -r key value; do
+  [[ "$key" =~ ^NEXT_PUBLIC_ ]] && BUILD_ARGS+=(--build-arg "${key}=${value}")
+done < <(grep -E '^NEXT_PUBLIC_[^=]+=.+' "$SECRETS_FILE")
+flyctl deploy --config "$FLY_TOML" --app "$APP_NAME" "${BUILD_ARGS[@]}"
 
 # Step 4: Scale
 echo "==> Scaling to ${MACHINE_COUNT} x ${MACHINE_SIZE}"
