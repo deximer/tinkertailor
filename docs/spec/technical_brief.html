@@ -230,7 +230,7 @@
   <div class="meta">
     <div class="row"><span class="label">Prepared by:</span><span class="value">Jeremy Stark</span></div>
     <div class="row"><span class="label">Date:</span><span class="value">February 2026</span></div>
-    <div class="row"><span class="label">Version:</span><span class="value">1.2</span></div>
+    <div class="row"><span class="label">Version:</span><span class="value">1.5</span></div>
   </div>
 </div>
 
@@ -365,7 +365,7 @@
     <tr><td>Application Hosting</td><td>Fly.io</td><td>Next.js runs as a long-lived container process; no cold starts, no function duration limits, native WebSocket support, global edge deployment across 30+ regions</td></tr>
     <tr><td>Database</td><td>Supabase (PostgreSQL)</td><td>Relational model fits the pattern/component compatibility graph well; built-in auth, row-level security, real-time subscriptions, and storage for 3D assets</td></tr>
     <tr><td>File/Asset Storage</td><td>Supabase Storage</td><td>3D renderings, fabric textures, tech pack files</td></tr>
-    <tr><td>Webhooks &amp; Async Flows</td><td>Next.js API Routes + Fly Machines</td><td>Stripe and ShipStation webhooks handled in API routes; factory push, email notifications, and payout tracking triggered inline. Background workers can be added as separate Fly Machines if pipeline complexity grows&mdash;no separate job infrastructure required.</td></tr>
+    <tr><td>Webhooks &amp; Async Flows</td><td>Next.js API Routes + pg-boss</td><td>Stripe and ShipStation webhooks handled in API routes; async work (factory order assembly, email notifications, payout tracking) dispatched to a pg-boss job queue backed by the existing Supabase PostgreSQL instance. No Redis required for MVP. Background workers can run as separate Fly Machines if workload justifies isolation.</td></tr>
     <tr><td>LLM Provider</td><td>One LLM to be selected</td><td>The Vercel AI SDK supports multiple providers (Claude, GPT-4o/4.1, Gemini, open-source models) and runs as a standard Node.js library independent of hosting platform; provider selection deferred to implementation based on persona adherence and tool-calling performance</td></tr>
     <tr><td>CI/CD</td><td>GitHub Actions + Fly.io</td><td>Automated deployments on push to main; preview deployments per pull request via Fly Machines</td></tr>
   </tbody>
@@ -516,6 +516,7 @@
     <tr><td>Search</td><td>PostgreSQL full-text search (MVP). Tag-based pattern matching; upgrade path to dedicated vector search post-MVP</td></tr>
     <tr><td>Email</td><td>Resend. Transactional emails (order confirmation, shipping updates, invitation codes)</td></tr>
     <tr><td>Webhooks</td><td>Next.js API Routes. Stripe payment confirmation and ShipStation shipping updates handled as webhook endpoints; factory push and email notifications triggered directly from these handlers</td></tr>
+    <tr><td>Job Queues</td><td>pg-boss (PostgreSQL-backed). Async job processing for factory order assembly, email notifications, and payout calculations. Runs against the existing Supabase PostgreSQL instance&mdash;no Redis or additional infrastructure required for MVP. Redis/BullMQ is an upgrade path if queue throughput becomes a bottleneck post-MVP.</td></tr>
   </tbody>
 </table>
 
@@ -542,17 +543,81 @@
 
 <h3 id="infrastructure-deployment">4.3 Infrastructure &amp; Deployment</h3>
 
-<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through GitHub Actions, with automated deployments on merge and preview environments per pull request.</p>
+<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through Gitea Actions with self-hosted local runners, with automated deployments to staging on every push to main.</p>
+
+<h4>Environments</h4>
 
 <table>
   <thead>
     <tr><th>Environment</th><th>Trigger</th><th>Purpose</th></tr>
   </thead>
   <tbody>
-    <tr><td>Preview</td><td>Every pull request deploys a unique preview URL via Fly Machines</td><td>Feature review and QA; each PR gets its own isolated deployment</td></tr>
-    <tr><td>Production</td><td>Merge to main</td><td>Live invite-only MVP; connected to production database, payment processor, and factory integration</td></tr>
+    <tr><td>Dev</td><td>Local — <code>next dev</code></td><td>Local development against <code>.env.local</code>; no deployment involved</td></tr>
+    <tr><td>Staging</td><td>Push to main</td><td>Live review environment on Fly.io; shared via staging URL for feedback and QA. No per-PR preview environments&mdash;staging links serve this purpose.</td></tr>
   </tbody>
 </table>
+
+<p>Production is deferred until the MVP pilot is ready to open. The staging environment runs the full stack&mdash;real Supabase project, Stripe test mode, iCreate sandbox&mdash;so it is a faithful representation of production behavior at all times.</p>
+
+<h4>CI/CD Pipeline</h4>
+
+<p>Gitea Actions drives the pipeline via two self-hosted runners on the local network:</p>
+
+<table>
+  <thead>
+    <tr><th>Runner</th><th>Labels</th><th>Role</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>amd64 machine</td><td><code>self-hosted, linux, amd64</code></td><td>Docker build + <code>flyctl deploy</code>. Builds target amd64 to match Fly.io machine architecture. Docker layer cache persists between runs for fast incremental builds.</td></tr>
+    <tr><td>arm64 machine</td><td><code>self-hosted, linux, arm64</code></td><td>Available for type-checking, linting, and unit tests.</td></tr>
+  </tbody>
+</table>
+
+<p><code>flyctl</code> is pre-installed on the amd64 runner machine rather than installed per-run. Deployments use <code>flyctl deploy</code> (local build, local push) rather than <code>--remote-only</code>, keeping the full build pipeline on local hardware.</p>
+
+<p>Two workflows cover the full lifecycle:</p>
+<table>
+  <thead>
+    <tr><th>Workflow</th><th>Trigger</th><th>What it does</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Deploy</td><td>Push to main</td><td>Type-check + lint, then <code>flyctl deploy</code>. Secrets are already on the Fly app; only <code>FLY_API_TOKEN</code> is needed in Gitea.</td></tr>
+    <tr><td>Provision</td><td>Manual (<code>workflow_dispatch</code>)</td><td>Assembles <code>.env.staging</code> from Gitea secrets, calls <code>infra/provision.sh staging</code>, removes the temp file. Run once when standing up a fresh environment.</td></tr>
+  </tbody>
+</table>
+
+<h4>Provisioning</h4>
+
+<p>The environment-to-VPS mapping and all non-secret configuration is defined in committed files. The provisioning script reads these and applies them idempotently&mdash;safe to run on a fresh Fly app or re-run against an existing one.</p>
+
+<table>
+  <thead>
+    <tr><th>File</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>infra/envs/staging.conf</code></td><td>Defines the environment: <code>APP_NAME</code>, <code>REGION</code>, <code>MACHINE_SIZE</code>, <code>MACHINE_COUNT</code>. The mapping from environment name to Fly.io app.</td></tr>
+    <tr><td><code>infra/fly.staging.toml</code></td><td>Fly app configuration for staging: internal port, health checks, env vars (non-secret).</td></tr>
+    <tr><td><code>infra/provision.sh</code></td><td>Idempotent bootstrap script. Takes environment name as argument (<code>./infra/provision.sh staging</code>). Sources the conf, creates the Fly app if absent, imports secrets from <code>.env.&lt;env&gt;</code>, deploys, and scales.</td></tr>
+    <tr><td><code>secrets.example</code></td><td>Canonical list of every required secret key with empty values. Serves as documentation for what to enter into Gitea secrets and what to populate in <code>.env.local</code>.</td></tr>
+  </tbody>
+</table>
+
+<p>To provision a fresh environment, two paths produce identical results:</p>
+<ul>
+  <li><strong>Manually:</strong> copy <code>secrets.example</code> to <code>.env.staging</code>, fill in values, run <code>./infra/provision.sh staging</code>.</li>
+  <li><strong>Via Gitea:</strong> trigger the Provision workflow; it assembles <code>.env.staging</code> from Gitea secrets and calls the same script.</li>
+</ul>
+<p><code>provision.sh</code> does not know or care which path provided the secrets file. Adding a new environment (e.g., production) requires a new <code>envs/prod.conf</code>, a new <code>fly.prod.toml</code>, and corresponding entries in Gitea secrets&mdash;no changes to the script itself.</p>
+
+<h4>Secrets Management</h4>
+
+<p>Secret values are stored in Gitea Actions secrets&mdash;the single source of truth accessible to both the operator and the CI pipeline. Three categories:</p>
+<ul>
+  <li><strong>Dev:</strong> <code>.env.local</code> on the developer&rsquo;s machine (git-ignored, populated from <code>secrets.example</code>).</li>
+  <li><strong>Staging app secrets:</strong> Stored in Gitea, pushed to the Fly app via <code>flyctl secrets import</code> during provisioning. The Fly app holds them at runtime; they do not need to be re-pushed on every deploy.</li>
+  <li><strong>CI secrets:</strong> Only <code>FLY_API_TOKEN</code> is needed by the deploy workflow directly.</li>
+</ul>
+<p>Gitea runs on a single local machine. Secret values should be backed up in an encrypted archive off that machine as a precaution against hardware failure.</p>
 
 <p>The Docker-based deployment ensures full portability. The same container image that runs on Fly.io can be deployed to AWS ECS/Fargate, GCP Cloud Run, or any container orchestration platform without application changes. This de-risks infrastructure decisions and preserves flexibility as the platform scales.</p>
 
