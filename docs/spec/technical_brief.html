@@ -367,7 +367,7 @@
     <tr><td>File/Asset Storage</td><td>Supabase Storage</td><td>3D renderings, fabric textures, tech pack files</td></tr>
     <tr><td>Webhooks &amp; Async Flows</td><td>Next.js API Routes + Fly Machines</td><td>Stripe and ShipStation webhooks handled in API routes; factory push, email notifications, and payout tracking triggered inline. Background workers can be added as separate Fly Machines if pipeline complexity grows&mdash;no separate job infrastructure required.</td></tr>
     <tr><td>LLM Provider</td><td>One LLM to be selected</td><td>The Vercel AI SDK supports multiple providers (Claude, GPT-4o/4.1, Gemini, open-source models) and runs as a standard Node.js library independent of hosting platform; provider selection deferred to implementation based on persona adherence and tool-calling performance</td></tr>
-    <tr><td>CI/CD</td><td>GitHub Actions + Fly.io</td><td>Automated deployments on push to main; preview deployments per pull request via Fly Machines</td></tr>
+    <tr><td>CI/CD</td><td>Gitea Actions + Fly.io</td><td>Three-branch model: <code>main</code> (integration), <code>staging</code> (client review, deploys to Fly.io), <code>prod</code> (future production). Deployments triggered by push to staging; promotion via <code>git push origin main:staging</code></td></tr>
   </tbody>
 </table>
 
@@ -389,7 +389,7 @@
   <li>Push the same Docker image to AWS Elastic Container Registry (ECR)</li>
   <li>Run it on ECS Fargate (serverless containers) or EKS (Kubernetes)&mdash;no application code changes required</li>
   <li>Replace Fly.io secrets with AWS Secrets Manager or Parameter Store</li>
-  <li>Swap the GitHub Actions deploy step from <code>fly deploy</code> to <code>aws ecs update-service</code></li>
+  <li>Swap the Gitea Actions deploy step from <code>fly deploy</code> to <code>aws ecs update-service</code></li>
   <li>Add an Application Load Balancer for SSL termination and routing</li>
 </ol>
 
@@ -542,15 +542,16 @@
 
 <h3 id="infrastructure-deployment">4.3 Infrastructure &amp; Deployment</h3>
 
-<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through GitHub Actions, with automated deployments on merge and preview environments per pull request.</p>
+<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through Gitea Actions with a three-branch model. Code is integrated on <code>main</code>, explicitly promoted to <code>staging</code> for client review, and will be promoted to <code>prod</code> for production release. Deployments are triggered only by pushes to the <code>staging</code> branch&mdash;pushing to <code>main</code> does not deploy anywhere.</p>
 
 <table>
   <thead>
-    <tr><th>Environment</th><th>Trigger</th><th>Purpose</th></tr>
+    <tr><th>Branch</th><th>Environment</th><th>Trigger</th><th>Purpose</th></tr>
   </thead>
   <tbody>
-    <tr><td>Preview</td><td>Every pull request deploys a unique preview URL via Fly Machines</td><td>Feature review and QA; each PR gets its own isolated deployment</td></tr>
-    <tr><td>Production</td><td>Merge to main</td><td>Live invite-only MVP; connected to production database, payment processor, and factory integration</td></tr>
+    <tr><td><code>main</code></td><td>None</td><td>All feature work merges here</td><td>Integration branch; CI runs typecheck + lint but does not deploy</td></tr>
+    <tr><td><code>staging</code></td><td>Fly.io staging</td><td><code>git push origin main:staging</code></td><td>Client review; deploys to <code>tinker-tailor-staging</code> on Fly.io</td></tr>
+    <tr><td><code>prod</code></td><td>Fly.io production (future)</td><td>Promote from staging when ready</td><td>Live invite-only MVP; connected to production database, payment processor, and factory integration</td></tr>
   </tbody>
 </table>
 
