@@ -977,6 +977,7 @@ export default function ModelViewer() {
   } | null>(null);
   const seamOverlayRef = useRef<THREE.Mesh | null>(null);
   const windEnabledRef = useRef(false);
+  const turntableRef = useRef(false);
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
   const [activeVariant, setActiveVariant] = useState("heavy");
@@ -1425,6 +1426,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
           controls.target.copy(targetLookAtRef.current);
           isAnimatingCameraRef.current = false;
           controls.enableDamping = true;
+          controls.autoRotate = turntableRef.current; // restore turntable after transition
         }
       }
 
@@ -1511,6 +1513,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
 
   // Turntable
   useEffect(() => {
+    turntableRef.current = turntable;
     if (controlsRef.current) {
       controlsRef.current.autoRotate = turntable;
     }
@@ -1583,6 +1586,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     targetLookAtRef.current = new THREE.Vector3(...preset.target);
     isAnimatingCameraRef.current = true;
     controls.enableDamping = false;
+    controls.autoRotate = false; // pause turntable during transition
     setActiveCameraPreset(idx);
   }, []);
 
@@ -1613,6 +1617,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
         targetLookAtRef.current = hitPoint.clone();
         isAnimatingCameraRef.current = true;
         controls.enableDamping = false;
+        controls.autoRotate = false; // pause turntable during zoom
         setActiveCameraPreset(-1);
       } else {
         // No hit — reset to front preset
