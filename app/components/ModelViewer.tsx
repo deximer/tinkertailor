@@ -1752,6 +1752,12 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
             <SliderRow label="Sheen Rgh" value={matSheenRoughness} min={0} max={1} step={0.01} onChange={setMatSheenRoughness} />
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <span className="w-14">Sheen Clr</span>
+              <input
+                type="color"
+                value={matSheenColor}
+                onChange={(e) => setMatSheenColor(e.target.value)}
+                className="w-7 h-7 rounded cursor-pointer border border-gray-600 bg-transparent p-0"
+              />
               <div className="flex gap-1">
                 {["#ffffff", "#d4a0a0", "#8a6a8a", "#9a9090", "#c48a8a", "#121212"].map((c) => (
                   <div
