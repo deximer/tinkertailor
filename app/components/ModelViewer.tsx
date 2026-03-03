@@ -977,6 +977,7 @@ export default function ModelViewer() {
   } | null>(null);
   const seamOverlayRef = useRef<THREE.Mesh | null>(null);
   const windEnabledRef = useRef(false);
+  const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
   const [activeVariant, setActiveVariant] = useState("heavy");
   const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
@@ -1464,6 +1465,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
       while (sceneProps.children.length) sceneProps.remove(sceneProps.children[0]);
       groundMat.roughness = 0.9;
       sceneDef.build(sceneObj, groundMat, sceneProps);
+      sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
     loadModel(activeVariant);
@@ -1551,7 +1553,7 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
     if (hdriBackground && envMapRef.current) {
       scene.background = envMapRef.current;
     } else {
-      scene.background = new THREE.Color(0x1a1a1a);
+      scene.background = sceneBackgroundRef.current ?? new THREE.Color(0x1a1a1a);
     }
   }, [hdriBackground]);
 
@@ -1664,6 +1666,8 @@ transformed.z += uWindDirection.y * wave * heightFactor * uWindIntensity;`,
       while (sceneProps.children.length) sceneProps.remove(sceneProps.children[0]);
       groundMat.roughness = 0.9;
       sceneDef.build(sceneObj, groundMat, sceneProps);
+      // Save the scene's native background so we can restore it when HDR BG is toggled off
+      sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
   };
