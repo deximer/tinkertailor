@@ -217,6 +217,13 @@ interface FabricDef {
   roughness: number;
   metalness: number;
   texture: () => THREE.CanvasTexture;
+  sheen?: number;
+  sheenRoughness?: number;
+  sheenColor?: string;
+  transmission?: number;
+  thickness?: number;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
 }
 
 const FABRICS: FabricDef[] = [
@@ -884,7 +891,7 @@ export default function ModelViewer() {
   const rimLightRef = useRef<THREE.DirectionalLight | null>(null);
   const groundMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const scenePropsRef = useRef<THREE.Group | null>(null);
-  const garmentMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const garmentMatRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
   const currentModelRef = useRef<THREE.Group | null>(null);
   const modelCacheRef = useRef<Record<string, THREE.Group>>({});
   const textureCacheRef = useRef<Record<number, THREE.CanvasTexture>>({});
@@ -1090,7 +1097,7 @@ export default function ModelViewer() {
     scenePropsRef.current = sceneProps;
 
     // Garment material
-    const garmentMat = new THREE.MeshStandardMaterial({
+    const garmentMat = new THREE.MeshPhysicalMaterial({
       color: 0xf0ead6,
       roughness: 0.2,
       metalness: 0.02,
