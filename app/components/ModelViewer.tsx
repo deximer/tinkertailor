@@ -283,6 +283,22 @@ const HDRI_PRESETS: HdriPreset[] = [
   { name: "Ballroom", file: "/hdri/ballroom.hdr" },
 ];
 
+// ── Camera presets ──
+
+interface CameraPreset {
+  name: string;
+  position: [number, number, number];
+  target: [number, number, number];
+}
+
+const CAMERA_PRESETS: CameraPreset[] = [
+  { name: "Front", position: [0, 50, 120], target: [0, 40, 0] },
+  { name: "Back", position: [0, 50, -120], target: [0, 40, 0] },
+  { name: "Side", position: [120, 50, 0], target: [0, 40, 0] },
+  { name: "3/4", position: [85, 55, 85], target: [0, 40, 0] },
+  { name: "Detail", position: [0, 75, 45], target: [0, 70, 0] },
+];
+
 // ── Lighting preset types ──
 
 interface LightCfg {
@@ -925,8 +941,12 @@ export default function ModelViewer() {
   const bokehPassRef = useRef<BokehPass | null>(null);
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
   const vignettePassRef = useRef<ShaderPass | null>(null);
+  const targetCameraPosRef = useRef<THREE.Vector3 | null>(null);
+  const targetLookAtRef = useRef<THREE.Vector3 | null>(null);
+  const isAnimatingCameraRef = useRef(false);
 
   const [activeVariant, setActiveVariant] = useState("heavy");
+  const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
   const [activeColorIdx, setActiveColorIdx] = useState(0);
   const [activeSceneIdx, setActiveSceneIdx] = useState(0);
@@ -1265,6 +1285,21 @@ export default function ModelViewer() {
     // Render loop
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
+
+      // Smooth camera transition
+      if (isAnimatingCameraRef.current && targetCameraPosRef.current && targetLookAtRef.current) {
+        camera.position.lerp(targetCameraPosRef.current, 0.08);
+        controls.target.lerp(targetLookAtRef.current, 0.08);
+        const posDist = camera.position.distanceTo(targetCameraPosRef.current);
+        const tgtDist = controls.target.distanceTo(targetLookAtRef.current);
+        if (posDist < 0.5 && tgtDist < 0.5) {
+          camera.position.copy(targetCameraPosRef.current);
+          controls.target.copy(targetLookAtRef.current);
+          isAnimatingCameraRef.current = false;
+          controls.enableDamping = true;
+        }
+      }
+
       controls.update();
       composer.render();
     }
@@ -1392,6 +1427,58 @@ export default function ModelViewer() {
       scene.background = new THREE.Color(0x1a1a1a);
     }
   }, [hdriBackground]);
+
+  // Camera preset handler
+  const handleCameraPreset = useCallback((idx: number) => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const preset = CAMERA_PRESETS[idx];
+    targetCameraPosRef.current = new THREE.Vector3(...preset.position);
+    targetLookAtRef.current = new THREE.Vector3(...preset.target);
+    isAnimatingCameraRef.current = true;
+    controls.enableDamping = false;
+    setActiveCameraPreset(idx);
+  }, []);
+
+  // Double-click zoom handler
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!renderer || !camera || !controls) return;
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const onDblClick = (event: MouseEvent) => {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const model = currentModelRef.current;
+      if (!model) return;
+
+      const intersects = raycaster.intersectObject(model, true);
+      if (intersects.length > 0) {
+        const hitPoint = intersects[0].point;
+        const direction = hitPoint.clone().sub(camera.position).normalize();
+        const newPos = camera.position.clone().add(direction.multiplyScalar(40));
+        targetCameraPosRef.current = newPos;
+        targetLookAtRef.current = hitPoint.clone();
+        isAnimatingCameraRef.current = true;
+        controls.enableDamping = false;
+        setActiveCameraPreset(-1);
+      } else {
+        // No hit — reset to front preset
+        handleCameraPreset(0);
+      }
+    };
+
+    renderer.domElement.addEventListener("dblclick", onDblClick);
+    return () => {
+      renderer.domElement.removeEventListener("dblclick", onDblClick);
+    };
+  }, [handleCameraPreset]);
 
   // Handlers
   const handleHdri = (idx: number) => {
@@ -1578,6 +1665,21 @@ export default function ModelViewer() {
             >
               Reset
             </button>
+          </div>
+        </ControlGroup>
+
+        {/* View */}
+        <ControlGroup label="View">
+          <div className="flex flex-wrap gap-1">
+            {CAMERA_PRESETS.map((preset, i) => (
+              <SidebarButton
+                key={preset.name}
+                active={activeCameraPreset === i}
+                onClick={() => handleCameraPreset(i)}
+              >
+                {preset.name}
+              </SidebarButton>
+            ))}
           </div>
         </ControlGroup>
 
