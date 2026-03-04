@@ -1,0 +1,39 @@
+name: Provision QA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  provision:
+    name: Provision Fly.io QA
+    runs-on: [self-hosted, linux, amd64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
+      - name: Assemble secrets file
+        run: |
+          cat > .env.qa << 'SECRETS_EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.QA_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.QA_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.QA_SUPABASE_SERVICE_ROLE_KEY }}
+          STRIPE_SECRET_KEY=${{ secrets.QA_STRIPE_SECRET_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.QA_STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.QA_STRIPE_WEBHOOK_SECRET }}
+          ANTHROPIC_API_KEY=${{ secrets.QA_ANTHROPIC_API_KEY }}
+          ICREATE_API_KEY=${{ secrets.QA_ICREATE_API_KEY }}
+          ICREATE_API_URL=${{ secrets.QA_ICREATE_API_URL }}
+          SHIPSTATION_API_KEY=${{ secrets.QA_SHIPSTATION_API_KEY }}
+          SHIPSTATION_API_SECRET=${{ secrets.QA_SHIPSTATION_API_SECRET }}
+          RESEND_API_KEY=${{ secrets.QA_RESEND_API_KEY }}
+          AUTH_SECRET=${{ secrets.QA_AUTH_SECRET }}
+          NEXT_PUBLIC_APP_URL=${{ secrets.QA_APP_URL }}
+          SEED_USER_EMAIL=${{ secrets.QA_SEED_USER_EMAIL }}
+          SEED_USER_PASSWORD=${{ secrets.QA_SEED_USER_PASSWORD }}
+          SECRETS_EOF
+      - name: Run provision script
+        run: ./infra/provision.sh qa
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Clean up secrets file
+        if: always()
+        run: rm -f .env.qa

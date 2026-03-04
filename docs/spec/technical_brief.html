@@ -543,7 +543,7 @@
 
 <h3 id="infrastructure-deployment">4.3 Infrastructure &amp; Deployment</h3>
 
-<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through Gitea Actions with a three-branch model. Code is integrated on <code>main</code>, explicitly promoted to <code>staging</code> for client review, and will be promoted to <code>prod</code> for production release. Deployments are triggered only by pushes to the <code>staging</code> branch&mdash;pushing to <code>main</code> does not deploy anywhere.</p>
+<p>The application is containerized via Docker and deployed to Fly.io. CI/CD is handled through Gitea Actions with a four-branch model. Code is integrated on <code>main</code>, promoted to <code>qa</code> for automated and manual QA testing, then to <code>staging</code> for client review, and finally to <code>prod</code> for production release. Deployments are triggered by pushes to the <code>qa</code> or <code>staging</code> branches&mdash;pushing to <code>main</code> does not deploy anywhere.</p>
 
 <table>
   <thead>
@@ -551,6 +551,7 @@
   </thead>
   <tbody>
     <tr><td><code>main</code></td><td>None</td><td>All feature work merges here</td><td>Integration branch; CI runs typecheck + lint but does not deploy</td></tr>
+    <tr><td><code>qa</code></td><td>Fly.io QA</td><td><code>git push origin main:qa</code></td><td>QA testing; deploys to <code>tinker-tailor-qa</code> on Fly.io with isolated Supabase project</td></tr>
     <tr><td><code>staging</code></td><td>Fly.io staging</td><td><code>git push origin main:staging</code></td><td>Client review; deploys to <code>tinker-tailor-staging</code> on Fly.io</td></tr>
     <tr><td><code>prod</code></td><td>Fly.io production (future)</td><td>Promote from staging when ready</td><td>Live invite-only MVP; connected to production database, payment processor, and factory integration</td></tr>
   </tbody>
@@ -574,14 +575,16 @@
 
 <p><code>flyctl</code> is pre-installed on the amd64 runner machine rather than installed per-run. Deployments use <code>flyctl deploy</code> (local build, local push) rather than <code>--remote-only</code>, keeping the full build pipeline on local hardware.</p>
 
-<p>Two workflows cover the full lifecycle:</p>
+<p>Four workflows cover the full lifecycle (deploy + provision for each environment):</p>
 <table>
   <thead>
     <tr><th>Workflow</th><th>Trigger</th><th>What it does</th></tr>
   </thead>
   <tbody>
-    <tr><td>Deploy</td><td>Push to staging branch</td><td>Type-check + lint, then <code>flyctl deploy</code>. Secrets are already on the Fly app; only <code>FLY_API_TOKEN</code> is needed in Gitea.</td></tr>
-    <tr><td>Provision</td><td>Manual (<code>workflow_dispatch</code>)</td><td>Assembles <code>.env.staging</code> from Gitea secrets, calls <code>infra/provision.sh staging</code>, removes the temp file. Run once when standing up a fresh environment.</td></tr>
+    <tr><td>Deploy QA</td><td>Push to qa branch</td><td>Type-check + lint, then <code>flyctl deploy --app tinker-tailor-qa</code>. Secrets are already on the Fly app; only <code>FLY_API_TOKEN</code> is needed in Gitea.</td></tr>
+    <tr><td>Deploy Staging</td><td>Push to staging branch</td><td>Type-check + lint, then <code>flyctl deploy --app tinker-tailor-staging</code>. Same secret requirements as QA.</td></tr>
+    <tr><td>Provision QA</td><td>Manual (<code>workflow_dispatch</code>)</td><td>Assembles <code>.env.qa</code> from Gitea <code>QA_*</code> secrets, calls <code>infra/provision.sh qa</code>, removes the temp file. Run once when standing up a fresh environment.</td></tr>
+    <tr><td>Provision Staging</td><td>Manual (<code>workflow_dispatch</code>)</td><td>Assembles <code>.env.staging</code> from Gitea <code>STAGING_*</code> secrets, calls <code>infra/provision.sh staging</code>, removes the temp file. Run once when standing up a fresh environment.</td></tr>
   </tbody>
 </table>
 
