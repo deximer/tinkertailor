@@ -27,6 +27,8 @@ jobs:
           RESEND_API_KEY=${{ secrets.QA_RESEND_API_KEY }}
           AUTH_SECRET=${{ secrets.QA_AUTH_SECRET }}
           NEXT_PUBLIC_APP_URL=${{ secrets.QA_APP_URL }}
+          SEED_USER_EMAIL=${{ secrets.QA_SEED_USER_EMAIL }}
+          SEED_USER_PASSWORD=${{ secrets.QA_SEED_USER_PASSWORD }}
           SECRETS_EOF
       - name: Run provision script
         run: ./infra/provision.sh qa

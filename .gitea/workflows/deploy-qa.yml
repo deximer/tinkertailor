@@ -2,7 +2,7 @@ name: Deploy QA
 
 on:
   push:
-    branches: [main]
+    branches: [qa]
 
 jobs:
   typecheck:
