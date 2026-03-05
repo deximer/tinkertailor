@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import type { DesignPhase } from "@/lib/compatibility/engine";
 
+export type StudioMode = "imagine" | "atelier";
+
 interface DesignSessionState {
+  studioMode: StudioMode;
   silhouetteId: string | null;
   selectedComponentIds: string[];
   selectedFabricSkinId: string | null;
@@ -12,6 +15,7 @@ interface DesignSessionState {
 }
 
 interface DesignSessionActions {
+  setStudioMode: (mode: StudioMode) => void;
   loadSilhouette: (id: string, componentIds: string[]) => void;
   selectComponent: (id: string) => void;
   deselectComponent: (id: string) => void;
@@ -25,6 +29,7 @@ interface DesignSessionActions {
 }
 
 const initialState: DesignSessionState = {
+  studioMode: "imagine",
   silhouetteId: null,
   selectedComponentIds: [],
   selectedFabricSkinId: null,
@@ -39,8 +44,11 @@ export const useDesignSession = create<
 >()((set, get) => ({
   ...initialState,
 
+  setStudioMode: (mode) => set({ studioMode: mode }),
+
   loadSilhouette: (id, componentIds) =>
     set({
+      studioMode: "atelier",
       silhouetteId: id,
       selectedComponentIds: componentIds,
       selectedFabricSkinId: null,

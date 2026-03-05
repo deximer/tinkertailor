@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ModelViewer from "@/app/components/ModelViewer";
 import LogoutButton from "@/app/components/LogoutButton";
 import TaraChat from "@/app/components/TaraChat";
@@ -13,7 +14,15 @@ export default function Home() {
       {/* Viewer panel — right */}
       <div className="relative flex-1">
         <ModelViewer />
-        <LogoutButton />
+        <div className="fixed bottom-4 right-4 z-10 flex items-center gap-3">
+          <Link
+            href="/design"
+            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-gray-200"
+          >
+            Open Design Studio
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
     </div>
   );
