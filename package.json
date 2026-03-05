@@ -17,8 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/react": "^3.0.118",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
+    "ai": "^6.0.116",
     "drizzle-orm": "^0.45.1",
     "exceljs": "^4.4.0",
     "mammoth": "^1.11.0",
