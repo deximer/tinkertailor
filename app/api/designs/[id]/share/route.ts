@@ -5,6 +5,21 @@ import { products, attributionLinks } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
+const RESERVED_SLUGS = new Set([
+  "api", "shop", "checkout", "orders", "auth", "admin",
+  "designs", "design", "login", "signup", "settings",
+  "webhooks", "health", "favicon",
+]);
+
+function generateSafeSlug(): string {
+  let slug = nanoid(10);
+  // Extremely unlikely for a 10-char nanoid to collide, but guard anyway
+  while (RESERVED_SLUGS.has(slug)) {
+    slug = nanoid(10);
+  }
+  return slug;
+}
+
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -47,8 +62,8 @@ export async function POST(
       return NextResponse.json({ url: `/shop/${existing[0].slug}` });
     }
 
-    // Generate new attribution link
-    const slug = nanoid(10);
+    // Generate new attribution link with reserved path check
+    const slug = generateSafeSlug();
     await db.insert(attributionLinks).values({
       productId,
       creatorId: user.id,

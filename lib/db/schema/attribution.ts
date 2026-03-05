@@ -30,7 +30,6 @@ export const attributionVisits = pgTable("attribution_visits", {
   visitedAt: timestamp("visited_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  ipHash: varchar("ip_hash", { length: 64 }),
 });
 
 export type AttributionLink = typeof attributionLinks.$inferSelect;
