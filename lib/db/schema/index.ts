@@ -6,3 +6,4 @@ export * from "./fabrics";
 export * from "./silhouettes";
 export * from "./tags";
 export * from "./products";
+export * from "./orders";
