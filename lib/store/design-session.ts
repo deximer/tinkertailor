@@ -19,6 +19,8 @@ interface DesignSessionActions {
   selectFabric: (id: string, fabricCode: string) => void;
   setDesignPhase: (phase: DesignPhase) => void;
   setDesignName: (name: string) => void;
+  saveDesign: () => Promise<string | null>;
+  loadDesign: (id: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -34,7 +36,7 @@ const initialState: DesignSessionState = {
 
 export const useDesignSession = create<
   DesignSessionState & DesignSessionActions
->()((set) => ({
+>()((set, get) => ({
   ...initialState,
 
   loadSilhouette: (id, componentIds) =>
@@ -69,6 +71,56 @@ export const useDesignSession = create<
 
   setDesignName: (name) =>
     set({ designName: name }),
+
+  saveDesign: async () => {
+    const state = get();
+    if (state.selectedComponentIds.length === 0) return null;
+
+    const res = await fetch("/api/designs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: state.designName,
+        silhouetteTemplateId: state.silhouetteId,
+        selectedComponentIds: state.selectedComponentIds,
+        selectedFabricSkinId: state.selectedFabricSkinId,
+      }),
+    });
+
+    if (!res.ok) return null;
+
+    const { id } = (await res.json()) as { id: string };
+    set({ savedDesignId: id });
+    return id;
+  },
+
+  loadDesign: async (id) => {
+    const res = await fetch(`/api/designs/${id}`);
+    if (!res.ok) return;
+
+    const data = (await res.json()) as {
+      id: string;
+      name: string;
+      silhouetteTemplateId: string | null;
+      components: {
+        id: string;
+        fabricSkinId: string | null;
+        fabricCode: string | null;
+      }[];
+    };
+
+    const componentIds = data.components.map((c) => c.id);
+    const fabric = data.components.find((c) => c.fabricSkinId);
+
+    set({
+      savedDesignId: data.id,
+      designName: data.name,
+      silhouetteId: data.silhouetteTemplateId,
+      selectedComponentIds: componentIds,
+      selectedFabricSkinId: fabric?.fabricSkinId ?? null,
+      selectedFabricCode: fabric?.fabricCode ?? null,
+    });
+  },
 
   reset: () => set(initialState),
 }));

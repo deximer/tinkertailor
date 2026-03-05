@@ -10,7 +10,7 @@ import { silhouetteTemplates } from "./silhouettes";
 import { components } from "./components";
 import { fabricSkins } from "./fabrics";
 
-export const productStatusEnum = ["draft", "published"] as const;
+export const productStatusEnum = ["draft", "published", "archived"] as const;
 export type ProductStatus = (typeof productStatusEnum)[number];
 
 export const products = pgTable("products", {
