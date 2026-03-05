@@ -17,8 +17,7 @@ import {
 } from "@/lib/compatibility";
 
 // The compatibility engine expects plain PostgresJsDatabase; our db proxy
-// carries the full schema generic. Cast once to avoid `as any` in every call.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// carries the full schema generic. Cast once to avoid repeated casts.
 const plainDb = db as unknown as PostgresJsDatabase;
 
 // ---------------------------------------------------------------------------
