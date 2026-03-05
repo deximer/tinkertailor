@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { orders, attributionLinks } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { calculateOrderTotal } from "@/lib/pricing/engine";
 import Stripe from "stripe";
 
@@ -33,10 +33,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "productId is required" }, { status: 400 });
     }
 
-    // 2. Calculate pricing
+    // 2. Check for existing pending order to prevent duplicates
+    const [existingOrder] = await db
+      .select({
+        id: orders.id,
+        stripePaymentIntentId: orders.stripePaymentIntentId,
+      })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.userId, user.id),
+          eq(orders.productId, body.productId),
+          eq(orders.status, "pending"),
+        ),
+      );
+
+    if (existingOrder?.stripePaymentIntentId) {
+      // Resume existing pending order — retrieve client secret from Stripe
+      const existingIntent = await getStripeClient().paymentIntents.retrieve(
+        existingOrder.stripePaymentIntentId,
+      );
+      return NextResponse.json({
+        clientSecret: existingIntent.client_secret,
+        orderId: existingOrder.id,
+      });
+    }
+
+    // 3. Calculate pricing
     const pricing = await calculateOrderTotal({ productId: body.productId });
 
-    // Check for attribution cookie
+    // Check for attribution cookie — verify slug belongs to this product
     let creatorId: string | null = null;
     const cookieStore = await cookies();
     const attributionSlug = cookieStore.get("attribution_slug")?.value;
@@ -44,13 +70,18 @@ export async function POST(request: Request) {
       const [link] = await db
         .select({ creatorId: attributionLinks.creatorId })
         .from(attributionLinks)
-        .where(eq(attributionLinks.slug, attributionSlug));
+        .where(
+          and(
+            eq(attributionLinks.slug, attributionSlug),
+            eq(attributionLinks.productId, body.productId),
+          ),
+        );
       if (link) {
         creatorId = link.creatorId;
       }
     }
 
-    // 3. Create Stripe Payment Intent (amount in cents)
+    // 4. Create Stripe Payment Intent (amount in cents)
     const amountInCents = Math.round(parseFloat(pricing.total) * 100);
     const paymentIntent = await getStripeClient().paymentIntents.create({
       amount: amountInCents,
@@ -61,7 +92,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // 4. Insert pending order
+    // 5. Insert pending order
     const [order] = await db
       .insert(orders)
       .values({
@@ -77,7 +108,7 @@ export async function POST(request: Request) {
       })
       .returning({ id: orders.id });
 
-    // 5. Return client secret and order ID
+    // 6. Return client secret and order ID
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       orderId: order.id,
