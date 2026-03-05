@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { orders, products } from "@/lib/db/schema";
+import { orders, products, shipments } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export async function GET(
@@ -27,13 +27,16 @@ export async function GET(
         shippingCost: orders.shippingCost,
         total: orders.total,
         shippingAddress: orders.shippingAddress,
-        stripePaymentIntentId: orders.stripePaymentIntentId,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         productName: products.name,
+        shipmentStatus: shipments.status,
+        trackingNumber: shipments.trackingNumber,
+        carrier: shipments.carrier,
       })
       .from(orders)
       .leftJoin(products, eq(orders.productId, products.id))
+      .leftJoin(shipments, eq(shipments.orderId, orders.id))
       .where(and(eq(orders.id, id), eq(orders.userId, user.id)));
 
     if (rows.length === 0) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 interface OrderSummary {
@@ -40,17 +40,25 @@ function formatDate(iso: string): string {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const fetchOrders = useCallback(async (cursor?: string) => {
+    const url = cursor ? `/api/orders?cursor=${encodeURIComponent(cursor)}` : "/api/orders";
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error("Failed to load orders");
+    }
+    return res.json() as Promise<{ items: OrderSummary[]; nextCursor: string | null }>;
+  }, []);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/orders");
-        if (!res.ok) {
-          throw new Error("Failed to load orders");
-        }
-        const data = await res.json();
-        setOrders(data);
+        const data = await fetchOrders();
+        setOrders(data.items);
+        setNextCursor(data.nextCursor);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load orders");
       } finally {
@@ -58,7 +66,21 @@ export default function OrdersPage() {
       }
     }
     load();
-  }, []);
+  }, [fetchOrders]);
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await fetchOrders(nextCursor);
+      setOrders((prev) => [...prev, ...data.items]);
+      setNextCursor(data.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load more orders");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -133,6 +155,15 @@ export default function OrdersPage() {
                 </div>
               </Link>
             ))}
+            {nextCursor && (
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="mt-4 w-full rounded-md border border-gray-700 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:text-white disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            )}
           </div>
         )}
       </div>

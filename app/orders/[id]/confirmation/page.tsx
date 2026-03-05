@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -12,33 +12,56 @@ interface OrderConfirmation {
   productName: string | null;
 }
 
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLLS = 30; // 60s max
+
 export default function OrderConfirmationPage() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderConfirmation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pollCount = useRef(0);
+
+  const fetchOrder = useCallback(async () => {
+    const res = await fetch(`/api/orders/${id}`);
+    if (res.status === 404) {
+      throw new Error("Order not found");
+    }
+    if (!res.ok) {
+      throw new Error("Failed to load order");
+    }
+    return (await res.json()) as OrderConfirmation;
+  }, [id]);
 
   useEffect(() => {
-    async function load() {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    async function poll() {
       try {
-        const res = await fetch(`/api/orders/${id}`);
-        if (res.status === 404) {
-          setError("Order not found");
-          return;
-        }
-        if (!res.ok) {
-          throw new Error("Failed to load order");
-        }
-        const data = await res.json();
+        const data = await fetchOrder();
+        if (cancelled) return;
         setOrder(data);
+        setLoading(false);
+
+        // Keep polling while pending until webhook confirms payment
+        if (data.status === "pending" && pollCount.current < MAX_POLLS) {
+          pollCount.current++;
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        }
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "Failed to load order");
-      } finally {
         setLoading(false);
       }
     }
-    load();
-  }, [id]);
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [fetchOrder]);
 
   if (loading) {
     return (
@@ -64,19 +87,36 @@ export default function OrderConfirmationPage() {
     );
   }
 
+  const isPending = order.status === "pending";
+
   return (
     <div className="min-h-screen bg-[#111] px-4 py-8">
       <div className="mx-auto max-w-lg text-center">
         <div className="mb-8">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-900/50 text-3xl">
-            <span role="img" aria-label="checkmark">
-              &#10003;
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold text-white">Thank you!</h1>
-          <p className="mt-2 text-gray-400">
-            Your order has been confirmed.
-          </p>
+          {isPending ? (
+            <>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-900/50 text-3xl animate-pulse">
+                <span role="img" aria-label="processing">&#9203;</span>
+              </div>
+              <h1 className="text-3xl font-bold text-white">
+                Finalizing your order...
+              </h1>
+              <p className="mt-2 text-gray-400">
+                Your payment is being processed. This usually takes a few
+                seconds.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-900/50 text-3xl">
+                <span role="img" aria-label="checkmark">&#10003;</span>
+              </div>
+              <h1 className="text-3xl font-bold text-white">Thank you!</h1>
+              <p className="mt-2 text-gray-400">
+                Your order has been confirmed.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="mb-8 rounded-lg border border-gray-800 bg-[#1a1a1a] p-6 text-left">

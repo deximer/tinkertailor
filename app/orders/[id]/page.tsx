@@ -21,10 +21,12 @@ interface OrderDetail {
   shippingCost: string;
   total: string;
   shippingAddress: ShippingAddress | null;
-  stripePaymentIntentId: string | null;
   createdAt: string;
   updatedAt: string;
   productName: string | null;
+  shipmentStatus: string | null;
+  trackingNumber: string | null;
+  carrier: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -169,6 +171,37 @@ export default function OrderDetailPage() {
                 </p>
               )}
               {addr.country && <p>{addr.country}</p>}
+            </div>
+          </section>
+        )}
+
+        {/* Shipment Tracking */}
+        {order.shipmentStatus && (
+          <section className="mb-6 rounded-lg border border-gray-800 bg-[#1a1a1a] p-4">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
+              Shipment
+            </h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-gray-300">
+                <span>Status</span>
+                <span className="font-medium capitalize text-white">
+                  {order.shipmentStatus.replace(/_/g, " ")}
+                </span>
+              </div>
+              {order.carrier && (
+                <div className="flex justify-between text-gray-300">
+                  <span>Carrier</span>
+                  <span className="text-white">{order.carrier}</span>
+                </div>
+              )}
+              {order.trackingNumber && (
+                <div className="flex justify-between text-gray-300">
+                  <span>Tracking</span>
+                  <span className="font-mono text-xs text-emerald-400">
+                    {order.trackingNumber}
+                  </span>
+                </div>
+              )}
             </div>
           </section>
         )}

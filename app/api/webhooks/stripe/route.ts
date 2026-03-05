@@ -37,6 +37,16 @@ export async function POST(request: Request) {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
     try {
+      // Idempotency: check if already processed
+      const [existingOrder] = await db
+        .select({ id: orders.id, status: orders.status })
+        .from(orders)
+        .where(eq(orders.stripePaymentIntentId, paymentIntent.id));
+
+      if (existingOrder?.status === "paid") {
+        return NextResponse.json({ received: true });
+      }
+
       const [updatedOrder] = await db
         .update(orders)
         .set({
@@ -44,7 +54,12 @@ export async function POST(request: Request) {
           stripeChargeId: paymentIntent.latest_charge as string | null,
           updatedAt: new Date(),
         })
-        .where(eq(orders.stripePaymentIntentId, paymentIntent.id))
+        .where(
+          and(
+            eq(orders.stripePaymentIntentId, paymentIntent.id),
+            eq(orders.status, "pending"),
+          ),
+        )
         .returning({
           id: orders.id,
           userId: orders.userId,

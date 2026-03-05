@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { orders, products } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, lt } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
-export async function GET() {
+const PAGE_SIZE = 20;
+
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -14,6 +17,19 @@ export async function GET() {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const cursor = searchParams.get("cursor");
+    const limitParam = searchParams.get("limit");
+    const limit = Math.min(
+      Math.max(parseInt(limitParam ?? "", 10) || PAGE_SIZE, 1),
+      100,
+    );
+
+    const conditions: SQL[] = [eq(orders.userId, user.id)];
+    if (cursor) {
+      conditions.push(lt(orders.createdAt, new Date(cursor)));
+    }
+
     const rows = await db
       .select({
         id: orders.id,
@@ -26,10 +42,17 @@ export async function GET() {
       })
       .from(orders)
       .leftJoin(products, eq(orders.productId, products.id))
-      .where(eq(orders.userId, user.id))
-      .orderBy(desc(orders.createdAt));
+      .where(and(...conditions))
+      .orderBy(desc(orders.createdAt))
+      .limit(limit + 1);
 
-    return NextResponse.json(rows);
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore
+      ? items[items.length - 1].createdAt.toISOString()
+      : null;
+
+    return NextResponse.json({ items, nextCursor });
   } catch (err) {
     console.error("[api/orders] Error:", err);
     return NextResponse.json(
