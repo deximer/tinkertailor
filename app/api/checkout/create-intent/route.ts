@@ -5,7 +5,13 @@ import { orders } from "@/lib/db/schema";
 import { calculateOrderTotal } from "@/lib/pricing/engine";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+let _stripe: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  }
+  return _stripe;
+}
 
 export async function POST(request: Request) {
   // 1. Auth check
@@ -30,7 +36,7 @@ export async function POST(request: Request) {
 
     // 3. Create Stripe Payment Intent (amount in cents)
     const amountInCents = Math.round(parseFloat(pricing.total) * 100);
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripeClient().paymentIntents.create({
       amount: amountInCents,
       currency: "usd",
       metadata: {

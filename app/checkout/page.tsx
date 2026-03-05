@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { Suspense, useEffect, useState, FormEvent } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -279,7 +279,7 @@ function CheckoutForm({
   );
 }
 
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const productId = searchParams.get("productId");
   const [pricing, setPricing] = useState<PricingBreakdown | null>(null);
@@ -351,5 +351,19 @@ export default function CheckoutPage() {
         </Elements>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#111]">
+          <p className="text-gray-400">Loading checkout...</p>
+        </div>
+      }
+    >
+      <CheckoutPageContent />
+    </Suspense>
   );
 }
