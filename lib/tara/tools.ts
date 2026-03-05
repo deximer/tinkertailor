@@ -27,8 +27,9 @@ const plainDb = db as unknown as PostgresJsDatabase;
 export const searchSilhouettes = tool({
   description:
     "Search silhouette templates by tag filters. Returns matching silhouettes " +
-    "with their name, pattern ID, and tags. Use extracted tag values from the " +
-    "user's description to find relevant designs.",
+    "ranked by how many tags match, with their name, pattern ID, match score, " +
+    "and tags. Results with more matching tags appear first. Use extracted tag " +
+    "values from the user's description to find relevant designs.",
   inputSchema: z.object({
     coreSilhouette: z.string().optional().describe("Core silhouette slug (e.g. a-line, sheath)"),
     length: z.string().optional().describe("Length slug (e.g. midi, floor-length)"),
@@ -78,14 +79,26 @@ export const searchSilhouettes = tool({
       .innerJoin(tagDimensions, eq(tagValues.dimensionId, tagDimensions.id))
       .where(inArray(silhouetteTags.silhouetteId, silhouetteIds));
 
-    // Filter silhouettes that have ALL requested tags
-    const matches = allSilhouettes.filter((sil) => {
-      if (requestedSlugs.length === 0) return true;
-      const silTags = tagAssignments
-        .filter((t) => t.silhouetteId === sil.id)
-        .map((t) => t.tagSlug);
-      return requestedSlugs.every((slug) => silTags.includes(slug));
+    // Score silhouettes by number of matching tags (ranked matching).
+    // Require at least half the requested tags (minimum 1) to qualify.
+    const MAX_RESULTS = 8;
+    const minScore = Math.max(1, Math.floor(requestedSlugs.length / 2));
+
+    const scored = allSilhouettes.map((sil) => {
+      if (requestedSlugs.length === 0) return { ...sil, matchScore: 1 };
+      const silTags = new Set(
+        tagAssignments
+          .filter((t) => t.silhouetteId === sil.id)
+          .map((t) => t.tagSlug),
+      );
+      const matchScore = requestedSlugs.filter((slug) => silTags.has(slug)).length;
+      return { ...sil, matchScore };
     });
+
+    const matches = scored
+      .filter((s) => s.matchScore >= (requestedSlugs.length === 0 ? 1 : minScore))
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, MAX_RESULTS);
 
     // Fetch components for matching silhouettes
     const matchIds = matches.map((m) => m.id);
@@ -107,6 +120,8 @@ export const searchSilhouettes = tool({
         id: sil.id,
         name: sil.name,
         patternId: sil.patternId,
+        matchScore: sil.matchScore,
+        totalRequested: requestedSlugs.length,
         tags: tagAssignments
           .filter((t) => t.silhouetteId === sil.id)
           .map((t) => ({
