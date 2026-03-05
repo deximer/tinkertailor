@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, products } from "@/lib/db/schema";
+import { orders, products, attributionLinks, attributionVisits } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import Stripe from "stripe";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
           id: orders.id,
           userId: orders.userId,
           productId: orders.productId,
+          creatorId: orders.creatorId,
           total: orders.total,
         });
 
@@ -73,6 +74,29 @@ export async function POST(request: Request) {
           }
         } catch (emailErr) {
           console.error("[webhooks/stripe] Email send error:", emailErr);
+        }
+
+        // Record attribution visit if order has a creator
+        if (updatedOrder.creatorId) {
+          try {
+            const [link] = await db
+              .select({ id: attributionLinks.id })
+              .from(attributionLinks)
+              .where(
+                and(
+                  eq(attributionLinks.productId, updatedOrder.productId),
+                  eq(attributionLinks.creatorId, updatedOrder.creatorId),
+                ),
+              );
+            if (link) {
+              await db.insert(attributionVisits).values({
+                attributionLinkId: link.id,
+                orderId: updatedOrder.id,
+              });
+            }
+          } catch (attrErr) {
+            console.error("[webhooks/stripe] Attribution visit error:", attrErr);
+          }
         }
       }
     } catch (err) {

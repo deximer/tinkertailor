@@ -15,6 +15,13 @@
       "when": 1772738431942,
       "tag": "0001_mixed_supernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772739489844,
+      "tag": "0002_pretty_ink",
+      "breakpoints": true
     }
   ]
 }

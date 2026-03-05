@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDesignSession } from "@/lib/store/design-session";
 import ModeSwitcher from "./ModeSwitcher";
@@ -15,8 +16,30 @@ export default function DesignSessionHeader() {
   const silhouetteId = useDesignSession((s) => s.silhouetteId);
   const selectedFabricSkinId = useDesignSession((s) => s.selectedFabricSkinId);
   const reset = useDesignSession((s) => s.reset);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const canCheckout = !!savedDesignId && !!silhouetteId && !!selectedFabricSkinId;
+
+  const handleShare = async () => {
+    if (!savedDesignId || sharing) return;
+    setSharing(true);
+    try {
+      const res = await fetch(`/api/designs/${savedDesignId}/share`, {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const fullUrl = `${window.location.origin}${data.url}`;
+      await navigator.clipboard.writeText(fullUrl);
+      setShareUrl(fullUrl);
+      setTimeout(() => setShareUrl(null), 3000);
+    } catch {
+      // Silently fail — share is best-effort
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const handleNew = () => {
     // Skip confirmation if nothing to lose (no components selected or already saved)
@@ -48,6 +71,15 @@ export default function DesignSessionHeader() {
       {/* Actions */}
       <div className="flex items-center gap-2">
         <SaveDesignButton />
+        {savedDesignId && (
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-[#2a2a2a] hover:text-white disabled:cursor-not-allowed"
+          >
+            {shareUrl ? "Copied!" : sharing ? "Sharing..." : "Share"}
+          </button>
+        )}
         <button
           disabled={!canCheckout}
           onClick={() => router.push(`/checkout?productId=${savedDesignId}`)}

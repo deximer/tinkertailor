@@ -7,3 +7,4 @@ export * from "./silhouettes";
 export * from "./tags";
 export * from "./products";
 export * from "./orders";
+export * from "./attribution";

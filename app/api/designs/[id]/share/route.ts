@@ -1,0 +1,63 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { products, attributionLinks } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
+import { nanoid } from "nanoid";
+
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: productId } = await params;
+
+  try {
+    // Verify the product exists and the caller is the creator
+    const [product] = await db
+      .select({ id: products.id, userId: products.userId })
+      .from(products)
+      .where(eq(products.id, productId));
+
+    if (!product) {
+      return NextResponse.json({ error: "Design not found" }, { status: 404 });
+    }
+
+    if (product.userId !== user.id) {
+      return NextResponse.json({ error: "Only the creator can share this design" }, { status: 403 });
+    }
+
+    // Idempotent: return existing link if one exists for this design+creator
+    const existing = await db
+      .select({ slug: attributionLinks.slug })
+      .from(attributionLinks)
+      .where(
+        and(
+          eq(attributionLinks.productId, productId),
+          eq(attributionLinks.creatorId, user.id),
+        ),
+      );
+
+    if (existing.length > 0) {
+      return NextResponse.json({ url: `/shop/${existing[0].slug}` });
+    }
+
+    // Generate new attribution link
+    const slug = nanoid(10);
+    await db.insert(attributionLinks).values({
+      productId,
+      creatorId: user.id,
+      slug,
+    });
+
+    return NextResponse.json({ url: `/shop/${slug}` }, { status: 201 });
+  } catch (err) {
+    console.error("[designs/[id]/share] Error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

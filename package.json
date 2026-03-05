@@ -27,6 +27,7 @@
     "drizzle-orm": "^0.45.1",
     "exceljs": "^4.4.0",
     "mammoth": "^1.11.0",
+    "nanoid": "^5.1.6",
     "next": "^15.1.0",
     "postgres": "^3.4.8",
     "react": "^19.0.0",
