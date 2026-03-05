@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useDesignSession } from "@/lib/store/design-session";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +29,17 @@ interface FabricParentCategory {
   children: FabricChildCategory[];
 }
 
+// Deterministic color swatch from fabric code — gives each fabric a stable
+// representative color until a proper hex column is added to fabric_skins.
+function fabricSwatch(code: string): string {
+  let h = 0;
+  for (let i = 0; i < code.length; i++) {
+    h = (h * 31 + code.charCodeAt(i)) | 0;
+  }
+  const hue = ((h % 360) + 360) % 360;
+  return `hsl(${hue}, 30%, 45%)`;
+}
+
 // ---------------------------------------------------------------------------
 // FabricPicker
 // ---------------------------------------------------------------------------
@@ -44,28 +55,31 @@ export default function FabricPicker() {
     new Set(),
   );
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Only show fabric picker after silhouette phase
   const hasSilhouetteComponents =
     designPhase !== "silhouette" && selectedComponentIds.length > 0;
 
   // Fetch compatible fabrics when component selection changes
-  useEffect(() => {
+  const fetchFabrics = useCallback(async () => {
     if (!hasSilhouetteComponents) {
       setCategories([]);
       return;
     }
 
-    async function fetchFabrics() {
-      setLoading(true);
-      const params = new URLSearchParams({
-        compatible_with: selectedComponentIds.join(","),
-      });
+    setLoading(true);
+    setFetchError(null);
+    const params = new URLSearchParams({
+      compatible_with: selectedComponentIds.join(","),
+    });
 
+    try {
       const res = await fetch(
         `/api/fabric-skin-categories?${params.toString()}`,
       );
       if (!res.ok) {
+        setFetchError("Failed to load fabrics");
         setLoading(false);
         return;
       }
@@ -74,14 +88,22 @@ export default function FabricPicker() {
       setCategories(data);
 
       // Auto-expand first category
-      if (data.length > 0 && expandedCategories.size === 0) {
-        setExpandedCategories(new Set([data[0].id]));
+      if (data.length > 0) {
+        setExpandedCategories((prev) =>
+          prev.size === 0 ? new Set([data[0].id]) : prev,
+        );
       }
 
       setLoading(false);
+    } catch {
+      setFetchError("Failed to load fabrics");
+      setLoading(false);
     }
+  }, [selectedComponentIds, hasSilhouetteComponents]);
+
+  useEffect(() => {
     fetchFabrics();
-  }, [selectedComponentIds, hasSilhouetteComponents]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchFabrics]);
 
   const toggleCategory = (id: string) => {
     setExpandedCategories((prev) => {
@@ -107,6 +129,20 @@ export default function FabricPicker() {
     return (
       <div className="flex h-32 items-center justify-center px-3 text-sm text-gray-500">
         Loading fabrics...
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex h-32 flex-col items-center justify-center gap-2 px-3 text-sm text-red-400">
+        <span>{fetchError}</span>
+        <button
+          onClick={fetchFabrics}
+          className="rounded-md bg-[#2a2a2a] px-3 py-1 text-xs text-gray-300 transition-colors hover:bg-[#3a3a3a]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -158,7 +194,13 @@ export default function FabricPicker() {
                               : "border-gray-700 bg-[#2a2a2a] text-gray-300 hover:border-gray-500 hover:bg-[#3a3a3a]"
                           }`}
                         >
-                          <div className="text-xs font-medium">{skin.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-600"
+                              style={{ backgroundColor: fabricSwatch(skin.fabricCode) }}
+                            />
+                            <span className="text-xs font-medium">{skin.name}</span>
+                          </div>
                           {markup > 0 && (
                             <div className="mt-0.5 text-[10px] text-gray-500">
                               +${markup.toFixed(0)}

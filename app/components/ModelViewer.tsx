@@ -1111,17 +1111,60 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     const mat = garmentMatRef.current;
     if (!mat) return;
 
-    // Map fabric code prefix to closest FABRICS texture preset
+    // Map fabric code to closest FABRICS texture preset index.
+    // Strategy: exact match → 2-char prefix → keyword search → default (Silk).
+    const FABRIC_CODE_MAP: Record<string, number> = {
+      // Exact code matches
+      "SILK": 0, "SC": 0, "SI": 0,
+      "SATIN": 1, "SS": 1, "SA": 1,
+      "COTTON": 2, "CC": 2, "CO": 2, "CT": 2,
+      "LINEN": 3, "LI": 3, "LN": 3,
+      "CHIFFON": 4, "CH": 4, "CF": 4,
+      "VELVET": 5, "VE": 5, "VL": 5,
+      "DENIM": 6, "DE": 6, "DN": 6,
+      "WOOL": 7, "WO": 7, "WL": 7,
+      // Additional type keywords
+      "CREPE": 0, "CHARMEUSE": 1, "ORGANZA": 4,
+      "TULLE": 4, "TWEED": 7, "CASHMERE": 7, "JERSEY": 2,
+      "POPLIN": 2, "CHAMBRAY": 6, "TAFFETA": 1,
+    };
+
+    const FABRIC_KEYWORDS: readonly [string, number][] = [
+      ["SILK", 0], ["SATIN", 1], ["COTTON", 2], ["LINEN", 3],
+      ["CHIFFON", 4], ["VELVET", 5], ["DENIM", 6], ["WOOL", 7],
+      ["CREPE", 0], ["CHARMEUSE", 1], ["ORGANZA", 4], ["TULLE", 4],
+      ["TWEED", 7], ["CASHMERE", 7], ["JERSEY", 2], ["POPLIN", 2],
+      ["CHAMBRAY", 6], ["TAFFETA", 1],
+    ] as const;
+
     const codeUpper = selectedFabricCode.toUpperCase();
-    let fabricIdx = 0; // default to Silk
-    if (codeUpper.startsWith("SS") || codeUpper.includes("SATIN")) fabricIdx = 1;
-    else if (codeUpper.startsWith("CC") || codeUpper.includes("COTTON")) fabricIdx = 2;
-    else if (codeUpper.startsWith("LI") || codeUpper.includes("LINEN")) fabricIdx = 3;
-    else if (codeUpper.startsWith("CH") || codeUpper.includes("CHIFFON")) fabricIdx = 4;
-    else if (codeUpper.startsWith("VE") || codeUpper.includes("VELVET")) fabricIdx = 5;
-    else if (codeUpper.startsWith("DE") || codeUpper.includes("DENIM")) fabricIdx = 6;
-    else if (codeUpper.startsWith("WO") || codeUpper.includes("WOOL")) fabricIdx = 7;
-    // SC/Silk Crepe and default → Silk (0)
+    let fabricIdx: number | undefined;
+
+    // 1. Exact match on full code
+    fabricIdx = FABRIC_CODE_MAP[codeUpper];
+
+    // 2. Prefix match on first 2 characters
+    if (fabricIdx === undefined && codeUpper.length >= 2) {
+      fabricIdx = FABRIC_CODE_MAP[codeUpper.slice(0, 2)];
+    }
+
+    // 3. Keyword search within the code string
+    if (fabricIdx === undefined) {
+      for (const [keyword, idx] of FABRIC_KEYWORDS) {
+        if (codeUpper.includes(keyword)) {
+          fabricIdx = idx;
+          break;
+        }
+      }
+    }
+
+    // 4. Default to Silk (0) with a warning
+    if (fabricIdx === undefined) {
+      console.warn(
+        `[ModelViewer] No fabric texture preset found for code "${selectedFabricCode}". Defaulting to Silk.`,
+      );
+      fabricIdx = 0;
+    }
 
     const fab = FABRICS[fabricIdx];
     if (!textureCacheRef.current[fabricIdx]) {
