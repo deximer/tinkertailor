@@ -9,6 +9,9 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "node --env-file=.env.local ./node_modules/.bin/tsx scripts/seed.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env.local ./node_modules/.bin/tsx lib/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
     "test": "echo \"No tests configured yet\" && exit 0"
   },
   "dependencies": {
