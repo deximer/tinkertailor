@@ -14,49 +14,57 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const typeSlug = searchParams.get("type");
-  const compatibleWith = searchParams.get("compatible_with");
+  try {
+    const { searchParams } = new URL(request.url);
+    const typeSlug = searchParams.get("type");
+    const compatibleWith = searchParams.get("compatible_with");
 
-  // If compatible_with is provided, delegate to the compatibility engine
-  if (compatibleWith) {
-    const selectedIds = compatibleWith.split(",").filter(Boolean);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await getCompatibleComponents(db as any, selectedIds);
+    // If compatible_with is provided, delegate to the compatibility engine
+    if (compatibleWith) {
+      const selectedIds = compatibleWith.split(",").filter(Boolean);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await getCompatibleComponents(db as any, selectedIds);
 
-    let filtered = result.components;
-    if (typeSlug) {
-      filtered = filtered.filter((c) => c.typeSlug === typeSlug);
+      let filtered = result.components;
+      if (typeSlug) {
+        filtered = filtered.filter((c) => c.typeSlug === typeSlug);
+      }
+
+      return NextResponse.json({
+        designPhase: result.designPhase,
+        components: filtered,
+        selectedComponents: result.selectedComponents,
+      });
     }
 
-    return NextResponse.json({
-      designPhase: result.designPhase,
-      components: filtered,
-      selectedComponents: result.selectedComponents,
-    });
+    // Simple component listing with optional type filter
+    const conditions: SQL[] = [];
+    if (typeSlug) {
+      conditions.push(eq(componentTypes.slug, typeSlug));
+    }
+
+    const rows = await db
+      .select({
+        id: components.id,
+        name: components.name,
+        code: components.code,
+        componentTypeId: components.componentTypeId,
+        modelPath: components.modelPath,
+        typeName: componentTypes.name,
+        typeSlug: componentTypes.slug,
+        stage: componentTypes.stage,
+        isFirstLeaf: componentTypes.isFirstLeaf,
+      })
+      .from(components)
+      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return NextResponse.json(rows);
+  } catch (err) {
+    console.error("[components] DB error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
-
-  // Simple component listing with optional type filter
-  const conditions: SQL[] = [];
-  if (typeSlug) {
-    conditions.push(eq(componentTypes.slug, typeSlug));
-  }
-
-  const rows = await db
-    .select({
-      id: components.id,
-      name: components.name,
-      code: components.code,
-      componentTypeId: components.componentTypeId,
-      modelPath: components.modelPath,
-      typeName: componentTypes.name,
-      typeSlug: componentTypes.slug,
-      stage: componentTypes.stage,
-      isFirstLeaf: componentTypes.isFirstLeaf,
-    })
-    .from(components)
-    .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-  return NextResponse.json(rows);
 }

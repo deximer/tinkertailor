@@ -14,39 +14,47 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const categorySlug = searchParams.get("category");
-  const stage = searchParams.get("stage");
+  try {
+    const { searchParams } = new URL(request.url);
+    const categorySlug = searchParams.get("category");
+    const stage = searchParams.get("stage");
 
-  const conditions: SQL[] = [];
+    const conditions: SQL[] = [];
 
-  if (categorySlug) {
-    const cat = await db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(eq(categories.slug, categorySlug))
-      .limit(1);
-    if (cat.length === 0) {
-      return NextResponse.json([]);
+    if (categorySlug) {
+      const cat = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, categorySlug))
+        .limit(1);
+      if (cat.length === 0) {
+        return NextResponse.json([]);
+      }
+      conditions.push(eq(componentTypes.categoryId, cat[0].id));
     }
-    conditions.push(eq(componentTypes.categoryId, cat[0].id));
+
+    if (stage) {
+      conditions.push(eq(componentTypes.stage, stage as ComponentStage));
+    }
+
+    const rows = await db
+      .select({
+        id: componentTypes.id,
+        name: componentTypes.name,
+        slug: componentTypes.slug,
+        categoryId: componentTypes.categoryId,
+        stage: componentTypes.stage,
+        isFirstLeaf: componentTypes.isFirstLeaf,
+      })
+      .from(componentTypes)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return NextResponse.json(rows);
+  } catch (err) {
+    console.error("[component-types] DB error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
-
-  if (stage) {
-    conditions.push(eq(componentTypes.stage, stage as ComponentStage));
-  }
-
-  const rows = await db
-    .select({
-      id: componentTypes.id,
-      name: componentTypes.name,
-      slug: componentTypes.slug,
-      categoryId: componentTypes.categoryId,
-      stage: componentTypes.stage,
-      isFirstLeaf: componentTypes.isFirstLeaf,
-    })
-    .from(componentTypes)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-  return NextResponse.json(rows);
 }

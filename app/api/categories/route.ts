@@ -12,13 +12,21 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rows = await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      slug: categories.slug,
-    })
-    .from(categories);
+  try {
+    const rows = await db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+      })
+      .from(categories);
 
-  return NextResponse.json(rows);
+    return NextResponse.json(rows);
+  } catch (err) {
+    console.error("[categories] DB error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
 }

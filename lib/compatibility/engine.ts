@@ -55,6 +55,7 @@ export interface FabricCategoryWithSkins {
   id: string;
   name: string;
   slug: string;
+  parentId: string | null;
   skins: {
     id: string;
     name: string;
@@ -331,6 +332,7 @@ export async function getCompatibleFabrics(
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
+        parentId: cat.parentId,
         skins,
       });
     }
