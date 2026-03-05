@@ -94,32 +94,22 @@ export async function calculateOrderTotal(params: {
 
   const basePrice = parseFloat(silhouetteRows[0].basePrice);
 
-  // 3. Get all product components with their fabric markups
+  // 3. Get all product components with their fabric markups in a single query
   const componentRows = await db
     .select({
       fabricSkinId: productComponents.fabricSkinId,
+      priceMarkup: fabricSkins.priceMarkup,
     })
     .from(productComponents)
+    .leftJoin(fabricSkins, eq(fabricSkins.id, productComponents.fabricSkinId))
     .where(eq(productComponents.productId, productId));
 
   // 4. Sum fabric markups
   let fabricMarkupTotal = 0;
 
   for (const row of componentRows) {
-    if (!row.fabricSkinId) {
-      // No fabric selected on this component — treat markup as 0
-      continue;
-    }
-
-    const fabricRows = await db
-      .select({
-        priceMarkup: fabricSkins.priceMarkup,
-      })
-      .from(fabricSkins)
-      .where(eq(fabricSkins.id, row.fabricSkinId));
-
-    if (fabricRows.length > 0) {
-      fabricMarkupTotal += parseFloat(fabricRows[0].priceMarkup);
+    if (row.priceMarkup) {
+      fabricMarkupTotal += parseFloat(row.priceMarkup);
     }
   }
 

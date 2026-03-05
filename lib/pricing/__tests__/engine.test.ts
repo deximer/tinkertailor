@@ -77,10 +77,8 @@ describe("calculateOrderTotal", () => {
       ],
       // select-1: silhouette base price
       "select-1": [{ basePrice: "49.99" }],
-      // select-2: product components
-      "select-2": [{ fabricSkinId: "fab-1" }],
-      // select-3: fabric skin markup for fab-1
-      "select-3": [{ priceMarkup: "12.50" }],
+      // select-2: product components LEFT JOIN fabric_skins
+      "select-2": [{ fabricSkinId: "fab-1", priceMarkup: "12.50" }],
     });
 
     // Re-import with fresh module to pick up our mock
@@ -102,18 +100,12 @@ describe("calculateOrderTotal", () => {
       ],
       // select-1: silhouette base price
       "select-1": [{ basePrice: "100.00" }],
-      // select-2: product components (3 components, each with a fabric)
+      // select-2: product components LEFT JOIN fabric_skins (all markups in one query)
       "select-2": [
-        { fabricSkinId: "fab-1" },
-        { fabricSkinId: "fab-2" },
-        { fabricSkinId: "fab-3" },
+        { fabricSkinId: "fab-1", priceMarkup: "5.00" },
+        { fabricSkinId: "fab-2", priceMarkup: "10.00" },
+        { fabricSkinId: "fab-3", priceMarkup: "7.50" },
       ],
-      // select-3: fabric skin markup for fab-1
-      "select-3": [{ priceMarkup: "5.00" }],
-      // select-4: fabric skin markup for fab-2
-      "select-4": [{ priceMarkup: "10.00" }],
-      // select-5: fabric skin markup for fab-3
-      "select-5": [{ priceMarkup: "7.50" }],
     });
 
     vi.doMock("@/lib/db", () => ({ db: mockDb, getDb: () => mockDb }));
@@ -136,14 +128,11 @@ describe("calculateOrderTotal", () => {
       ],
       // select-1: silhouette base price
       "select-1": [{ basePrice: "75.00" }],
-      // select-2: product components — one with fabric, one without
+      // select-2: product components LEFT JOIN fabric_skins — null priceMarkup for no fabric
       "select-2": [
-        { fabricSkinId: "fab-1" },
-        { fabricSkinId: null },
+        { fabricSkinId: "fab-1", priceMarkup: "15.00" },
+        { fabricSkinId: null, priceMarkup: null },
       ],
-      // select-3: fabric skin markup for fab-1
-      "select-3": [{ priceMarkup: "15.00" }],
-      // No select-4 needed — the null fabricSkinId is skipped
     });
 
     vi.doMock("@/lib/db", () => ({ db: mockDb, getDb: () => mockDb }));

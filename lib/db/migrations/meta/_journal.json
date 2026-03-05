@@ -22,6 +22,13 @@
       "when": 1772739489844,
       "tag": "0002_pretty_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772825000000,
+      "tag": "0003_add_indexes",
+      "breakpoints": true
     }
   ]
 }
