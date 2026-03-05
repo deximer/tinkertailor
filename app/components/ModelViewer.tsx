@@ -850,7 +850,7 @@ const SCENES: SceneDef[] = [
     name: "Studio",
     build: buildStudio,
     lighting: [
-      { name: "Standard", ambient: { color: 0xffffff, intensity: 0.4 }, key: { color: 0xffffff, intensity: 1.2, pos: [30, 80, 60] }, fill: { color: 0xc4b5a0, intensity: 0.5, pos: [-40, 60, -30] }, rim: { color: 0x8b9dc3, intensity: 0.3, pos: [0, 30, -80] }, exposure: 1.2 },
+      { name: "Standard", ambient: { color: 0xffffff, intensity: 0.6 }, key: { color: 0xffffff, intensity: 1.2, pos: [30, 80, 60] }, fill: { color: 0xc4b5a0, intensity: 0.5, pos: [-40, 60, -30] }, rim: { color: 0x8b9dc3, intensity: 0.3, pos: [0, 30, -80] }, exposure: 1.4 },
       { name: "Natural", ambient: { color: 0xf5f0e8, intensity: 0.6 }, key: { color: 0xfff8e7, intensity: 1.0, pos: [50, 100, 40] }, fill: { color: 0xc8d8e8, intensity: 0.35, pos: [-30, 40, 20] }, rim: { color: 0xe8dcc8, intensity: 0.15, pos: [0, 20, -60] }, exposure: 1.3 },
       { name: "Dramatic", ambient: { color: 0x202020, intensity: 0.15 }, key: { color: 0xffffff, intensity: 1.8, pos: [60, 90, 30] }, fill: { color: 0x1a1a2e, intensity: 0.1, pos: [-50, 40, -20] }, rim: { color: 0xffffff, intensity: 0.6, pos: [-20, 50, -70] }, exposure: 1.0 },
       { name: "Cool", ambient: { color: 0xd0e0f0, intensity: 0.45 }, key: { color: 0xe8f0ff, intensity: 1.1, pos: [30, 80, 60] }, fill: { color: 0x8899bb, intensity: 0.4, pos: [-40, 60, -30] }, rim: { color: 0x6688bb, intensity: 0.35, pos: [0, 30, -80] }, exposure: 1.15 },
@@ -1383,11 +1383,11 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     controlsRef.current = controls;
 
     // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambient);
     ambientRef.current = ambient;
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
     keyLight.position.set(30, 80, 60);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 1024;
@@ -1401,12 +1401,12 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     scene.add(keyLight);
     keyLightRef.current = keyLight;
 
-    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.3);
+    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.5);
     fillLight.position.set(-40, 60, -30);
     scene.add(fillLight);
     fillLightRef.current = fillLight;
 
-    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.2);
+    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.3);
     rimLight.position.set(0, 30, -80);
     scene.add(rimLight);
     rimLightRef.current = rimLight;
@@ -1466,7 +1466,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
     const vignettePass = new ShaderPass(VignetteShader);
     vignettePass.uniforms["offset"].value = 0.2;
-    vignettePass.uniforms["darkness"].value = 1.4;
+    vignettePass.uniforms["darkness"].value = 1.1;
     vignettePass.enabled = true;
     composer.addPass(vignettePass);
     vignettePassRef.current = vignettePass;
