@@ -5,6 +5,7 @@ interface DesignSessionState {
   silhouetteId: string | null;
   selectedComponentIds: string[];
   selectedFabricSkinId: string | null;
+  selectedFabricCode: string | null;
   designPhase: DesignPhase;
   designName: string;
   savedDesignId: string | null;
@@ -15,7 +16,7 @@ interface DesignSessionActions {
   selectComponent: (id: string) => void;
   deselectComponent: (id: string) => void;
   setSelectedComponents: (ids: string[]) => void;
-  selectFabric: (id: string) => void;
+  selectFabric: (id: string, fabricCode: string) => void;
   setDesignPhase: (phase: DesignPhase) => void;
   setDesignName: (name: string) => void;
   reset: () => void;
@@ -25,6 +26,7 @@ const initialState: DesignSessionState = {
   silhouetteId: null,
   selectedComponentIds: [],
   selectedFabricSkinId: null,
+  selectedFabricCode: null,
   designPhase: "silhouette",
   designName: "My Design",
   savedDesignId: null,
@@ -40,6 +42,7 @@ export const useDesignSession = create<
       silhouetteId: id,
       selectedComponentIds: componentIds,
       selectedFabricSkinId: null,
+      selectedFabricCode: null,
       designPhase: "embellishment",
     }),
 
@@ -58,8 +61,8 @@ export const useDesignSession = create<
   setSelectedComponents: (ids) =>
     set({ selectedComponentIds: ids }),
 
-  selectFabric: (id) =>
-    set({ selectedFabricSkinId: id }),
+  selectFabric: (id, fabricCode) =>
+    set({ selectedFabricSkinId: id, selectedFabricCode: fabricCode }),
 
   setDesignPhase: (phase) =>
     set({ designPhase: phase }),

@@ -1102,6 +1102,50 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     loadDesignModels(selectedComponentIds);
   }, [designMode, selectedComponentIds, loadDesignModels]);
 
+  // Design mode: respond to fabric selection
+  const selectedFabricCode = useDesignSession((s) => s.selectedFabricCode);
+
+  useEffect(() => {
+    if (!designMode || !selectedFabricCode) return;
+
+    const mat = garmentMatRef.current;
+    if (!mat) return;
+
+    // Map fabric code prefix to closest FABRICS texture preset
+    const codeUpper = selectedFabricCode.toUpperCase();
+    let fabricIdx = 0; // default to Silk
+    if (codeUpper.startsWith("SS") || codeUpper.includes("SATIN")) fabricIdx = 1;
+    else if (codeUpper.startsWith("CC") || codeUpper.includes("COTTON")) fabricIdx = 2;
+    else if (codeUpper.startsWith("LI") || codeUpper.includes("LINEN")) fabricIdx = 3;
+    else if (codeUpper.startsWith("CH") || codeUpper.includes("CHIFFON")) fabricIdx = 4;
+    else if (codeUpper.startsWith("VE") || codeUpper.includes("VELVET")) fabricIdx = 5;
+    else if (codeUpper.startsWith("DE") || codeUpper.includes("DENIM")) fabricIdx = 6;
+    else if (codeUpper.startsWith("WO") || codeUpper.includes("WOOL")) fabricIdx = 7;
+    // SC/Silk Crepe and default → Silk (0)
+
+    const fab = FABRICS[fabricIdx];
+    if (!textureCacheRef.current[fabricIdx]) {
+      textureCacheRef.current[fabricIdx] = fab.texture();
+    }
+    mat.map = textureCacheRef.current[fabricIdx];
+    mat.roughness = fab.roughness;
+    mat.metalness = fab.metalness;
+    mat.sheen = fab.sheen ?? 0;
+    mat.sheenRoughness = fab.sheenRoughness ?? 0;
+    mat.sheenColor.set(fab.sheenColor ?? "#ffffff");
+    mat.transmission = fab.transmission ?? 0;
+    mat.thickness = fab.thickness ?? 0;
+    mat.needsUpdate = true;
+
+    // Sync material control state
+    setActiveFabricIdx(fabricIdx);
+    setMatSheen(fab.sheen ?? 0);
+    setMatSheenRoughness(fab.sheenRoughness ?? 0);
+    setMatSheenColor(fab.sheenColor ?? "#ffffff");
+    setMatTransmission(fab.transmission ?? 0);
+    setMatThickness(fab.thickness ?? 0);
+  }, [designMode, selectedFabricCode]);
+
   // Apply lighting preset
   const applyLighting = useCallback((preset: LightingPreset) => {
     const ambient = ambientRef.current;
