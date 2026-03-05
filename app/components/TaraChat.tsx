@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useRef, useEffect, useState, type FormEvent } from "react";
+import { useRef, useEffect, useState, useMemo, type FormEvent } from "react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useDesignSession } from "@/lib/store/design-session";
 
@@ -107,11 +107,31 @@ export default function TaraChat() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/tara/chat",
-    }),
-  });
+  // Read current design session state so TARA knows what's selected
+  const selectedComponentIds = useDesignSession((s) => s.selectedComponentIds);
+  const designPhase = useDesignSession((s) => s.designPhase);
+  const silhouetteId = useDesignSession((s) => s.silhouetteId);
+  const selectedFabricCode = useDesignSession((s) => s.selectedFabricCode);
+
+  // Memoize transport so it updates when design context changes but
+  // doesn't recreate on every render
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/tara/chat",
+        body: {
+          designContext: {
+            selectedComponentIds,
+            designPhase,
+            silhouetteId,
+            selectedFabricCode,
+          },
+        },
+      }),
+    [selectedComponentIds, designPhase, silhouetteId, selectedFabricCode],
+  );
+
+  const { messages, sendMessage, status } = useChat({ transport });
 
   const isLoading = status === "submitted" || status === "streaming";
 
