@@ -24,7 +24,7 @@ interface DesignSessionActions {
   setDesignPhase: (phase: DesignPhase) => void;
   setDesignName: (name: string) => void;
   saveDesign: () => Promise<string | null>;
-  loadDesign: (id: string) => Promise<void>;
+  loadDesign: (id: string) => Promise<{ error: string } | null>;
   reset: () => void;
 }
 
@@ -84,50 +84,61 @@ export const useDesignSession = create<
     const state = get();
     if (state.selectedComponentIds.length === 0) return null;
 
-    const res = await fetch("/api/designs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: state.designName,
-        silhouetteTemplateId: state.silhouetteId,
-        selectedComponentIds: state.selectedComponentIds,
-        selectedFabricSkinId: state.selectedFabricSkinId,
-      }),
-    });
+    try {
+      const res = await fetch("/api/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: state.designName,
+          silhouetteTemplateId: state.silhouetteId,
+          selectedComponentIds: state.selectedComponentIds,
+          selectedFabricSkinId: state.selectedFabricSkinId,
+        }),
+      });
 
-    if (!res.ok) return null;
+      if (!res.ok) return null;
 
-    const { id } = (await res.json()) as { id: string };
-    set({ savedDesignId: id });
-    return id;
+      const { id } = (await res.json()) as { id: string };
+      set({ savedDesignId: id });
+      return id;
+    } catch {
+      return null;
+    }
   },
 
   loadDesign: async (id) => {
-    const res = await fetch(`/api/designs/${id}`);
-    if (!res.ok) return;
+    try {
+      const res = await fetch(`/api/designs/${id}`);
+      if (!res.ok) {
+        return { error: res.status === 404 ? "Design not found" : "Failed to load design" };
+      }
 
-    const data = (await res.json()) as {
-      id: string;
-      name: string;
-      silhouetteTemplateId: string | null;
-      components: {
+      const data = (await res.json()) as {
         id: string;
-        fabricSkinId: string | null;
-        fabricCode: string | null;
-      }[];
-    };
+        name: string;
+        silhouetteTemplateId: string | null;
+        components: {
+          id: string;
+          fabricSkinId: string | null;
+          fabricCode: string | null;
+        }[];
+      };
 
-    const componentIds = data.components.map((c) => c.id);
-    const fabric = data.components.find((c) => c.fabricSkinId);
+      const componentIds = data.components.map((c) => c.id);
+      const fabric = data.components.find((c) => c.fabricSkinId);
 
-    set({
-      savedDesignId: data.id,
-      designName: data.name,
-      silhouetteId: data.silhouetteTemplateId,
-      selectedComponentIds: componentIds,
-      selectedFabricSkinId: fabric?.fabricSkinId ?? null,
-      selectedFabricCode: fabric?.fabricCode ?? null,
-    });
+      set({
+        savedDesignId: data.id,
+        designName: data.name,
+        silhouetteId: data.silhouetteTemplateId,
+        selectedComponentIds: componentIds,
+        selectedFabricSkinId: fabric?.fabricSkinId ?? null,
+        selectedFabricCode: fabric?.fabricCode ?? null,
+      });
+      return null;
+    } catch {
+      return { error: "Failed to load design" };
+    }
   },
 
   reset: () => set(initialState),

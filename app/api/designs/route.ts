@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { products, productComponents } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, ne, count, and } from "drizzle-orm";
 
 // POST /api/designs — save current design session
 export async function POST(request: Request) {
@@ -63,8 +63,8 @@ export async function POST(request: Request) {
   }
 }
 
-// GET /api/designs — list user's saved designs
-export async function GET() {
+// GET /api/designs — list user's saved designs (paginated)
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -74,22 +74,42 @@ export async function GET() {
   }
 
   try {
-    const designs = await db
-      .select({
-        id: products.id,
-        name: products.name,
-        status: products.status,
-        createdAt: products.createdAt,
-        updatedAt: products.updatedAt,
-      })
-      .from(products)
-      .where(eq(products.userId, user.id))
-      .orderBy(desc(products.updatedAt));
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") ?? "20", 10) || 20, 1),
+      100,
+    );
+    const offset = Math.max(
+      parseInt(searchParams.get("offset") ?? "0", 10) || 0,
+      0,
+    );
 
-    // Filter out archived (we use status check, but also allow drafts and published)
-    const active = designs.filter((d) => d.status !== "archived");
+    const whereClause = and(
+      eq(products.userId, user.id),
+      ne(products.status, "archived"),
+    );
 
-    return NextResponse.json(active);
+    const [designs, [{ total }]] = await Promise.all([
+      db
+        .select({
+          id: products.id,
+          name: products.name,
+          status: products.status,
+          createdAt: products.createdAt,
+          updatedAt: products.updatedAt,
+        })
+        .from(products)
+        .where(whereClause)
+        .orderBy(desc(products.updatedAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(products)
+        .where(whereClause),
+    ]);
+
+    return NextResponse.json({ designs, totalCount: total, limit, offset });
   } catch (err) {
     console.error("[designs GET] Error:", err);
     return NextResponse.json(
