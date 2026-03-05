@@ -1,0 +1,126 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import {
+  silhouetteTemplates,
+  silhouetteComponents,
+  categories,
+  components,
+  silhouetteTags,
+  tagValues,
+  tagDimensions,
+} from "@/lib/db/schema";
+import { eq, and, inArray, type SQL } from "drizzle-orm";
+
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const categorySlug = searchParams.get("category");
+  const tagSlugs = searchParams.get("tags");
+
+  const conditions: SQL[] = [];
+
+  if (categorySlug) {
+    const cat = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.slug, categorySlug))
+      .limit(1);
+    if (cat.length === 0) {
+      return NextResponse.json([]);
+    }
+    conditions.push(eq(silhouetteTemplates.categoryId, cat[0].id));
+  }
+
+  // Fetch silhouettes
+  const silhouettes = await db
+    .select({
+      id: silhouetteTemplates.id,
+      name: silhouetteTemplates.name,
+      patternId: silhouetteTemplates.patternId,
+      categoryId: silhouetteTemplates.categoryId,
+      basePrice: silhouetteTemplates.basePrice,
+      description: silhouetteTemplates.description,
+    })
+    .from(silhouetteTemplates)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  if (silhouettes.length === 0) {
+    return NextResponse.json([]);
+  }
+
+  const silhouetteIds = silhouettes.map((s) => s.id);
+
+  // Fetch component assignments for all silhouettes
+  const compAssignments = await db
+    .select({
+      silhouetteId: silhouetteComponents.silhouetteId,
+      componentId: silhouetteComponents.componentId,
+      componentName: components.name,
+      componentCode: components.code,
+    })
+    .from(silhouetteComponents)
+    .innerJoin(components, eq(silhouetteComponents.componentId, components.id))
+    .where(inArray(silhouetteComponents.silhouetteId, silhouetteIds));
+
+  // Fetch tags for all silhouettes
+  const tagAssignments = await db
+    .select({
+      silhouetteId: silhouetteTags.silhouetteId,
+      tagValueId: tagValues.id,
+      tagLabel: tagValues.label,
+      tagSlug: tagValues.slug,
+      dimensionName: tagDimensions.name,
+      dimensionSlug: tagDimensions.slug,
+    })
+    .from(silhouetteTags)
+    .innerJoin(tagValues, eq(silhouetteTags.tagValueId, tagValues.id))
+    .innerJoin(tagDimensions, eq(tagValues.dimensionId, tagDimensions.id))
+    .where(inArray(silhouetteTags.silhouetteId, silhouetteIds));
+
+  // If filtering by tags, find matching silhouette IDs
+  let filteredIds: Set<string> | null = null;
+  if (tagSlugs) {
+    const requestedSlugs = tagSlugs.split(",").filter(Boolean);
+    filteredIds = new Set<string>();
+    for (const sil of silhouettes) {
+      const silTags = tagAssignments
+        .filter((t) => t.silhouetteId === sil.id)
+        .map((t) => t.tagSlug);
+      if (requestedSlugs.every((slug) => silTags.includes(slug))) {
+        filteredIds.add(sil.id);
+      }
+    }
+  }
+
+  // Assemble response
+  const result = silhouettes
+    .filter((s) => (filteredIds ? filteredIds.has(s.id) : true))
+    .map((s) => ({
+      ...s,
+      components: compAssignments
+        .filter((c) => c.silhouetteId === s.id)
+        .map((c) => ({
+          id: c.componentId,
+          name: c.componentName,
+          code: c.componentCode,
+        })),
+      tags: tagAssignments
+        .filter((t) => t.silhouetteId === s.id)
+        .map((t) => ({
+          dimension: t.dimensionSlug,
+          dimensionName: t.dimensionName,
+          value: t.tagSlug,
+          label: t.tagLabel,
+        })),
+    }));
+
+  return NextResponse.json(result);
+}
