@@ -60,38 +60,48 @@ export default function ComponentBrowser() {
     ComponentData[]
   >([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Fetch component types on mount
   useEffect(() => {
     async function fetchTypes() {
-      const res = await fetch("/api/component-types");
-      if (!res.ok) return;
-      const types: ComponentType[] = await res.json();
-      // Sort by stage order, then alphabetically
-      types.sort(
-        (a, b) =>
-          (STAGE_ORDER[a.stage] ?? 99) - (STAGE_ORDER[b.stage] ?? 99) ||
-          a.name.localeCompare(b.name),
-      );
-      setComponentTypes(types);
-      if (types.length > 0 && !activeTypeSlug) {
-        setActiveTypeSlug(types[0].slug);
+      try {
+        const res = await fetch("/api/component-types");
+        if (!res.ok) {
+          setFetchError("Failed to load component types");
+          return;
+        }
+        const types: ComponentType[] = await res.json();
+        // Sort by stage order, then alphabetically
+        types.sort(
+          (a, b) =>
+            (STAGE_ORDER[a.stage] ?? 99) - (STAGE_ORDER[b.stage] ?? 99) ||
+            a.name.localeCompare(b.name),
+        );
+        setComponentTypes(types);
+        if (types.length > 0 && !activeTypeSlug) {
+          setActiveTypeSlug(types[0].slug);
+        }
+      } catch {
+        setFetchError("Failed to load component types");
       }
     }
     fetchTypes();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch compatible components when selection changes
-  useEffect(() => {
-    async function fetchCompatible() {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (selectedComponentIds.length > 0) {
-        params.set("compatible_with", selectedComponentIds.join(","));
-      }
+  const fetchCompatible = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    const params = new URLSearchParams();
+    if (selectedComponentIds.length > 0) {
+      params.set("compatible_with", selectedComponentIds.join(","));
+    }
 
+    try {
       const res = await fetch(`/api/components?${params.toString()}`);
       if (!res.ok) {
+        setFetchError("Failed to load components");
         setLoading(false);
         return;
       }
@@ -114,9 +124,15 @@ export default function ComponentBrowser() {
         setSelectedComponentsData([]);
       }
       setLoading(false);
+    } catch {
+      setFetchError("Failed to load components");
+      setLoading(false);
     }
-    fetchCompatible();
   }, [selectedComponentIds, setDesignPhase]);
+
+  useEffect(() => {
+    fetchCompatible();
+  }, [fetchCompatible]);
 
   // Apply selection rules client-side
   const handleSelectComponent = useCallback(
@@ -181,18 +197,44 @@ export default function ComponentBrowser() {
   return (
     <div className="flex h-full flex-col">
       {/* Component type tabs */}
-      <div className="flex gap-1 overflow-x-auto border-b border-gray-800 px-3 py-2">
+      <div
+        role="tablist"
+        aria-label="Component types"
+        className="flex gap-1 overflow-x-auto border-b border-gray-800 px-3 py-2"
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          const idx = componentTypes.findIndex(
+            (ct) => ct.slug === activeTypeSlug,
+          );
+          if (idx === -1) return;
+          const next =
+            e.key === "ArrowRight"
+              ? (idx + 1) % componentTypes.length
+              : (idx - 1 + componentTypes.length) % componentTypes.length;
+          setActiveTypeSlug(componentTypes[next].slug);
+          // Move focus to the newly active tab
+          const container = e.currentTarget;
+          const buttons = container.querySelectorAll<HTMLButtonElement>(
+            '[role="tab"]',
+          );
+          buttons[next]?.focus();
+        }}
+      >
         {componentTypes.map((ct) => {
           const count = countByType.get(ct.slug) ?? 0;
+          const isActive = activeTypeSlug === ct.slug;
           const hasSelected = selectedComponentsData.some(
             (c) => c.typeSlug === ct.slug,
           );
           return (
             <button
               key={ct.id}
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveTypeSlug(ct.slug)}
               className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTypeSlug === ct.slug
+                isActive
                   ? "bg-white text-black"
                   : "bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a]"
               }`}
@@ -201,7 +243,7 @@ export default function ComponentBrowser() {
               {hasSelected && (
                 <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
               )}
-              {count > 0 && activeTypeSlug !== ct.slug && (
+              {count > 0 && !isActive && (
                 <span className="text-gray-500">{count}</span>
               )}
             </button>
@@ -210,8 +252,18 @@ export default function ComponentBrowser() {
       </div>
 
       {/* Component grid */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {loading ? (
+      <div role="tabpanel" className="flex-1 overflow-y-auto p-3">
+        {fetchError ? (
+          <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-red-400">
+            <span>{fetchError}</span>
+            <button
+              onClick={fetchCompatible}
+              className="rounded-md bg-[#2a2a2a] px-3 py-1 text-xs text-gray-300 transition-colors hover:bg-[#3a3a3a]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="flex h-32 items-center justify-center text-sm text-gray-500">
             Loading components...
           </div>
