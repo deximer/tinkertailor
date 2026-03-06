@@ -20,7 +20,7 @@ import type { ComponentWithType } from "../engine";
 // that returns controlled data for each test.
 
 function createMockDb(overrides: {
-  selectResults?: Record<string, unknown[][]>;
+  selectResults?: Record<string, unknown[]>;
 } = {}) {
   const selectResults = overrides.selectResults ?? {};
   let callIndex = 0;

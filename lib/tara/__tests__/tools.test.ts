@@ -79,6 +79,13 @@ const toolCtx = {
 
 let searchSilhouettes: typeof import("../tools").searchSilhouettes;
 
+// The Vercel AI SDK types execute as returning T | AsyncIterable<T> to support
+// streaming, but in non-streaming tests it always returns T directly.
+type SearchInput = Parameters<NonNullable<typeof searchSilhouettes["execute"]>>[0];
+type SearchResult = { silhouettes: { id: string; name: string; patternId: string; matchScore: number; totalRequested: number; tags: { dimension: string; value: string; label: string }[]; components: { id: string; name: string; code: string }[] }[] };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const exec = (input: SearchInput, ctx = toolCtx) => searchSilhouettes.execute!(input, ctx) as any as Promise<SearchResult>;
+
 beforeEach(async () => {
   vi.clearAllMocks();
   dbCallCount = 0;
@@ -91,12 +98,12 @@ beforeEach(async () => {
 
 describe("searchSilhouettes", () => {
   it("returns all silhouettes when no filters are provided", async () => {
-    const result = await searchSilhouettes.execute({}, toolCtx);
+    const result = await exec({}, toolCtx);
     expect(result.silhouettes).toHaveLength(3);
   });
 
   it("ranks exact matches highest", async () => {
-    const result = await searchSilhouettes.execute(
+    const result = await exec(
       { aestheticMood: ["modern-romantic"], length: "midi", occasion: ["wedding-guest"] },
       toolCtx,
     );
@@ -111,7 +118,7 @@ describe("searchSilhouettes", () => {
   it("includes partial matches above threshold", async () => {
     // 3 requested slugs → minScore = max(1, floor(3/2)) = 1
     // sil-1: 3 matches, sil-2: 1 match (midi), sil-3: 0 matches
-    const result = await searchSilhouettes.execute(
+    const result = await exec(
       { aestheticMood: ["modern-romantic"], length: "midi", occasion: ["wedding-guest"] },
       toolCtx,
     );
@@ -123,7 +130,7 @@ describe("searchSilhouettes", () => {
   });
 
   it("returns empty array when no silhouettes match any tag", async () => {
-    const result = await searchSilhouettes.execute(
+    const result = await exec(
       { aestheticMood: ["goth"], occasion: ["burning-man"] },
       toolCtx,
     );
@@ -135,7 +142,7 @@ describe("searchSilhouettes", () => {
     mockSilhouettes = [];
     mockTags = [];
     mockComps = [];
-    const result = await searchSilhouettes.execute(
+    const result = await exec(
       { length: "midi" },
       toolCtx,
     );
@@ -144,7 +151,7 @@ describe("searchSilhouettes", () => {
   });
 
   it("includes tags and components in results", async () => {
-    const result = await searchSilhouettes.execute(
+    const result = await exec(
       { coreSilhouette: "a-line" },
       toolCtx,
     );
@@ -165,7 +172,7 @@ describe("searchSilhouettes", () => {
   it("sorts results by match score descending", async () => {
     // 2 requested slugs → minScore = max(1, floor(2/2)) = 1
     // sil-1: 2 matches (midi, modern-romantic), sil-2: 1 match (midi), sil-3: 0
-    const result = await searchSilhouettes.execute(
+    const result = await exec(
       { aestheticMood: ["modern-romantic"], length: "midi" },
       toolCtx,
     );
