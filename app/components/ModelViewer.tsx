@@ -1019,6 +1019,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
   const [vignetteDarkness, setVignetteDarkness] = useState(1.4);
 
   // Material controls state — initialised from first fabric's defaults
+  const [matRoughness, setMatRoughness] = useState(FABRICS[0].roughness);
   const [matSheen, setMatSheen] = useState(FABRICS[0].sheen ?? 0);
   const [matSheenRoughness, setMatSheenRoughness] = useState(FABRICS[0].sheenRoughness ?? 0);
   const [matSheenColor, setMatSheenColor] = useState(FABRICS[0].sheenColor ?? "#ffffff");
@@ -1237,6 +1238,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
     // Sync material control state
     setActiveFabricIdx(fabricIdx);
+    setMatRoughness(fab.roughness);
     setMatSheen(fab.sheen ?? 0);
     setMatSheenRoughness(fab.sheenRoughness ?? 0);
     setMatSheenColor(fab.sheenColor ?? "#ffffff");
@@ -1681,12 +1683,13 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
   useEffect(() => {
     const mat = garmentMatRef.current;
     if (!mat) return;
+    mat.roughness = matRoughness;
     mat.sheen = matSheen;
     mat.sheenRoughness = matSheenRoughness;
     mat.sheenColor.set(matSheenColor);
     mat.transmission = matTransmission;
     mat.thickness = matThickness;
-  }, [matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness]);
+  }, [matRoughness, matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness]);
 
   // Turntable
   useEffect(() => {
@@ -1788,6 +1791,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     setActiveFabricIdx(idx);
     applyMaterial(idx, activeColorIdx);
     const fab = FABRICS[idx];
+    setMatRoughness(fab.roughness);
     setMatSheen(fab.sheen ?? 0);
     setMatSheenRoughness(fab.sheenRoughness ?? 0);
     setMatSheenColor(fab.sheenColor ?? "#ffffff");
@@ -1903,6 +1907,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
         {/* Material */}
         <ControlGroup label="Material">
           <div className="flex flex-col gap-1.5">
+            <SliderRow label="Reflection" value={1 - matRoughness} min={0} max={1} step={0.01} onChange={(v) => setMatRoughness(1 - v)} />
             <SliderRow label="Sheen" value={matSheen} min={0} max={1} step={0.01} onChange={setMatSheen} />
             <SliderRow label="Sheen Rgh" value={matSheenRoughness} min={0} max={1} step={0.01} onChange={setMatSheenRoughness} />
             <div className="flex items-center gap-2 text-xs text-gray-400">
