@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   varchar,
+  boolean,
   integer,
   numeric,
   timestamp,
@@ -24,6 +25,7 @@ export const products = pgTable("products", {
     .notNull()
     .default("draft")
     .$type<ProductStatus>(),
+  shared: boolean("shared").notNull().default(false),
   totalPrice: numeric("total_price", { precision: 10, scale: 2 })
     .notNull()
     .default("0"),

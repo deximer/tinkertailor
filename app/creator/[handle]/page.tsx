@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { profiles, creatorApplications, products } from "@/lib/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 function formatDate(date: Date): string {
@@ -55,14 +55,14 @@ export default async function CreatorProfilePage({
     )
     .limit(1);
 
-  // Get their published designs
+  // Get their shared designs (publicly visible on creator profile)
   const designs = await db
     .select()
     .from(products)
     .where(
       and(
         eq(products.userId, profile.id),
-        ne(products.status, "archived"),
+        eq(products.shared, true),
       ),
     );
 

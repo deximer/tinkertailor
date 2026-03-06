@@ -28,6 +28,16 @@ export default async function UserNav() {
           Design Studio
         </Link>
       )}
+      {role === "creator" && (
+        <>
+          <Link href="/dashboard" className={linkClass}>
+            Dashboard
+          </Link>
+          <Link href="/designs" className={linkClass}>
+            My Designs
+          </Link>
+        </>
+      )}
       <Link href="/profile" className={linkClass}>
         Profile
       </Link>

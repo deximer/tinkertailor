@@ -30,9 +30,12 @@ export async function createClient() {
 }
 
 /**
- * Read the user's role from the JWT app_metadata claim.
+ * Read the user's role from the validated JWT app_metadata claim.
+ * Uses getUser() instead of getSession() to ensure the JWT is validated
+ * against the Supabase Auth server, preventing stale or tampered tokens.
+ *
  * The `custom_access_token_hook` DB function stamps `app_role` into the JWT
- * so this requires no additional DB query.
+ * so this requires no additional DB query beyond the validation call.
  *
  * Setup: Register `public.custom_access_token_hook` as a Custom Access Token
  * Hook in the Supabase Auth dashboard (Authentication → Hooks).
@@ -41,11 +44,11 @@ export async function getUserRole(
   supabase: SupabaseClient,
 ): Promise<UserRole | null> {
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) return null;
+  if (!user) return null;
 
-  const role = session.user.app_metadata?.app_role as UserRole | undefined;
+  const role = user.app_metadata?.app_role as UserRole | undefined;
   return role ?? null;
 }

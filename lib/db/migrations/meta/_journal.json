@@ -57,6 +57,20 @@
       "when": 1772870600000,
       "tag": "0007_creator_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772870700000,
+      "tag": "0008_profiles_fk_auth_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772870800000,
+      "tag": "0009_products_shared_column",
+      "breakpoints": true
     }
   ]
 }

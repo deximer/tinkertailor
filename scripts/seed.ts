@@ -112,6 +112,28 @@ async function main() {
     console.log('Created storage bucket "models" (private).');
   }
 
+  // Create avatars storage bucket (public — avatar images are served publicly)
+  const { error: avatarBucketError } = await supabase.storage.createBucket('avatars', {
+    public: true,
+    fileSizeLimit: 5242880, // 5 MB
+    allowedMimeTypes: [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ],
+  });
+
+  if (avatarBucketError) {
+    if (avatarBucketError.message.includes('already exists')) {
+      console.log('Storage bucket "avatars" already exists, skipping.');
+    } else {
+      console.error('Failed to create avatars bucket:', avatarBucketError.message);
+    }
+  } else {
+    console.log('Created storage bucket "avatars" (public).');
+  }
+
   // Add Storage RLS policy: authenticated users can read objects from the models bucket.
   const policyName = 'Authenticated users can read models';
   const { error: policyError } = await supabase.rpc('exec_sql', {

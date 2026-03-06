@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { inviteCodes, type InviteCode } from "@/lib/db/schema/invite-codes";
 

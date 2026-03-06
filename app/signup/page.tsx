@@ -11,7 +11,39 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [inviteCodeStatus, setInviteCodeStatus] = useState<
+    "idle" | "checking" | "valid" | "invalid"
+  >("idle");
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const validateCode = async (code: string) => {
+    if (!code.trim()) {
+      setInviteCodeStatus("idle");
+      setInviteCodeError(null);
+      return;
+    }
+
+    setInviteCodeStatus("checking");
+    setInviteCodeError(null);
+
+    try {
+      const res = await fetch(
+        `/api/auth/validate-invite-code?code=${encodeURIComponent(code.trim())}`,
+      );
+      const data = await res.json();
+
+      if (data.valid) {
+        setInviteCodeStatus("valid");
+        setInviteCodeError(null);
+      } else {
+        setInviteCodeStatus("invalid");
+        setInviteCodeError(data.error || "Invalid invite code");
+      }
+    } catch {
+      setInviteCodeStatus("idle");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,11 +104,33 @@ export default function SignupPage() {
               id="invite-code"
               type="text"
               value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
+              onChange={(e) => {
+                setInviteCode(e.target.value);
+                if (inviteCodeStatus !== "idle") {
+                  setInviteCodeStatus("idle");
+                  setInviteCodeError(null);
+                }
+              }}
+              onBlur={() => validateCode(inviteCode)}
               required
-              className="w-full rounded border border-gray-600 bg-[#2a2a2a] px-3 py-2 text-white placeholder-gray-500 focus:border-white focus:outline-none"
+              className={`w-full rounded border bg-[#2a2a2a] px-3 py-2 text-white placeholder-gray-500 focus:outline-none ${
+                inviteCodeStatus === "valid"
+                  ? "border-green-600 focus:border-green-500"
+                  : inviteCodeStatus === "invalid"
+                    ? "border-red-600 focus:border-red-500"
+                    : "border-gray-600 focus:border-white"
+              }`}
               placeholder="Enter your invite code"
             />
+            {inviteCodeStatus === "checking" && (
+              <p className="mt-1 text-xs text-gray-400">Checking code…</p>
+            )}
+            {inviteCodeStatus === "valid" && (
+              <p className="mt-1 text-xs text-green-400">Valid invite code</p>
+            )}
+            {inviteCodeError && (
+              <p className="mt-1 text-xs text-red-400">{inviteCodeError}</p>
+            )}
           </div>
 
           <div>

@@ -208,6 +208,14 @@ export default function ProfilePage() {
                 Apply to become a creator
               </Link>
             )}
+            {profile.role === "creator" && profile.handle && (
+              <Link
+                href={`/creator/${profile.handle}`}
+                className="ml-3 text-xs text-emerald-400 hover:text-emerald-300"
+              >
+                View your public profile
+              </Link>
+            )}
           </div>
 
           {/* Feedback */}
