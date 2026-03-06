@@ -1387,36 +1387,46 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
             }
             // Clo3D exports UVs in millimeter pattern space (e.g. -137..+124mm).
             // Detect and normalize to [0,1] so the fabric texture maps correctly.
-            const uvAttr = geo.attributes.uv as THREE.BufferAttribute;
+            // We always build a fresh non-interleaved Float32Array so the renderer
+            // uploads clean data regardless of the source attribute type.
+            const uvSrc = geo.attributes.uv;
             let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
-            for (let i = 0; i < uvAttr.count; i++) {
-              const u = uvAttr.getX(i), v = uvAttr.getY(i);
+            for (let i = 0; i < uvSrc.count; i++) {
+              const u = uvSrc.getX(i), v = uvSrc.getY(i);
               if (u < uMin) uMin = u; if (u > uMax) uMax = u;
               if (v < vMin) vMin = v; if (v > vMax) vMax = v;
             }
             const needsNorm = uMax > 1.5 || uMin < -0.5;
-            console.log(`[GLB mesh ${meshCount}] uvCount=${uvAttr.count} u=[${uMin.toFixed(2)},${uMax.toFixed(2)}] v=[${vMin.toFixed(2)},${vMax.toFixed(2)}] normalize=${needsNorm}`);
+            console.log(`[GLB mesh ${meshCount}] uvCount=${uvSrc.count} u=[${uMin.toFixed(2)},${uMax.toFixed(2)}] v=[${vMin.toFixed(2)},${vMax.toFixed(2)}] normalize=${needsNorm}`);
+            const arr = new Float32Array(uvSrc.count * 2);
             if (needsNorm) {
               const uRange = uMax - uMin || 1, vRange = vMax - vMin || 1;
-              const arr = new Float32Array(uvAttr.count * 2);
-              for (let i = 0; i < uvAttr.count; i++) {
-                arr[i * 2]     = (uvAttr.getX(i) - uMin) / uRange;
-                arr[i * 2 + 1] = (uvAttr.getY(i) - vMin) / vRange;
+              for (let i = 0; i < uvSrc.count; i++) {
+                arr[i * 2]     = (uvSrc.getX(i) - uMin) / uRange;
+                arr[i * 2 + 1] = (uvSrc.getY(i) - vMin) / vRange;
               }
-              geo.setAttribute("uv", new THREE.BufferAttribute(arr, 2));
             } else {
-              geo.attributes.uv.needsUpdate = true;
+              for (let i = 0; i < uvSrc.count; i++) {
+                arr[i * 2]     = uvSrc.getX(i);
+                arr[i * 2 + 1] = uvSrc.getY(i);
+              }
             }
+            const newUv = new THREE.BufferAttribute(arr, 2);
+            newUv.needsUpdate = true;
+            geo.setAttribute("uv", newUv);
           }
           mesh.material = mat;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         });
-        console.log(`[GLB] total meshes found: ${meshCount}, mat.map=${!!mat.map}`);
-        if (isGlb) {
-          // Force material recompile so USE_MAP is recalculated with the new UVs
-          mat.needsUpdate = true;
-          if (mat.map) mat.map.needsUpdate = true;
+        console.log(`[GLB] total meshes found: ${meshCount}, mat.map=${!!mat.map}, mat.map.channel=${mat.map?.channel ?? 'n/a'}`);
+        if (isGlb && mat.map) {
+          // Ensure the fabric texture uses UV channel 0 (geo.attributes.uv)
+          // and force re-upload so the normalized UVs are picked up on first render.
+          mat.map.channel = 0;
+          mat.map.needsUpdate = true;
+          // Do NOT call mat.needsUpdate here — the shader was already compiled
+          // with USE_MAP from the initial OBJ render; recompiling can drop it.
         }
         modelCacheRef.current[filename] = obj;
         currentModelRef.current = obj;
