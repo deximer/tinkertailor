@@ -62,6 +62,20 @@ export default function AdminPage() {
 
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
+            User Management
+          </h2>
+          <nav className="grid grid-cols-2 gap-2">
+            <Link
+              href="/admin/invite-codes"
+              className="rounded border border-gray-700 px-4 py-3 text-sm text-gray-200 hover:bg-[#2a2a2a] hover:border-gray-500 transition-colors"
+            >
+              Invite Codes
+            </Link>
+          </nav>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
             Upload Assets
           </h2>
           <AssetUploader onUploaded={() => setRefreshKey((k) => k + 1)} />
