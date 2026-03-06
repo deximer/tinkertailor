@@ -15,5 +15,10 @@ export default async function AdminLayout({
     redirect("/login?next=/admin");
   }
 
+  const role = user.app_metadata?.role as string | undefined;
+  if (role && role !== "admin") {
+    redirect("/login?next=/admin");
+  }
+
   return <>{children}</>;
 }
