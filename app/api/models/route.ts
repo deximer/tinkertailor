@@ -26,5 +26,9 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json((data ?? []).map((f) => ({ name: f.name })));
+  const files = (data ?? [])
+    .filter((f) => f.id !== null) // exclude folders
+    .map((f) => ({ name: f.name }));
+
+  return NextResponse.json(files);
 }

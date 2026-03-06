@@ -19,10 +19,6 @@ import { useDesignSession } from "@/lib/store/design-session";
 // Cache signed URLs so we don't re-fetch for the same filename
 const signedUrlCache: Record<string, { url: string; expiresAt: number }> = {};
 
-async function getModelUrl(filename: string): Promise<string> {
-  return getSignedModelUrl(filename, filename);
-}
-
 async function getSignedModelUrl(cacheKey: string, filename: string): Promise<string> {
   const cached = signedUrlCache[cacheKey];
   // Use cached URL if it expires more than 5 minutes from now
@@ -83,6 +79,18 @@ async function loadGroup(
       );
     }
   });
+}
+
+// Normalize GLB model height so it matches OBJ scale in the scene.
+function normalizeModel(group: THREE.Group, targetHeight = 20): void {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (size.y === 0) return;
+  const scale = targetHeight / size.y;
+  group.scale.setScalar(scale);
+  box.setFromObject(group);
+  group.position.y = -box.min.y;
 }
 
 // ── Procedural fabric texture helpers ──
@@ -982,7 +990,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [activeVariant, setActiveVariant] = useState("");
+  const [activeModel, setActiveModel] = useState<string | null>(null);
   const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
   const [activeColorIdx, setActiveColorIdx] = useState(3);
@@ -1304,9 +1312,9 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     [],
   );
 
-  // Load model
+  // Load model by filename
   const loadModel = useCallback(
-    async (variant: string) => {
+    async (filename: string) => {
       const scene = sceneRef.current;
       const mat = garmentMatRef.current;
       if (!scene || !mat) return;
@@ -1319,8 +1327,8 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
         scene.remove(currentModelRef.current);
       }
 
-      if (modelCacheRef.current[variant]) {
-        const cached = modelCacheRef.current[variant];
+      if (modelCacheRef.current[filename]) {
+        const cached = modelCacheRef.current[filename];
         currentModelRef.current = cached;
         scene.add(cached);
         setLoading(false);
@@ -1329,7 +1337,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
       let modelUrl: string;
       try {
-        modelUrl = await getModelUrl(variant);
+        modelUrl = await getSignedModelUrl(filename, filename);
       } catch (err) {
         setLoadError(
           `Failed to get model URL: ${err instanceof Error ? err.message : String(err)}`,
@@ -1344,7 +1352,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
             setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
           }
         });
-        if (isGlb) normalizeModel(obj);
+        if (isGlb) normalizeModel(obj, 20);
         obj.traverse((child) => {
           const mesh = child as THREE.Mesh;
           if (!mesh.isMesh) return;
@@ -1360,8 +1368,8 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         });
-        mat.needsUpdate = true;
-        modelCacheRef.current[variant] = obj;
+        if (isGlb) mat.needsUpdate = true;
+        modelCacheRef.current[filename] = obj;
         currentModelRef.current = obj;
         scene.add(obj);
         setLoading(false);
@@ -1611,7 +1619,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
         const names = files.map((f) => f.name);
         setAvailableModels(names);
         if (names.length > 0) {
-          setActiveVariant(names[0]);
+          setActiveModel(names[0]);
           loadModel(names[0]);
         }
       })
@@ -1747,9 +1755,9 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     loadHDR(HDRI_PRESETS[idx].file);
   };
 
-  const handleVariant = (variant: string) => {
-    setActiveVariant(variant);
-    loadModel(variant);
+  const handleModel = (filename: string) => {
+    setActiveModel(filename);
+    loadModel(filename);
   };
 
   const handleFabric = (idx: number) => {
@@ -1818,16 +1826,16 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
       {/* Controls sidebar — hidden in design mode */}
       <div ref={sidebarRef} className={`fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin ${designMode ? "hidden" : ""}`}>
-        {/* Variant */}
+        {/* Model */}
         {availableModels.length > 0 && (
-          <ControlGroup label="Variant">
+          <ControlGroup label="Model">
             {availableModels.map((name) => {
               const label = name.replace(/\.[^.]+$/, "");
               return (
                 <SidebarButton
                   key={name}
-                  active={activeVariant === name}
-                  onClick={() => handleVariant(name)}
+                  active={activeModel === name}
+                  onClick={() => handleModel(name)}
                 >
                   {label.length > 20 ? `…${label.slice(-18)}` : label}
                 </SidebarButton>
