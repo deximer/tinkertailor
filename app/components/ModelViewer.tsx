@@ -16,19 +16,8 @@ import { useDesignSession } from "@/lib/store/design-session";
 
 // ── Constants ──
 
-const MODEL_FILES: Record<string, string> = {
-  heavy: "TT-PAT-SIL-038-000-000-140415-heavy.obj",
-  light: "TT-PAT-SIL-038-000-000-140709-light.obj",
-};
-
-// Cache signed URLs so we don't re-fetch for the same variant
+// Cache signed URLs so we don't re-fetch for the same filename
 const signedUrlCache: Record<string, { url: string; expiresAt: number }> = {};
-
-async function getModelUrl(variant: string): Promise<string> {
-  const filename = MODEL_FILES[variant];
-  if (!filename) throw new Error(`Unknown variant: ${variant}`);
-  return getSignedModelUrl(variant, filename);
-}
 
 async function getSignedModelUrl(cacheKey: string, filename: string): Promise<string> {
   const cached = signedUrlCache[cacheKey];
@@ -52,19 +41,32 @@ async function getSignedModelUrl(cacheKey: string, filename: string): Promise<st
 }
 
 // Loads a model as a THREE.Group, picking OBJLoader or GLTFLoader by extension.
+// Returns the group and whether it was a GLB/GLTF file.
 async function loadGroup(
   url: string,
   onProgress?: (e: ProgressEvent) => void,
-): Promise<THREE.Group> {
+): Promise<{ group: THREE.Group; isGlb: boolean }> {
   const path = url.split("?")[0].toLowerCase();
   const isGlb = path.endsWith(".glb") || path.endsWith(".gltf");
   return new Promise((resolve, reject) => {
     if (isGlb) {
-      new GLTFLoader().load(url, (gltf) => resolve(gltf.scene), onProgress, reject);
+      new GLTFLoader().load(url, (gltf) => resolve({ group: gltf.scene, isGlb: true }), onProgress, reject);
     } else {
-      new OBJLoader().load(url, resolve, onProgress, reject);
+      new OBJLoader().load(url, (group) => resolve({ group, isGlb: false }), onProgress, reject);
     }
   });
+}
+
+// Normalize GLB model height so it matches OBJ scale in the scene.
+function normalizeModel(group: THREE.Group, targetHeight = 20): void {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (size.y === 0) return;
+  const scale = targetHeight / size.y;
+  group.scale.setScalar(scale);
+  box.setFromObject(group);
+  group.position.y = -box.min.y;
 }
 
 // ── Procedural fabric texture helpers ──
@@ -963,7 +965,8 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
   const turntableRef = useRef(false);
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
-  const [activeVariant, setActiveVariant] = useState("heavy");
+  const [activeModel, setActiveModel] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
   const [activeColorIdx, setActiveColorIdx] = useState(3);
@@ -1284,9 +1287,9 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     [],
   );
 
-  // Load model
+  // Load model by filename
   const loadModel = useCallback(
-    async (variant: string) => {
+    async (filename: string) => {
       const scene = sceneRef.current;
       const mat = garmentMatRef.current;
       if (!scene || !mat) return;
@@ -1299,8 +1302,8 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
         scene.remove(currentModelRef.current);
       }
 
-      if (modelCacheRef.current[variant]) {
-        const cached = modelCacheRef.current[variant];
+      if (modelCacheRef.current[filename]) {
+        const cached = modelCacheRef.current[filename];
         currentModelRef.current = cached;
         scene.add(cached);
         setLoading(false);
@@ -1309,7 +1312,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
       let modelUrl: string;
       try {
-        modelUrl = await getModelUrl(variant);
+        modelUrl = await getSignedModelUrl(filename, filename);
       } catch (err) {
         setLoadError(
           `Failed to get model URL: ${err instanceof Error ? err.message : String(err)}`,
@@ -1319,21 +1322,40 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       }
 
       try {
-        const obj = await loadGroup(modelUrl, (progress) => {
+        const { group, isGlb } = await loadGroup(modelUrl, (progress) => {
           if (progress.total) {
             setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
           }
         });
-        obj.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            (child as THREE.Mesh).material = mat;
-            (child as THREE.Mesh).castShadow = true;
-            (child as THREE.Mesh).receiveShadow = true;
-          }
-        });
-        modelCacheRef.current[variant] = obj;
-        currentModelRef.current = obj;
-        scene.add(obj);
+
+        if (isGlb) {
+          normalizeModel(group, 20);
+          group.traverse((child) => {
+            const mesh = child as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            // Promote uv1 → uv if the GLB uses TEXCOORD_1
+            const geo = mesh.geometry;
+            if (!geo.attributes.uv && geo.attributes.uv1) {
+              geo.attributes.uv = geo.attributes.uv1;
+            }
+            mesh.material = mat;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          });
+          mat.needsUpdate = true;
+        } else {
+          group.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              (child as THREE.Mesh).material = mat;
+              (child as THREE.Mesh).castShadow = true;
+              (child as THREE.Mesh).receiveShadow = true;
+            }
+          });
+        }
+
+        modelCacheRef.current[filename] = group;
+        currentModelRef.current = group;
+        scene.add(group);
         setLoading(false);
       } catch {
         setLoadError("Failed to load model. Check that model files exist in the storage bucket.");
@@ -1574,7 +1596,20 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
-    loadModel(activeVariant);
+    // Fetch available models from the storage bucket, then load the first one
+    fetch("/api/models")
+      .then((r) => r.json())
+      .then((data: { name: string }[]) => {
+        const names = data.map((f) => f.name);
+        setAvailableModels(names);
+        if (names.length > 0) {
+          setActiveModel(names[0]);
+          loadModel(names[0]);
+        }
+      })
+      .catch(() => {
+        setLoadError("Failed to fetch model list from storage.");
+      });
     // Load initial HDR environment
     loadHDR(HDRI_PRESETS[0].file);
     // Only run once on mount
@@ -1704,9 +1739,9 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
     loadHDR(HDRI_PRESETS[idx].file);
   };
 
-  const handleVariant = (variant: string) => {
-    setActiveVariant(variant);
-    loadModel(variant);
+  const handleModel = (filename: string) => {
+    setActiveModel(filename);
+    loadModel(filename);
   };
 
   const handleFabric = (idx: number) => {
@@ -1775,15 +1810,18 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
       {/* Controls sidebar — hidden in design mode */}
       <div ref={sidebarRef} className={`fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin ${designMode ? "hidden" : ""}`}>
-        {/* Variant */}
-        <ControlGroup label="Variant">
-          {(["heavy", "light"] as const).map((v) => (
+        {/* Model */}
+        <ControlGroup label="Model">
+          {availableModels.length === 0 && (
+            <span className="text-xs text-white/40">No models in storage</span>
+          )}
+          {availableModels.map((name) => (
             <SidebarButton
-              key={v}
-              active={activeVariant === v}
-              onClick={() => handleVariant(v)}
+              key={name}
+              active={activeModel === name}
+              onClick={() => handleModel(name)}
             >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
+              {name}
             </SidebarButton>
           ))}
         </ControlGroup>
