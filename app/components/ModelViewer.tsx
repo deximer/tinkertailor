@@ -40,16 +40,15 @@ async function getSignedModelUrl(cacheKey: string, filename: string): Promise<st
   return url;
 }
 
-// Scales a loaded group so its bounding box height matches targetHeight,
+// Scales a GLB group so its bounding box height matches targetHeight,
 // then centers it on the ground plane (y=0 at base).
-function normalizeModel(group: THREE.Group, targetHeight = 8): void {
+function normalizeModel(group: THREE.Group, targetHeight = 20): void {
   const box = new THREE.Box3().setFromObject(group);
   const size = new THREE.Vector3();
   box.getSize(size);
   if (size.y === 0) return;
   const scale = targetHeight / size.y;
   group.scale.setScalar(scale);
-  // Re-compute box after scale and seat on ground
   box.setFromObject(group);
   group.position.y = -box.min.y;
 }
@@ -79,18 +78,6 @@ async function loadGroup(
       );
     }
   });
-}
-
-// Normalize GLB model height so it matches OBJ scale in the scene.
-function normalizeModel(group: THREE.Group, targetHeight = 20): void {
-  const box = new THREE.Box3().setFromObject(group);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  if (size.y === 0) return;
-  const scale = targetHeight / size.y;
-  group.scale.setScalar(scale);
-  box.setFromObject(group);
-  group.position.y = -box.min.y;
 }
 
 // ── Procedural fabric texture helpers ──
