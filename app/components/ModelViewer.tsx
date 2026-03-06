@@ -16,18 +16,11 @@ import { useDesignSession } from "@/lib/store/design-session";
 
 // ── Constants ──
 
-const MODEL_FILES: Record<string, string> = {
-  heavy: "TT-PAT-SIL-038-000-000-140415-heavy.obj",
-  light: "TT-PAT-SIL-038-000-000-140709-light.obj",
-};
-
-// Cache signed URLs so we don't re-fetch for the same variant
+// Cache signed URLs so we don't re-fetch for the same filename
 const signedUrlCache: Record<string, { url: string; expiresAt: number }> = {};
 
-async function getModelUrl(variant: string): Promise<string> {
-  const filename = MODEL_FILES[variant];
-  if (!filename) throw new Error(`Unknown variant: ${variant}`);
-  return getSignedModelUrl(variant, filename);
+async function getModelUrl(filename: string): Promise<string> {
+  return getSignedModelUrl(filename, filename);
 }
 
 async function getSignedModelUrl(cacheKey: string, filename: string): Promise<string> {
@@ -51,18 +44,43 @@ async function getSignedModelUrl(cacheKey: string, filename: string): Promise<st
   return url;
 }
 
+// Scales a loaded group so its bounding box height matches targetHeight,
+// then centers it on the ground plane (y=0 at base).
+function normalizeModel(group: THREE.Group, targetHeight = 8): void {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (size.y === 0) return;
+  const scale = targetHeight / size.y;
+  group.scale.setScalar(scale);
+  // Re-compute box after scale and seat on ground
+  box.setFromObject(group);
+  group.position.y = -box.min.y;
+}
+
 // Loads a model as a THREE.Group, picking OBJLoader or GLTFLoader by extension.
+// Returns { group, isGlb } so callers can apply GLB-specific post-processing.
 async function loadGroup(
   url: string,
   onProgress?: (e: ProgressEvent) => void,
-): Promise<THREE.Group> {
+): Promise<{ group: THREE.Group; isGlb: boolean }> {
   const path = url.split("?")[0].toLowerCase();
   const isGlb = path.endsWith(".glb") || path.endsWith(".gltf");
   return new Promise((resolve, reject) => {
     if (isGlb) {
-      new GLTFLoader().load(url, (gltf) => resolve(gltf.scene), onProgress, reject);
+      new GLTFLoader().load(
+        url,
+        (gltf) => resolve({ group: gltf.scene, isGlb: true }),
+        onProgress,
+        reject,
+      );
     } else {
-      new OBJLoader().load(url, resolve, onProgress, reject);
+      new OBJLoader().load(
+        url,
+        (group) => resolve({ group, isGlb: false }),
+        onProgress,
+        reject,
+      );
     }
   });
 }
@@ -963,7 +981,8 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
   const turntableRef = useRef(false);
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
-  const [activeVariant, setActiveVariant] = useState("heavy");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [activeVariant, setActiveVariant] = useState("");
   const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
   const [activeColorIdx, setActiveColorIdx] = useState(3);
@@ -1060,7 +1079,8 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
         try {
           const url = await getSignedModelUrl(comp.id, comp.modelPath);
-          const obj = await loadGroup(url);
+          const { group: obj, isGlb } = await loadGroup(url);
+          if (isGlb) normalizeModel(obj);
 
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
@@ -1319,18 +1339,28 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       }
 
       try {
-        const obj = await loadGroup(modelUrl, (progress) => {
+        const { group: obj, isGlb } = await loadGroup(modelUrl, (progress) => {
           if (progress.total) {
             setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
           }
         });
+        if (isGlb) normalizeModel(obj);
         obj.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            (child as THREE.Mesh).material = mat;
-            (child as THREE.Mesh).castShadow = true;
-            (child as THREE.Mesh).receiveShadow = true;
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          // GLB UVs may be on channel 1 (uv1) rather than channel 0 (uv).
+          // Promote uv1 → uv so material.map renders correctly.
+          if (isGlb && mesh.geometry) {
+            const geo = mesh.geometry;
+            if (!geo.attributes.uv && geo.attributes.uv1) {
+              geo.attributes.uv = geo.attributes.uv1;
+            }
           }
+          mesh.material = mat;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
         });
+        mat.needsUpdate = true;
         modelCacheRef.current[variant] = obj;
         currentModelRef.current = obj;
         scene.add(obj);
@@ -1574,7 +1604,20 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
-    loadModel(activeVariant);
+    // Fetch available models from bucket, then load the first one
+    fetch("/api/models")
+      .then((r) => r.json())
+      .then((files: { name: string }[]) => {
+        const names = files.map((f) => f.name);
+        setAvailableModels(names);
+        if (names.length > 0) {
+          setActiveVariant(names[0]);
+          loadModel(names[0]);
+        }
+      })
+      .catch(() => {
+        // Not authenticated or bucket empty — viewer stays blank
+      });
     // Load initial HDR environment
     loadHDR(HDRI_PRESETS[0].file);
     // Only run once on mount
@@ -1776,17 +1819,22 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       {/* Controls sidebar — hidden in design mode */}
       <div ref={sidebarRef} className={`fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin ${designMode ? "hidden" : ""}`}>
         {/* Variant */}
-        <ControlGroup label="Variant">
-          {(["heavy", "light"] as const).map((v) => (
-            <SidebarButton
-              key={v}
-              active={activeVariant === v}
-              onClick={() => handleVariant(v)}
-            >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </SidebarButton>
-          ))}
-        </ControlGroup>
+        {availableModels.length > 0 && (
+          <ControlGroup label="Variant">
+            {availableModels.map((name) => {
+              const label = name.replace(/\.[^.]+$/, "");
+              return (
+                <SidebarButton
+                  key={name}
+                  active={activeVariant === name}
+                  onClick={() => handleVariant(name)}
+                >
+                  {label.length > 20 ? `…${label.slice(-18)}` : label}
+                </SidebarButton>
+              );
+            })}
+          </ControlGroup>
+        )}
 
         {/* Fabric */}
         <ControlGroup label="Fabric">
