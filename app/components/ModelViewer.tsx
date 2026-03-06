@@ -287,11 +287,11 @@ interface FabricDef {
 }
 
 const FABRICS: FabricDef[] = [
-  { name: "Silk", roughness: 0.5, metalness: 0.0, texture: texSilk, sheen: 0.3, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
-  { name: "Satin", roughness: 0.4, metalness: 0.0, texture: texSatin },
+  { name: "Silk", roughness: 0.68, metalness: 0.0, texture: texSilk, sheen: 0.3, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
+  { name: "Satin", roughness: 0.6, metalness: 0.0, texture: texSatin },
   { name: "Cotton", roughness: 0.65, metalness: 0.0, texture: texCotton },
   { name: "Linen", roughness: 0.75, metalness: 0.0, texture: texLinen },
-  { name: "Chiffon", roughness: 0.55, metalness: 0.0, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.1 },
+  { name: "Chiffon", roughness: 0.68, metalness: 0.0, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.1 },
   { name: "Velvet", roughness: 0.85, metalness: 0.0, texture: texVelvet, sheen: 0.9, sheenRoughness: 0.6, sheenColor: "#6a4a6a" },
   { name: "Denim", roughness: 0.7, metalness: 0.0, texture: texDenim },
   { name: "Wool", roughness: 0.8, metalness: 0.0, texture: texWool, sheen: 0.5, sheenRoughness: 0.8 },
