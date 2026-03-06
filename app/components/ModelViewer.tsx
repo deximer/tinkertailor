@@ -277,7 +277,6 @@ interface FabricDef {
   name: string;
   roughness: number;
   metalness: number;
-  reflectivity?: number;
   texture: () => THREE.CanvasTexture;
   sheen?: number;
   sheenRoughness?: number;
@@ -288,14 +287,14 @@ interface FabricDef {
 }
 
 const FABRICS: FabricDef[] = [
-  { name: "Silk",    roughness: 0.68, metalness: 0.0, reflectivity: 0.08, texture: texSilk, sheen: 0.15, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
-  { name: "Satin",   roughness: 0.6,  metalness: 0.0, reflectivity: 0.10, texture: texSatin },
-  { name: "Cotton",  roughness: 0.65, metalness: 0.0, reflectivity: 0.09, texture: texCotton },
-  { name: "Linen",   roughness: 0.75, metalness: 0.0, reflectivity: 0.065, texture: texLinen },
-  { name: "Chiffon", roughness: 0.68, metalness: 0.0, reflectivity: 0.08, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.05 },
-  { name: "Velvet",  roughness: 0.85, metalness: 0.0, reflectivity: 0.04, texture: texVelvet, sheen: 0.45, sheenRoughness: 0.6, sheenColor: "#6a4a6a" },
-  { name: "Denim",   roughness: 0.7,  metalness: 0.0, reflectivity: 0.075, texture: texDenim },
-  { name: "Wool",    roughness: 0.8,  metalness: 0.0, reflectivity: 0.05, texture: texWool, sheen: 0.25, sheenRoughness: 0.8 },
+  { name: "Silk",    roughness: 0.84, metalness: 0.0, texture: texSilk, sheen: 0.15, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
+  { name: "Satin",   roughness: 0.80, metalness: 0.0, texture: texSatin },
+  { name: "Cotton",  roughness: 0.83, metalness: 0.0, texture: texCotton },
+  { name: "Linen",   roughness: 0.88, metalness: 0.0, texture: texLinen },
+  { name: "Chiffon", roughness: 0.84, metalness: 0.0, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.05 },
+  { name: "Velvet",  roughness: 0.93, metalness: 0.0, texture: texVelvet, sheen: 0.45, sheenRoughness: 0.6, sheenColor: "#6a4a6a" },
+  { name: "Denim",   roughness: 0.85, metalness: 0.0, texture: texDenim },
+  { name: "Wool",    roughness: 0.90, metalness: 0.0, texture: texWool, sheen: 0.25, sheenRoughness: 0.8 },
 ];
 
 interface ColorDef {
@@ -1317,7 +1316,6 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       mat.color.set(col.hex);
       mat.roughness = fab.roughness;
       mat.metalness = fab.metalness;
-      mat.reflectivity = fab.reflectivity ?? 1;
       mat.sheen = fab.sheen ?? 0;
       mat.sheenRoughness = fab.sheenRoughness ?? 0;
       mat.sheenColor.set(fab.sheenColor ?? "#ffffff");
