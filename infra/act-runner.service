@@ -1,0 +1,14 @@
+[Unit]
+Description=Gitea Actions Runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/act_runner daemon --config %h/.config/act_runner.yaml
+Restart=on-failure
+RestartSec=10
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:%h/.fly/bin
+
+[Install]
+WantedBy=default.target
