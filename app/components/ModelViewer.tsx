@@ -1368,9 +1368,11 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
           }
         });
         if (isGlb) normalizeModel(obj, 20);
+        let meshCount = 0;
         obj.traverse((child) => {
           const mesh = child as THREE.Mesh;
           if (!mesh.isMesh) return;
+          meshCount++;
           if (isGlb) {
             const geo = mesh.geometry;
             // Prefer uv1 (TEXCOORD_1) over uv (TEXCOORD_0) for Clo3D exports —
@@ -1392,7 +1394,9 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
               if (u < uMin) uMin = u; if (u > uMax) uMax = u;
               if (v < vMin) vMin = v; if (v > vMax) vMax = v;
             }
-            if (uMax > 1.5 || uMin < -0.5) {
+            const needsNorm = uMax > 1.5 || uMin < -0.5;
+            console.log(`[GLB mesh ${meshCount}] uvCount=${uvAttr.count} u=[${uMin.toFixed(2)},${uMax.toFixed(2)}] v=[${vMin.toFixed(2)},${vMax.toFixed(2)}] normalize=${needsNorm}`);
+            if (needsNorm) {
               const uRange = uMax - uMin || 1, vRange = vMax - vMin || 1;
               const arr = new Float32Array(uvAttr.count * 2);
               for (let i = 0; i < uvAttr.count; i++) {
@@ -1408,6 +1412,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         });
+        console.log(`[GLB] total meshes found: ${meshCount}, mat.map=${!!mat.map}`);
         if (isGlb) {
           // Force material recompile so USE_MAP is recalculated with the new UVs
           mat.needsUpdate = true;
@@ -1534,7 +1539,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       color: 0xf0ead6,
       roughness: 0.2,
       metalness: 0.02,
-      thin: true,
+      thickness: 0,
       side: THREE.DoubleSide,
     });
     garmentMatRef.current = garmentMat;
