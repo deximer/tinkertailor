@@ -40,6 +40,22 @@ async function getSignedModelUrl(cacheKey: string, filename: string): Promise<st
   return url;
 }
 
+// Generate planar UVs for a geometry that has no UV attribute.
+// Projects vertex positions onto the XY plane, normalized to [0,1].
+function generatePlanarUVs(geo: THREE.BufferGeometry): void {
+  const pos = geo.attributes.position;
+  if (!pos) return;
+  const box = new THREE.Box3().setFromBufferAttribute(pos as THREE.BufferAttribute);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const uvs = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uvs[i * 2] = size.x > 0 ? (pos.getX(i) - box.min.x) / size.x : 0;
+    uvs[i * 2 + 1] = size.y > 0 ? (pos.getY(i) - box.min.y) / size.y : 0;
+  }
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+}
+
 // Scales a GLB group so its bounding box height matches targetHeight,
 // then centers it on the ground plane (y=0 at base).
 function normalizeModel(group: THREE.Group, targetHeight = 20): void {
@@ -1078,12 +1094,22 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
           if (isGlb) normalizeModel(obj);
 
           obj.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              (child as THREE.Mesh).material = mat;
-              (child as THREE.Mesh).castShadow = true;
-              (child as THREE.Mesh).receiveShadow = true;
+            const mesh = child as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            if (isGlb) {
+              const geo = mesh.geometry;
+              if (geo.attributes.uv1) geo.attributes.uv = geo.attributes.uv1;
+              if (!geo.attributes.uv) generatePlanarUVs(geo);
+              if (geo.attributes.uv) geo.attributes.uv.needsUpdate = true;
             }
+            mesh.material = mat;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
           });
+          if (isGlb) {
+            mat.needsUpdate = true;
+            if (mat.map) mat.map.needsUpdate = true;
+          }
 
           loadedModels.push(obj);
           scene.add(obj);
@@ -1343,19 +1369,30 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
         obj.traverse((child) => {
           const mesh = child as THREE.Mesh;
           if (!mesh.isMesh) return;
-          // GLB UVs may be on channel 1 (uv1) rather than channel 0 (uv).
-          // Promote uv1 → uv so material.map renders correctly.
-          if (isGlb && mesh.geometry) {
+          if (isGlb) {
             const geo = mesh.geometry;
-            if (!geo.attributes.uv && geo.attributes.uv1) {
+            // Prefer uv1 (TEXCOORD_1) over uv (TEXCOORD_0) for Clo3D exports —
+            // Clo3D often places the fabric UV on channel 1.
+            if (geo.attributes.uv1) {
               geo.attributes.uv = geo.attributes.uv1;
             }
+            // If there are still no UVs, generate planar UVs from vertex positions
+            // so the fabric texture at least renders (even if not perfectly fitted).
+            if (!geo.attributes.uv) {
+              generatePlanarUVs(geo);
+            }
+            // Ensure Three.js re-uploads the geometry with the new UV attribute
+            geo.attributes.uv.needsUpdate = true;
           }
           mesh.material = mat;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         });
-        if (isGlb) mat.needsUpdate = true;
+        if (isGlb) {
+          // Force material recompile so USE_MAP is recalculated with the new UVs
+          mat.needsUpdate = true;
+          if (mat.map) mat.map.needsUpdate = true;
+        }
         modelCacheRef.current[filename] = obj;
         currentModelRef.current = obj;
         scene.add(obj);
