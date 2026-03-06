@@ -7,35 +7,27 @@ on:
 jobs:
   typecheck:
     name: Typecheck
-    runs-on: [self-hosted, linux, amd64]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
       - run: npm ci
       - run: npm run typecheck
 
   lint:
     name: Lint
-    runs-on: [self-hosted, linux, amd64]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
       - run: npm ci
       - run: npm run lint
 
   deploy:
     name: Deploy to Staging
     needs: [typecheck, lint]
-    runs-on: [self-hosted, linux, amd64]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
-      - run: flyctl deploy --app tinker-tailor-staging --local-only
+      - run: flyctl deploy --app tinker-tailor-staging
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
