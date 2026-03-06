@@ -1383,8 +1383,26 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
             if (!geo.attributes.uv) {
               generatePlanarUVs(geo);
             }
-            // Ensure Three.js re-uploads the geometry with the new UV attribute
-            geo.attributes.uv.needsUpdate = true;
+            // Clo3D exports UVs in millimeter pattern space (e.g. -137..+124mm).
+            // Detect and normalize to [0,1] so the fabric texture maps correctly.
+            const uvAttr = geo.attributes.uv as THREE.BufferAttribute;
+            let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+            for (let i = 0; i < uvAttr.count; i++) {
+              const u = uvAttr.getX(i), v = uvAttr.getY(i);
+              if (u < uMin) uMin = u; if (u > uMax) uMax = u;
+              if (v < vMin) vMin = v; if (v > vMax) vMax = v;
+            }
+            if (uMax > 1.5 || uMin < -0.5) {
+              const uRange = uMax - uMin || 1, vRange = vMax - vMin || 1;
+              const arr = new Float32Array(uvAttr.count * 2);
+              for (let i = 0; i < uvAttr.count; i++) {
+                arr[i * 2]     = (uvAttr.getX(i) - uMin) / uRange;
+                arr[i * 2 + 1] = (uvAttr.getY(i) - vMin) / vRange;
+              }
+              geo.setAttribute("uv", new THREE.BufferAttribute(arr, 2));
+            } else {
+              geo.attributes.uv.needsUpdate = true;
+            }
           }
           mesh.material = mat;
           mesh.castShadow = true;
@@ -1516,6 +1534,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       color: 0xf0ead6,
       roughness: 0.2,
       metalness: 0.02,
+      thin: true,
       side: THREE.DoubleSide,
     });
     garmentMatRef.current = garmentMat;
