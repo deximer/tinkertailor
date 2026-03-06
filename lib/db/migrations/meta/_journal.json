@@ -36,6 +36,13 @@
       "when": 1772826000000,
       "tag": "0004_drop_ip_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772870400000,
+      "tag": "0005_profiles_and_roles",
+      "breakpoints": true
     }
   ]
 }
