@@ -1368,11 +1368,9 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
           }
         });
         if (isGlb) normalizeModel(obj, 20);
-        let meshCount = 0;
         obj.traverse((child) => {
           const mesh = child as THREE.Mesh;
           if (!mesh.isMesh) return;
-          meshCount++;
           if (isGlb) {
             const geo = mesh.geometry;
             // Prefer uv1 (TEXCOORD_1) over uv (TEXCOORD_0) for Clo3D exports —
@@ -1397,7 +1395,6 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
               if (v < vMin) vMin = v; if (v > vMax) vMax = v;
             }
             const needsNorm = uMax > 1.5 || uMin < -0.5;
-            console.log(`[GLB mesh ${meshCount}] uvCount=${uvSrc.count} u=[${uMin.toFixed(2)},${uMax.toFixed(2)}] v=[${vMin.toFixed(2)},${vMax.toFixed(2)}] normalize=${needsNorm}`);
             const arr = new Float32Array(uvSrc.count * 2);
             if (needsNorm) {
               const uRange = uMax - uMin || 1, vRange = vMax - vMin || 1;
@@ -1419,7 +1416,6 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         });
-        console.log(`[GLB] total meshes found: ${meshCount}, mat.map=${!!mat.map}, mat.map.channel=${mat.map?.channel ?? 'n/a'}`);
         if (isGlb && mat.map) {
           // Ensure the fabric texture uses UV channel 0 (geo.attributes.uv)
           // and force re-upload so the normalized UVs are picked up on first render.
