@@ -4,7 +4,20 @@ set -euo pipefail
 # Usage: ./infra/provision.sh <env>
 # Example: ./infra/provision.sh staging
 
-ENV="${1:?Usage: $0 <env>}"
+usage() {
+  echo "Usage: $0 <env>"
+  echo "  env: qa | staging"
+  echo ""
+  echo "One-time setup: creates the Fly app, imports secrets, deploys, and scales machines."
+  echo "For routine deploys use deploy.sh instead."
+  exit 1
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+fi
+
+ENV="${1:?$(usage)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 

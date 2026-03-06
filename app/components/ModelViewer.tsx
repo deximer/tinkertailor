@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -16,7 +17,7 @@ import { useDesignSession } from "@/lib/store/design-session";
 // ── Constants ──
 
 const MODEL_FILES: Record<string, string> = {
-  heavy: "TT-PAT-SIL-038-000-000-140709-heavy.obj",
+  heavy: "TT-PAT-SIL-038-000-000-140415-heavy.obj",
   light: "TT-PAT-SIL-038-000-000-140709-light.obj",
 };
 
@@ -48,6 +49,22 @@ async function getSignedModelUrl(cacheKey: string, filename: string): Promise<st
   const { url } = (await res.json()) as { url: string };
   signedUrlCache[cacheKey] = { url, expiresAt: Date.now() + 3600 * 1000 };
   return url;
+}
+
+// Loads a model as a THREE.Group, picking OBJLoader or GLTFLoader by extension.
+async function loadGroup(
+  url: string,
+  onProgress?: (e: ProgressEvent) => void,
+): Promise<THREE.Group> {
+  const path = url.split("?")[0].toLowerCase();
+  const isGlb = path.endsWith(".glb") || path.endsWith(".gltf");
+  return new Promise((resolve, reject) => {
+    if (isGlb) {
+      new GLTFLoader().load(url, (gltf) => resolve(gltf.scene), onProgress, reject);
+    } else {
+      new OBJLoader().load(url, resolve, onProgress, reject);
+    }
+  });
 }
 
 // ── Procedural fabric texture helpers ──
@@ -1035,7 +1052,6 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       if (loadId !== designLoadAbortRef.current) return;
 
       // Load each component's model
-      const loader = new OBJLoader();
       const loadedModels: THREE.Group[] = [];
 
       for (const comp of selectedComps) {
@@ -1044,9 +1060,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
 
         try {
           const url = await getSignedModelUrl(comp.id, comp.modelPath);
-          const obj = await new Promise<THREE.Group>((resolve, reject) => {
-            loader.load(url, resolve, undefined, reject);
-          });
+          const obj = await loadGroup(url);
 
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
@@ -1304,35 +1318,27 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
         return;
       }
 
-      const loader = new OBJLoader();
-      loader.load(
-        modelUrl,
-        (obj) => {
-          obj.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              (child as THREE.Mesh).material = mat;
-              (child as THREE.Mesh).castShadow = true;
-              (child as THREE.Mesh).receiveShadow = true;
-            }
-          });
-          modelCacheRef.current[variant] = obj;
-          currentModelRef.current = obj;
-          scene.add(obj);
-
-          setLoading(false);
-        },
-        (progress) => {
+      try {
+        const obj = await loadGroup(modelUrl, (progress) => {
           if (progress.total) {
-            setLoadProgress(
-              Math.round((progress.loaded / progress.total) * 100),
-            );
+            setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
           }
-        },
-        () => {
-          setLoadError("Failed to load model. Check that model files exist in the storage bucket.");
-          setLoading(false);
-        },
-      );
+        });
+        obj.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            (child as THREE.Mesh).material = mat;
+            (child as THREE.Mesh).castShadow = true;
+            (child as THREE.Mesh).receiveShadow = true;
+          }
+        });
+        modelCacheRef.current[variant] = obj;
+        currentModelRef.current = obj;
+        scene.add(obj);
+        setLoading(false);
+      } catch {
+        setLoadError("Failed to load model. Check that model files exist in the storage bucket.");
+        setLoading(false);
+      }
     },
     [],
   );

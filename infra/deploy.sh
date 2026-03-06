@@ -9,8 +9,12 @@ usage() {
   echo "Usage: $0 <env> [--migrate]"
   echo "  env:       qa | staging"
   echo "  --migrate: run DB migrations after deploy"
-  exit 1
+  exit "${1:-1}"
 }
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage 0
+fi
 
 ENV="${1:?$(usage)}"
 shift
