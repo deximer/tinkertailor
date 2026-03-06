@@ -28,6 +28,9 @@ export default async function UserNav() {
           Design Studio
         </Link>
       )}
+      <Link href="/profile" className={linkClass}>
+        Profile
+      </Link>
       <Link href="/orders" className={linkClass}>
         Orders
       </Link>

@@ -71,6 +71,12 @@ export default function AdminPage() {
             >
               Invite Codes
             </Link>
+            <Link
+              href="/admin/applications"
+              className="rounded border border-gray-700 px-4 py-3 text-sm text-gray-200 hover:bg-[#2a2a2a] hover:border-gray-500 transition-colors"
+            >
+              Applications
+            </Link>
           </nav>
         </section>
 

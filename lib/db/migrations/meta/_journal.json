@@ -50,6 +50,13 @@
       "when": 1772870500000,
       "tag": "0006_invite_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772870600000,
+      "tag": "0007_creator_applications",
+      "breakpoints": true
     }
   ]
 }

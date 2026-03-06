@@ -12,6 +12,7 @@ export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(), // FK to auth.users — set on insert, no defaultRandom
   role: userRoleEnum("role").notNull().default("shopper"),
   displayName: text("display_name"),
+  handle: text("handle").unique(), // URL-slug for public profile, e.g. "jane-doe"
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
