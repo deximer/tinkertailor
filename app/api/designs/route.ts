@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { products, productComponents } from "@/lib/db/schema";
 import { eq, desc, ne, count, and } from "drizzle-orm";
+import { requireRole, requireAuth } from "@/lib/auth/guards";
 
-// POST /api/designs — save current design session
+// POST /api/designs — save current design session (creator only)
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { user, error: authError } = await requireRole("creator");
+  if (authError) return authError;
 
   try {
     const body = (await request.json()) as {
@@ -63,15 +58,10 @@ export async function POST(request: Request) {
   }
 }
 
-// GET /api/designs — list user's saved designs (paginated)
+// GET /api/designs — list user's saved designs (paginated, any authenticated user)
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { user, error: authError } = await requireAuth();
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);

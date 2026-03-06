@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserRole } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
   children,
@@ -15,9 +15,9 @@ export default async function AdminLayout({
     redirect("/login?next=/admin");
   }
 
-  const role = user.app_metadata?.role as string | undefined;
-  if (role && role !== "admin") {
-    redirect("/login?next=/admin");
+  const role = await getUserRole(supabase);
+  if (role !== "admin") {
+    redirect("/");
   }
 
   return <>{children}</>;

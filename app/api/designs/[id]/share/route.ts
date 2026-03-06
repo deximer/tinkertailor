@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { products, attributionLinks } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { requireRole } from "@/lib/auth/guards";
 
 const RESERVED_SLUGS = new Set([
   "api", "shop", "checkout", "orders", "auth", "admin",
@@ -24,11 +24,8 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { user, error: authError } = await requireRole("creator");
+  if (authError) return authError;
 
   const { id: productId } = await params;
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/guards";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,11 +14,8 @@ function getServiceClient() {
 }
 
 export async function POST(request: Request) {
-  const supabaseAuth = await createAuthClient();
-  const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { error: authError } = await requireAdmin();
+  if (authError) return authError;
 
   const formData = await request.formData();
   const files = formData.getAll("files") as File[];

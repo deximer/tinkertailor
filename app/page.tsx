@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ModelViewer from "@/app/components/ModelViewer";
-import LogoutButton from "@/app/components/LogoutButton";
 import TaraChat from "@/app/components/TaraChat";
+import UserNav from "@/app/components/UserNav";
 
 export default function Home() {
   return (
@@ -14,6 +14,7 @@ export default function Home() {
       {/* Viewer panel — right */}
       <div className="relative flex-1">
         <ModelViewer />
+        <UserNav />
         <div className="fixed bottom-4 right-4 z-10 flex items-center gap-3">
           <Link
             href="/design"
@@ -21,7 +22,6 @@ export default function Home() {
           >
             Open Design Studio
           </Link>
-          <LogoutButton />
         </div>
       </div>
     </div>

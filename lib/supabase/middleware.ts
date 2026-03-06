@@ -44,5 +44,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Forward the user's role as a request header so API routes and server
+  // components can read it without calling getUser() again.
+  if (user) {
+    const appRole = user.app_metadata?.app_role as string | undefined;
+    if (appRole) {
+      supabaseResponse.headers.set("x-user-role", appRole);
+    }
+  }
+
   return supabaseResponse;
 }
