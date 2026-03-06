@@ -11,6 +11,7 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
+import { useDesignSession } from "@/lib/store/design-session";
 
 // ── Constants ──
 
@@ -25,8 +26,11 @@ const signedUrlCache: Record<string, { url: string; expiresAt: number }> = {};
 async function getModelUrl(variant: string): Promise<string> {
   const filename = MODEL_FILES[variant];
   if (!filename) throw new Error(`Unknown variant: ${variant}`);
+  return getSignedModelUrl(variant, filename);
+}
 
-  const cached = signedUrlCache[variant];
+async function getSignedModelUrl(cacheKey: string, filename: string): Promise<string> {
+  const cached = signedUrlCache[cacheKey];
   // Use cached URL if it expires more than 5 minutes from now
   if (cached && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
     return cached.url;
@@ -42,7 +46,7 @@ async function getModelUrl(variant: string): Promise<string> {
     );
   }
   const { url } = (await res.json()) as { url: string };
-  signedUrlCache[variant] = { url, expiresAt: Date.now() + 3600 * 1000 };
+  signedUrlCache[cacheKey] = { url, expiresAt: Date.now() + 3600 * 1000 };
   return url;
 }
 
@@ -846,7 +850,7 @@ const SCENES: SceneDef[] = [
     name: "Studio",
     build: buildStudio,
     lighting: [
-      { name: "Standard", ambient: { color: 0xffffff, intensity: 0.4 }, key: { color: 0xffffff, intensity: 1.2, pos: [30, 80, 60] }, fill: { color: 0xc4b5a0, intensity: 0.5, pos: [-40, 60, -30] }, rim: { color: 0x8b9dc3, intensity: 0.3, pos: [0, 30, -80] }, exposure: 1.2 },
+      { name: "Standard", ambient: { color: 0xffffff, intensity: 0.6 }, key: { color: 0xffffff, intensity: 1.2, pos: [30, 80, 60] }, fill: { color: 0xc4b5a0, intensity: 0.5, pos: [-40, 60, -30] }, rim: { color: 0x8b9dc3, intensity: 0.3, pos: [0, 30, -80] }, exposure: 1.4 },
       { name: "Natural", ambient: { color: 0xf5f0e8, intensity: 0.6 }, key: { color: 0xfff8e7, intensity: 1.0, pos: [50, 100, 40] }, fill: { color: 0xc8d8e8, intensity: 0.35, pos: [-30, 40, 20] }, rim: { color: 0xe8dcc8, intensity: 0.15, pos: [0, 20, -60] }, exposure: 1.3 },
       { name: "Dramatic", ambient: { color: 0x202020, intensity: 0.15 }, key: { color: 0xffffff, intensity: 1.8, pos: [60, 90, 30] }, fill: { color: 0x1a1a2e, intensity: 0.1, pos: [-50, 40, -20] }, rim: { color: 0xffffff, intensity: 0.6, pos: [-20, 50, -70] }, exposure: 1.0 },
       { name: "Cool", ambient: { color: 0xd0e0f0, intensity: 0.45 }, key: { color: 0xe8f0ff, intensity: 1.1, pos: [30, 80, 60] }, fill: { color: 0x8899bb, intensity: 0.4, pos: [-40, 60, -30] }, rim: { color: 0x6688bb, intensity: 0.35, pos: [0, 30, -80] }, exposure: 1.15 },
@@ -907,7 +911,12 @@ const SCENES: SceneDef[] = [
 
 // ── Component ──
 
-export default function ModelViewer() {
+interface ModelViewerProps {
+  /** When true, subscribes to design session store and hides showcase sidebar */
+  designMode?: boolean;
+}
+
+export default function ModelViewer({ designMode = false }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -969,7 +978,216 @@ export default function ModelViewer() {
   const [matTransmission, setMatTransmission] = useState(FABRICS[0].transmission ?? 0);
   const [matThickness, setMatThickness] = useState(FABRICS[0].thickness ?? 0);
 
+  // Design session store subscription
+  const selectedComponentIds = useDesignSession((s) => s.selectedComponentIds);
+  const designModelsRef = useRef<THREE.Group[]>([]);
+  const designLoadAbortRef = useRef(0);
 
+  // Load component models from design session
+  const loadDesignModels = useCallback(
+    async (componentIds: string[]) => {
+      const scene = sceneRef.current;
+      const mat = garmentMatRef.current;
+      if (!scene || !mat) return;
+
+      // Bump abort counter to cancel stale loads
+      const loadId = ++designLoadAbortRef.current;
+
+      // Remove previous design models
+      for (const m of designModelsRef.current) {
+        scene.remove(m);
+      }
+      designModelsRef.current = [];
+
+      if (componentIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setLoadError(null);
+
+      // Fetch component data to get modelPaths
+      const params = new URLSearchParams({
+        compatible_with: componentIds.join(","),
+      });
+      let selectedComps: {
+        id: string;
+        modelPath: string | null;
+      }[] = [];
+
+      try {
+        const res = await fetch(`/api/components?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as {
+          selectedComponents: { id: string; modelPath: string | null }[];
+        };
+        selectedComps = data.selectedComponents;
+      } catch (err) {
+        if (loadId !== designLoadAbortRef.current) return;
+        setLoadError(
+          `Failed to fetch components: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (loadId !== designLoadAbortRef.current) return;
+
+      // Load each component's model
+      const loader = new OBJLoader();
+      const loadedModels: THREE.Group[] = [];
+
+      for (const comp of selectedComps) {
+        if (!comp.modelPath) continue;
+        if (loadId !== designLoadAbortRef.current) return;
+
+        try {
+          const url = await getSignedModelUrl(comp.id, comp.modelPath);
+          const obj = await new Promise<THREE.Group>((resolve, reject) => {
+            loader.load(url, resolve, undefined, reject);
+          });
+
+          obj.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              (child as THREE.Mesh).material = mat;
+              (child as THREE.Mesh).castShadow = true;
+              (child as THREE.Mesh).receiveShadow = true;
+            }
+          });
+
+          loadedModels.push(obj);
+          scene.add(obj);
+        } catch {
+          // Skip components whose models fail to load
+          console.warn(`Failed to load model for component ${comp.id}`);
+        }
+      }
+
+      if (loadId !== designLoadAbortRef.current) {
+        // Stale — clean up
+        for (const m of loadedModels) scene.remove(m);
+        return;
+      }
+
+      designModelsRef.current = loadedModels;
+
+      // Hide the showcase model when design models are active
+      if (loadedModels.length > 0 && currentModelRef.current) {
+        scene.remove(currentModelRef.current);
+      }
+
+      setLoading(false);
+    },
+    [],
+  );
+
+  // When design session component selection changes, load models
+  useEffect(() => {
+    if (!designMode) return;
+
+    if (selectedComponentIds.length === 0) {
+      // No components selected — restore showcase model
+      const scene = sceneRef.current;
+      if (scene) {
+        for (const m of designModelsRef.current) scene.remove(m);
+        designModelsRef.current = [];
+      }
+      if (currentModelRef.current && scene && !scene.children.includes(currentModelRef.current)) {
+        scene.add(currentModelRef.current);
+      }
+      return;
+    }
+
+    loadDesignModels(selectedComponentIds);
+  }, [designMode, selectedComponentIds, loadDesignModels]);
+
+  // Design mode: respond to fabric selection
+  const selectedFabricCode = useDesignSession((s) => s.selectedFabricCode);
+
+  useEffect(() => {
+    if (!designMode || !selectedFabricCode) return;
+
+    const mat = garmentMatRef.current;
+    if (!mat) return;
+
+    // Map fabric code to closest FABRICS texture preset index.
+    // Strategy: exact match → 2-char prefix → keyword search → default (Silk).
+    const FABRIC_CODE_MAP: Record<string, number> = {
+      // Exact code matches
+      "SILK": 0, "SC": 0, "SI": 0,
+      "SATIN": 1, "SS": 1, "SA": 1,
+      "COTTON": 2, "CC": 2, "CO": 2, "CT": 2,
+      "LINEN": 3, "LI": 3, "LN": 3,
+      "CHIFFON": 4, "CH": 4, "CF": 4,
+      "VELVET": 5, "VE": 5, "VL": 5,
+      "DENIM": 6, "DE": 6, "DN": 6,
+      "WOOL": 7, "WO": 7, "WL": 7,
+      // Additional type keywords
+      "CREPE": 0, "CHARMEUSE": 1, "ORGANZA": 4,
+      "TULLE": 4, "TWEED": 7, "CASHMERE": 7, "JERSEY": 2,
+      "POPLIN": 2, "CHAMBRAY": 6, "TAFFETA": 1,
+    };
+
+    const FABRIC_KEYWORDS: readonly [string, number][] = [
+      ["SILK", 0], ["SATIN", 1], ["COTTON", 2], ["LINEN", 3],
+      ["CHIFFON", 4], ["VELVET", 5], ["DENIM", 6], ["WOOL", 7],
+      ["CREPE", 0], ["CHARMEUSE", 1], ["ORGANZA", 4], ["TULLE", 4],
+      ["TWEED", 7], ["CASHMERE", 7], ["JERSEY", 2], ["POPLIN", 2],
+      ["CHAMBRAY", 6], ["TAFFETA", 1],
+    ] as const;
+
+    const codeUpper = selectedFabricCode.toUpperCase();
+    let fabricIdx: number | undefined;
+
+    // 1. Exact match on full code
+    fabricIdx = FABRIC_CODE_MAP[codeUpper];
+
+    // 2. Prefix match on first 2 characters
+    if (fabricIdx === undefined && codeUpper.length >= 2) {
+      fabricIdx = FABRIC_CODE_MAP[codeUpper.slice(0, 2)];
+    }
+
+    // 3. Keyword search within the code string
+    if (fabricIdx === undefined) {
+      for (const [keyword, idx] of FABRIC_KEYWORDS) {
+        if (codeUpper.includes(keyword)) {
+          fabricIdx = idx;
+          break;
+        }
+      }
+    }
+
+    // 4. Default to Silk (0) with a warning
+    if (fabricIdx === undefined) {
+      console.warn(
+        `[ModelViewer] No fabric texture preset found for code "${selectedFabricCode}". Defaulting to Silk.`,
+      );
+      fabricIdx = 0;
+    }
+
+    const fab = FABRICS[fabricIdx];
+    if (!textureCacheRef.current[fabricIdx]) {
+      textureCacheRef.current[fabricIdx] = fab.texture();
+    }
+    mat.map = textureCacheRef.current[fabricIdx];
+    mat.roughness = fab.roughness;
+    mat.metalness = fab.metalness;
+    mat.sheen = fab.sheen ?? 0;
+    mat.sheenRoughness = fab.sheenRoughness ?? 0;
+    mat.sheenColor.set(fab.sheenColor ?? "#ffffff");
+    mat.transmission = fab.transmission ?? 0;
+    mat.thickness = fab.thickness ?? 0;
+    mat.needsUpdate = true;
+
+    // Sync material control state
+    setActiveFabricIdx(fabricIdx);
+    setMatSheen(fab.sheen ?? 0);
+    setMatSheenRoughness(fab.sheenRoughness ?? 0);
+    setMatSheenColor(fab.sheenColor ?? "#ffffff");
+    setMatTransmission(fab.transmission ?? 0);
+    setMatThickness(fab.thickness ?? 0);
+  }, [designMode, selectedFabricCode]);
 
   // Apply lighting preset
   const applyLighting = useCallback((preset: LightingPreset) => {
@@ -1123,13 +1341,23 @@ export default function ModelViewer() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const container = containerRef.current;
+    const getSize = () => {
+      if (designMode) {
+        return { w: container.clientWidth || window.innerWidth, h: container.clientHeight || window.innerHeight };
+      }
+      return { w: window.innerWidth, h: window.innerHeight };
+    };
+
+    const { w: initW, h: initH } = getSize();
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a1a);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
       40,
-      window.innerWidth / window.innerHeight,
+      initW / initH,
       0.1,
       1000,
     );
@@ -1137,7 +1365,7 @@ export default function ModelViewer() {
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(initW, initH);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -1155,11 +1383,11 @@ export default function ModelViewer() {
     controlsRef.current = controls;
 
     // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambient);
     ambientRef.current = ambient;
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
     keyLight.position.set(30, 80, 60);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 1024;
@@ -1173,12 +1401,12 @@ export default function ModelViewer() {
     scene.add(keyLight);
     keyLightRef.current = keyLight;
 
-    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.3);
+    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.5);
     fillLight.position.set(-40, 60, -30);
     scene.add(fillLight);
     fillLightRef.current = fillLight;
 
-    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.2);
+    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.3);
     rimLight.position.set(0, 30, -80);
     scene.add(rimLight);
     rimLightRef.current = rimLight;
@@ -1238,7 +1466,7 @@ export default function ModelViewer() {
 
     const vignettePass = new ShaderPass(VignetteShader);
     vignettePass.uniforms["offset"].value = 0.2;
-    vignettePass.uniforms["darkness"].value = 1.4;
+    vignettePass.uniforms["darkness"].value = 1.1;
     vignettePass.enabled = true;
     composer.addPass(vignettePass);
     vignettePassRef.current = vignettePass;
@@ -1248,6 +1476,14 @@ export default function ModelViewer() {
 
     // Offset the camera frustum so the model centers in the content area (right of sidebar)
     const applySidebarOffset = () => {
+      if (designMode) {
+        // In design mode, clear any view offset and use container dimensions
+        camera.clearViewOffset();
+        const { w, h } = getSize();
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        return;
+      }
       const sidebarW = sidebarRef.current?.offsetWidth ?? 0;
       const fullW = window.innerWidth;
       const fullH = window.innerHeight;
@@ -1258,13 +1494,19 @@ export default function ModelViewer() {
 
     // Resize handler
     const onResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const { w, h } = getSize();
       renderer.setSize(w, h);
       composer.setSize(w, h);
       applySidebarOffset();
     };
     window.addEventListener("resize", onResize);
+
+    // In design mode, also observe container size changes
+    let resizeObserver: ResizeObserver | undefined;
+    if (designMode) {
+      resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(container);
+    }
 
     // Render loop
     function animate() {
@@ -1292,9 +1534,9 @@ export default function ModelViewer() {
     animate();
 
     // Cleanup
-    const container = containerRef.current;
     return () => {
       window.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
       cancelAnimationFrame(animFrameRef.current);
       for (const tex of Object.values(textureCacheRef.current)) {
         tex.dispose();
@@ -1308,7 +1550,7 @@ export default function ModelViewer() {
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [designMode]);
 
   // Apply initial material + scene + load model on mount
   useEffect(() => {
@@ -1509,24 +1751,24 @@ export default function ModelViewer() {
   return (
     <>
       {/* Three.js canvas container */}
-      <div ref={containerRef} className="fixed inset-0" />
+      <div ref={containerRef} className={designMode ? "absolute inset-0" : "fixed inset-0"} />
 
       {/* Loading overlay */}
       {loading && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 text-white text-lg">
+        <div className={`${designMode ? "absolute" : "fixed"} inset-0 z-20 flex items-center justify-center bg-black/50 text-white text-lg`}>
           {loadError ?? `Loading model\u2026 ${loadProgress}%`}
         </div>
       )}
 
       {/* Error overlay (when not loading but error persists) */}
       {!loading && loadError && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 text-red-400 text-lg">
+        <div className={`${designMode ? "absolute" : "fixed"} inset-0 z-20 flex items-center justify-center bg-black/50 text-red-400 text-lg`}>
           {loadError}
         </div>
       )}
 
-      {/* Controls sidebar */}
-      <div ref={sidebarRef} className="fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin">
+      {/* Controls sidebar — hidden in design mode */}
+      <div ref={sidebarRef} className={`fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin ${designMode ? "hidden" : ""}`}>
         {/* Variant */}
         <ControlGroup label="Variant">
           {(["heavy", "light"] as const).map((v) => (
@@ -1714,10 +1956,12 @@ export default function ModelViewer() {
         </ControlGroup>
       </div>
 
-      {/* Info bar */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 text-xs text-gray-500">
-        Orbit: drag &middot; Zoom: scroll &middot; Pan: right-drag
-      </div>
+      {/* Info bar — hidden in design mode */}
+      {!designMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 text-xs text-gray-500">
+          Orbit: drag &middot; Zoom: scroll &middot; Pan: right-drag
+        </div>
+      )}
     </>
   );
 }

@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { redirect, forbidden } from "next/navigation";
+import { createClient, getUserRole } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
   children,
@@ -13,6 +13,11 @@ export default async function AdminLayout({
 
   if (!user) {
     redirect("/login?next=/admin");
+  }
+
+  const role = await getUserRole(supabase);
+  if (role !== "admin") {
+    forbidden();
   }
 
   return <>{children}</>;

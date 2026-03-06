@@ -2,9 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import AssetUploader from "@/app/components/admin/AssetUploader";
 import AssetList from "@/app/components/admin/AssetList";
+
+const NAV_LINKS = [
+  { href: "/admin/component-types", label: "Component Types & Categories" },
+  { href: "/admin/components", label: "Components" },
+  { href: "/admin/compatibility", label: "Compatibility Graph" },
+  { href: "/admin/fabrics", label: "Fabric Catalog" },
+  { href: "/admin/component-fabric-rules", label: "Component Fabric Rules" },
+  { href: "/admin/tags", label: "Tag Dimensions & Values" },
+  { href: "/admin/silhouettes", label: "Silhouettes" },
+];
 
 export default function AdminPage() {
   const router = useRouter();
@@ -22,7 +33,7 @@ export default function AdminPage() {
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-xl font-bold tracking-tight">
-            Tinker Tailor — Asset Manager
+            Tinker Tailor — Admin
           </h1>
           <button
             onClick={handleLogout}
@@ -31,6 +42,43 @@ export default function AdminPage() {
             Sign Out
           </button>
         </div>
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
+            Pattern Library
+          </h2>
+          <nav className="grid grid-cols-2 gap-2">
+            {NAV_LINKS.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="rounded border border-gray-700 px-4 py-3 text-sm text-gray-200 hover:bg-[#2a2a2a] hover:border-gray-500 transition-colors"
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
+            User Management
+          </h2>
+          <nav className="grid grid-cols-2 gap-2">
+            <Link
+              href="/admin/invite-codes"
+              className="rounded border border-gray-700 px-4 py-3 text-sm text-gray-200 hover:bg-[#2a2a2a] hover:border-gray-500 transition-colors"
+            >
+              Invite Codes
+            </Link>
+            <Link
+              href="/admin/applications"
+              className="rounded border border-gray-700 px-4 py-3 text-sm text-gray-200 hover:bg-[#2a2a2a] hover:border-gray-500 transition-colors"
+            >
+              Applications
+            </Link>
+          </nav>
+        </section>
 
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">

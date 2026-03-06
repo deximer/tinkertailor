@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 function LoginForm() {
   const router = useRouter();
@@ -101,6 +102,23 @@ export default function LoginPage() {
         <Suspense>
           <LoginForm />
         </Suspense>
+        <div className="mt-4 flex flex-col gap-2 text-center text-sm text-gray-500">
+          <Link
+            href="/auth/reset-password"
+            className="text-gray-400 hover:text-white"
+          >
+            Forgot password?
+          </Link>
+          <p>
+            No account?{" "}
+            <Link
+              href="/signup"
+              className="text-white underline hover:no-underline"
+            >
+              Sign up
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/guards";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,18 +13,9 @@ function getServiceClient() {
   });
 }
 
-async function requireAuth(): Promise<NextResponse | null> {
-  const supabase = await createAuthClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return null;
-}
-
 export async function GET() {
-  const denied = await requireAuth();
-  if (denied) return denied;
+  const { error: authError } = await requireAdmin();
+  if (authError) return authError;
 
   const supabase = getServiceClient();
 
@@ -46,8 +37,8 @@ export async function GET() {
 }
 
 export async function DELETE(request: Request) {
-  const denied = await requireAuth();
-  if (denied) return denied;
+  const { error: authError } = await requireAdmin();
+  if (authError) return authError;
 
   const { searchParams } = new URL(request.url);
   const name = searchParams.get("name");
