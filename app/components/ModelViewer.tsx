@@ -1367,7 +1367,12 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
             setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
           }
         });
-        if (isGlb) normalizeModel(obj, 20);
+        if (isGlb) {
+          // Clo3D GLB exports are in meters; OBJ files are in inches.
+          // Scaling by 39.3701 (m→in) preserves world-space Y so garment pieces
+          // sit at their correct body height (e.g. bodice aligns to upper dress).
+          obj.scale.setScalar(39.3701);
+        }
         obj.traverse((child) => {
           const mesh = child as THREE.Mesh;
           if (!mesh.isMesh) return;
