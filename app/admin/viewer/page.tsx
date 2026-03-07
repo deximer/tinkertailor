@@ -95,9 +95,22 @@ export default function ViewerPage() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  // Derived
-  const modelUrl =
-    meshes.find((m) => m.variant === selectedVariant)?.publicUrl ?? null;
+  // Resolved signed URL for the selected mesh
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
+
+  const selectedMesh = meshes.find((m) => m.variant === selectedVariant);
+
+  useEffect(() => {
+    if (!selectedMesh) {
+      setModelUrl(null);
+      return;
+    }
+    fetch(`/api/models/signed-url?name=${encodeURIComponent(selectedMesh.storagePath)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setModelUrl(data?.url ?? null))
+      .catch(() => setModelUrl(null));
+  }, [selectedMesh?.storagePath]);
+
   const isDirty =
     selectedFabricId !== null &&
     JSON.stringify(settings) !== JSON.stringify(savedSettings);
