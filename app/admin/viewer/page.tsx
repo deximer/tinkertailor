@@ -93,6 +93,7 @@ export default function ViewerPage() {
   const [savedSettings, setSavedSettings] = useState<ViewerSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   // Derived
   const modelUrl =
@@ -176,7 +177,7 @@ export default function ViewerPage() {
       setSelectedFabricId(fabric.id);
       const s = fabric.viewerSettings ?? DEFAULT_SETTINGS;
       setSettings(s);
-      setSavedSettings(fabric.viewerSettings ? { ...s } : null);
+      setSavedSettings({ ...s });
     },
     [],
   );
@@ -184,6 +185,7 @@ export default function ViewerPage() {
   const handleSave = useCallback(async () => {
     if (!selectedFabricId || saving) return;
     setSaving(true);
+    setSaveError(false);
     try {
       const res = await fetch("/api/admin/fabric-skins", {
         method: "PUT",
@@ -198,9 +200,14 @@ export default function ViewerPage() {
         setSavedSettings({ ...settings });
         setSaveFlash(true);
         setTimeout(() => setSaveFlash(false), 1500);
+      } else {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 2000);
       }
     } catch (err) {
       console.error("Save failed:", err);
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 2000);
     } finally {
       setSaving(false);
     }
@@ -425,6 +432,26 @@ export default function ViewerPage() {
             value={settings.sheenRoughness ?? 0}
             onChange={(v) => updateSetting("sheenRoughness", v)}
           />
+
+          {/* Sheen color */}
+          <label className="mb-2 block">
+            <span className="mb-1 block text-xs text-gray-500">Sheen Color</span>
+            <div className="flex gap-2">
+              <input
+                type="color"
+                value={settings.sheenColor ?? "#ffffff"}
+                onChange={(e) => updateSetting("sheenColor", e.target.value)}
+                className="h-8 w-8 shrink-0 cursor-pointer rounded border border-gray-600"
+              />
+              <input
+                type="text"
+                value={settings.sheenColor ?? "#ffffff"}
+                onChange={(e) => updateSetting("sheenColor", e.target.value)}
+                className="flex-1 rounded border border-gray-600 bg-[#222] px-2 py-1 text-sm text-white font-mono"
+              />
+            </div>
+          </label>
+
           <Slider
             label="Transmission"
             value={settings.transmission ?? 0}
@@ -444,20 +471,24 @@ export default function ViewerPage() {
             disabled={!selectedFabricId || saving}
             onClick={handleSave}
             className={`w-full rounded px-3 py-2 text-sm font-medium transition-colors ${
-              saveFlash
-                ? "bg-green-600 text-white"
-                : !selectedFabricId
-                  ? "cursor-not-allowed bg-[#333] text-gray-600"
-                  : isDirty
-                    ? "bg-white text-black hover:bg-gray-200"
-                    : "bg-[#333] text-gray-300 hover:bg-[#444]"
+              saveError
+                ? "bg-red-600 text-white"
+                : saveFlash
+                  ? "bg-green-600 text-white"
+                  : !selectedFabricId
+                    ? "cursor-not-allowed bg-[#333] text-gray-600"
+                    : isDirty
+                      ? "bg-white text-black hover:bg-gray-200"
+                      : "bg-[#333] text-gray-300 hover:bg-[#444]"
             }`}
           >
-            {saveFlash
-              ? "Saved!"
-              : saving
-                ? "Saving..."
-                : "Save to Fabric"}
+            {saveError
+              ? "Save failed"
+              : saveFlash
+                ? "Saved!"
+                : saving
+                  ? "Saving..."
+                  : "Save to Fabric"}
           </button>
         </div>
       </div>
