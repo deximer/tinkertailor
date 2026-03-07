@@ -8,6 +8,7 @@ interface Silhouette {
   patternId: string;
   categoryId: string;
   basePrice: string;
+  isComposable: boolean;
   description: string | null;
   createdAt: string;
 }
@@ -61,6 +62,7 @@ interface CreateForm {
   patternId: string;
   categoryId: string;
   basePrice: string;
+  isComposable: boolean;
   description: string;
 }
 
@@ -88,6 +90,7 @@ export default function AdminSilhouettesPage() {
     name: "",
     patternId: "",
     basePrice: "",
+    isComposable: false,
     description: "",
   });
   const [saving, setSaving] = useState(false);
@@ -99,6 +102,7 @@ export default function AdminSilhouettesPage() {
     patternId: "",
     categoryId: "",
     basePrice: "0",
+    isComposable: false,
     description: "",
   });
 
@@ -163,6 +167,7 @@ export default function AdminSilhouettesPage() {
       name: sil.name,
       patternId: sil.patternId,
       basePrice: sil.basePrice,
+      isComposable: sil.isComposable,
       description: sil.description ?? "",
     });
     setErrorMsg(null);
@@ -186,6 +191,7 @@ export default function AdminSilhouettesPage() {
         patternId: createForm.patternId,
         categoryId: createForm.categoryId,
         basePrice: createForm.basePrice || "0",
+        isComposable: createForm.isComposable,
         description: createForm.description || null,
       }),
     });
@@ -198,6 +204,7 @@ export default function AdminSilhouettesPage() {
         patternId: "",
         categoryId: "",
         basePrice: "0",
+        isComposable: false,
         description: "",
       });
       setShowCreate(false);
@@ -220,6 +227,7 @@ export default function AdminSilhouettesPage() {
         name: editForm.name,
         patternId: editForm.patternId,
         basePrice: editForm.basePrice,
+        isComposable: editForm.isComposable,
         description: editForm.description || null,
       }),
     });
@@ -518,6 +526,20 @@ export default function AdminSilhouettesPage() {
                     className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
                   />
                 </div>
+                <div className="col-span-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="create-isComposable"
+                    checked={createForm.isComposable}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, isComposable: e.target.checked }))
+                    }
+                    className="rounded border-gray-600"
+                  />
+                  <label htmlFor="create-isComposable" className="text-xs text-gray-500">
+                    Composable (multi-component silhouette)
+                  </label>
+                </div>
               </div>
               <div className="mb-4">
                 <label className="mb-1 block text-xs text-gray-500">
@@ -565,6 +587,7 @@ export default function AdminSilhouettesPage() {
                     <th className="px-4 py-2">Pattern ID</th>
                     <th className="px-4 py-2">Category</th>
                     <th className="px-4 py-2">Base Price</th>
+                    <th className="px-4 py-2">Mode</th>
                     <th className="px-4 py-2">Components</th>
                     <th className="px-4 py-2">Tags</th>
                     <th className="px-4 py-2" />
@@ -590,6 +613,15 @@ export default function AdminSilhouettesPage() {
                       </td>
                       <td className="px-4 py-2 text-gray-400">
                         ${sil.basePrice}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
+                          sil.isComposable
+                            ? "bg-teal-900/40 text-teal-300"
+                            : "bg-gray-700/40 text-gray-400"
+                        }`}>
+                          {sil.isComposable ? "Composable" : "Legacy"}
+                        </span>
                       </td>
                       <td className="px-4 py-2 text-gray-400">
                         {componentCount(sil.id)}
@@ -685,6 +717,20 @@ export default function AdminSilhouettesPage() {
                         }
                         className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                       />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="edit-isComposable"
+                        checked={editForm.isComposable}
+                        onChange={(e) =>
+                          setEditForm((f) => ({ ...f, isComposable: e.target.checked }))
+                        }
+                        className="rounded border-gray-600"
+                      />
+                      <label htmlFor="edit-isComposable" className="text-xs text-gray-500">
+                        Composable
+                      </label>
                     </div>
                   </div>
                   <div className="mb-4">
