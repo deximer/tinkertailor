@@ -627,6 +627,38 @@ async function seedFabricAffinity(
 // Main
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Step 3b: Seed extra components from seed JSON (those not in spreadsheet)
+// ---------------------------------------------------------------------------
+
+async function seedExtraComponentsFromJson(
+  typeIds: Record<string, string>,
+  componentMap: Record<string, string>,
+) {
+  console.log("Seeding extra components from seed JSON...");
+  const sections: { key: keyof typeof seedData; typeSlug: string }[] = [
+    { key: "bodices", typeSlug: "bodice" },
+    { key: "skirts", typeSlug: "skirt-section" },
+    { key: "sleeves", typeSlug: "sleeve" },
+  ];
+
+  let added = 0;
+  for (const { key, typeSlug } of sections) {
+    for (const comp of seedData[key]) {
+      if (componentMap[comp.code]) continue; // already seeded from spreadsheet
+      const row = await upsertByCode(comp.code, {
+        name: comp.name || comp.code,
+        code: comp.code,
+        componentTypeId: typeIds[typeSlug],
+        legacyCode: comp.code,
+      });
+      componentMap[comp.code] = row.id;
+      added++;
+    }
+  }
+  console.log(`  ${added} extra components added.`);
+}
+
 async function main() {
   console.log("=== Seed Components & Compatibility ===\n");
 
@@ -635,6 +667,7 @@ async function main() {
   await ensureGarmentParts();
   const { componentMap, bodiceCodes, skirtCodes, sleeveCodes, wb } =
     await seedComponentsFromSpreadsheet(typeIds);
+  await seedExtraComponentsFromJson(typeIds, componentMap);
   await seedCompatibilityMatrices(
     componentMap,
     bodiceCodes,
