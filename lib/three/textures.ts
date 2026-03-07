@@ -187,6 +187,43 @@ export interface FabricDef {
   thickness?: number;
 }
 
+export type TextureType =
+  | "silk"
+  | "satin"
+  | "cotton"
+  | "linen"
+  | "chiffon"
+  | "velvet"
+  | "denim"
+  | "wool"
+  | "solid";
+
+export const TEXTURE_GENERATORS: Record<
+  Exclude<TextureType, "solid">,
+  () => THREE.CanvasTexture
+> = {
+  silk: texSilk,
+  satin: texSatin,
+  cotton: texCotton,
+  linen: texLinen,
+  chiffon: texChiffon,
+  velvet: texVelvet,
+  denim: texDenim,
+  wool: texWool,
+};
+
+export interface ViewerSettings {
+  textureType: TextureType;
+  color: string;
+  roughness: number;
+  metalness: number;
+  sheen?: number;
+  sheenRoughness?: number;
+  sheenColor?: string;
+  transmission?: number;
+  thickness?: number;
+}
+
 export const FABRICS: FabricDef[] = [
   { name: "Silk", roughness: 0.68, metalness: 0.0, texture: texSilk, sheen: 0.3, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
   { name: "Satin", roughness: 0.6, metalness: 0.0, texture: texSatin },
