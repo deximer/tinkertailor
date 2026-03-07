@@ -203,6 +203,24 @@ export default function AdminFabricViewer({
 
       garmentGroupRef.current = group;
       scene.add(group);
+
+      // Fit camera to the loaded model
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      if (camera && controls) {
+        const box = new THREE.Box3().setFromObject(group);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        const dist = (maxDim / (2 * Math.tan(fov / 2))) * 1.8;
+        controls.target.copy(center);
+        camera.position.set(center.x, center.y, center.z + dist);
+        camera.near = dist / 100;
+        camera.far = dist * 10;
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
     };
 
     if (isGlb) {

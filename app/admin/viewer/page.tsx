@@ -12,13 +12,6 @@ const AdminFabricViewer = dynamic(
 
 // ── Types ──
 
-interface ComponentType {
-  id: string;
-  name: string;
-  slug: string;
-  stage: string;
-}
-
 interface Component {
   id: string;
   name: string;
@@ -49,7 +42,7 @@ interface FabricSkin {
   createdAt: string;
 }
 
-const TABS = ["Bodice", "Skirt", "Sleeve"] as const;
+const TABS = ["Bodice", "Skirt Section", "Sleeve"] as const;
 const VARIANTS = ["heavy", "light", "standard"] as const;
 
 const TEXTURE_OPTIONS: TextureType[] = [
@@ -78,7 +71,6 @@ const DEFAULT_SETTINGS: ViewerSettings = {
 
 export default function ViewerPage() {
   // Component state
-  const [componentTypes, setComponentTypes] = useState<ComponentType[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
   const [activeTab, setActiveTab] = useState<string>("Bodice");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -118,11 +110,6 @@ export default function ViewerPage() {
   // ── Data fetching ──
 
   useEffect(() => {
-    fetch("/api/component-types?stage=silhouette")
-      .then((r) => r.json())
-      .then((data: ComponentType[]) => setComponentTypes(data))
-      .catch(console.error);
-
     fetch("/api/components")
       .then((r) => r.json())
       .then((data: Component[]) => setComponents(data))
@@ -161,10 +148,7 @@ export default function ViewerPage() {
   }, [selectedComponentId]);
 
   // Lazy-load mesh counts for visible components
-  const filteredComponents = components.filter((c) => {
-    const ct = componentTypes.find((t) => t.id === c.componentTypeId);
-    return ct?.name === activeTab;
-  });
+  const filteredComponents = components.filter((c) => c.typeName === activeTab);
 
   useEffect(() => {
     const toFetch = filteredComponents.filter(
@@ -181,7 +165,7 @@ export default function ViewerPage() {
         });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, components, componentTypes]);
+  }, [activeTab, components]);
 
   // ── Handlers ──
 
