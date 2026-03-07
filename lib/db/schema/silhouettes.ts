@@ -5,6 +5,7 @@ import {
   numeric,
   timestamp,
   primaryKey,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { categories } from "./categories";
 import { components } from "./components";
@@ -21,6 +22,7 @@ export const silhouetteTemplates = pgTable("silhouette_templates", {
     .notNull()
     .default("0"),
   description: varchar("description", { length: 2000 }),
+  isComposable: boolean("is_composable").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
