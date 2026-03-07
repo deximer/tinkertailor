@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { componentTypes, categories } from "@/lib/db/schema";
-import { eq, and, type SQL } from "drizzle-orm";
+import { eq, and, asc, type SQL } from "drizzle-orm";
 import type { ComponentStage } from "@/lib/db/schema/component-types";
 
 export async function GET(request: Request) {
@@ -45,9 +45,11 @@ export async function GET(request: Request) {
         categoryId: componentTypes.categoryId,
         stage: componentTypes.stage,
         isFirstLeaf: componentTypes.isFirstLeaf,
+        garmentPart: componentTypes.garmentPart,
       })
       .from(componentTypes)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(componentTypes.name));
 
     return NextResponse.json(rows);
   } catch (err) {

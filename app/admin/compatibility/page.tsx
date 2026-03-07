@@ -9,6 +9,7 @@ interface ComponentType {
   categoryId: string;
   stage: string;
   isFirstLeaf: boolean;
+  garmentPart: string | null;
 }
 
 interface MatrixComponent {
@@ -45,14 +46,21 @@ export default function AdminCompatibilityPage() {
         const res = await fetch("/api/component-types");
         if (res.ok) {
           const types: ComponentType[] = await res.json();
-          setComponentTypes(types);
+          // Only show types that participate in compatibility (have a garmentPart)
+          const compatibleTypes = types.filter((t) => t.garmentPart != null);
+          setComponentTypes(compatibleTypes);
 
-          // Default to first two types if available
-          if (types.length >= 2) {
-            setTypeASlug(types[0].slug);
-            setTypeBSlug(types[1].slug);
-          } else if (types.length === 1) {
-            setTypeASlug(types[0].slug);
+          // Default to bodice + skirt if available, otherwise first two compatible types
+          const bodice = compatibleTypes.find((t) => t.garmentPart === "bodice");
+          const skirt = compatibleTypes.find((t) => t.garmentPart === "skirt");
+          if (bodice && skirt) {
+            setTypeASlug(bodice.slug);
+            setTypeBSlug(skirt.slug);
+          } else if (compatibleTypes.length >= 2) {
+            setTypeASlug(compatibleTypes[0].slug);
+            setTypeBSlug(compatibleTypes[1].slug);
+          } else if (compatibleTypes.length === 1) {
+            setTypeASlug(compatibleTypes[0].slug);
           }
         } else {
           setErrorMsg("Failed to load component types");

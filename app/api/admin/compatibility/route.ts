@@ -322,7 +322,6 @@ export async function GET(request: Request) {
           .select({
             bodiceId: bodiceSleeveCompatibility.bodiceId,
             sleeveId: bodiceSleeveCompatibility.sleeveId,
-            sleeveStyleCode: bodiceSleeveCompatibility.sleeveStyleCode,
           })
           .from(bodiceSleeveCompatibility)
           .where(
@@ -332,12 +331,11 @@ export async function GET(request: Request) {
             ),
           );
 
-        edges = edgeRows.map((e) => {
-          const suffix = e.sleeveStyleCode ? `:${e.sleeveStyleCode}` : "";
-          return rowIsBodice
-            ? `${e.bodiceId}:${e.sleeveId}${suffix}`
-            : `${e.sleeveId}:${e.bodiceId}${suffix}`;
-        });
+        edges = edgeRows.map((e) =>
+          rowIsBodice
+            ? `${e.bodiceId}:${e.sleeveId}`
+            : `${e.sleeveId}:${e.bodiceId}`,
+        );
       }
     }
 
