@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./infra/deploy.sh <env> [--migrate]
+# Usage: ./infra/deploy.sh <env> [--no-migrate]
 # Example: ./infra/deploy.sh qa
-#          ./infra/deploy.sh staging --migrate
+#          ./infra/deploy.sh staging --no-migrate
+#
+# Migrations run automatically for all environments.
+# Pass --no-migrate to skip (e.g. hotfix deploy with no schema changes).
 
 usage() {
-  echo "Usage: $0 <env> [--migrate]"
-  echo "  env:       qa | staging"
-  echo "  --migrate: run DB migrations after deploy"
+  echo "Usage: $0 <env> [--no-migrate]"
+  echo "  env:         qa | staging"
+  echo "  --no-migrate: skip DB migrations after deploy"
   exit "${1:-1}"
 }
 
@@ -18,10 +21,10 @@ fi
 
 ENV="${1:?$(usage)}"
 shift
-MIGRATE=false
+MIGRATE=true
 for arg in "$@"; do
   case "$arg" in
-    --migrate) MIGRATE=true ;;
+    --no-migrate) MIGRATE=false ;;
     *) echo "Unknown option: $arg" >&2; usage ;;
   esac
 done
@@ -74,7 +77,7 @@ flyctl deploy --config "$FLY_TOML" --app "$APP_NAME" "${BUILD_ARGS[@]}"
 
 echo "==> Deploy complete: ${APP_NAME}"
 
-# Run migrations if requested
+# Run migrations (always, unless --no-migrate was passed)
 if [[ "$MIGRATE" == "true" ]]; then
   if [[ ! -f "$SECRETS_FILE" ]]; then
     echo "Error: Secrets file not found: $SECRETS_FILE (needed for DATABASE_URL)" >&2
