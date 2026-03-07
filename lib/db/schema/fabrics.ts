@@ -9,6 +9,7 @@ import {
   timestamp,
   primaryKey,
 } from "drizzle-orm/pg-core";
+import { type MeshVariant } from "./component-meshes";
 import { components } from "./components";
 
 export const fabricSkinCategories = pgTable("fabric_skin_categories", {
@@ -30,7 +31,9 @@ export const fabricSkins = pgTable("fabric_skins", {
   categoryId: uuid("category_id")
     .notNull()
     .references(() => fabricSkinCategories.id),
-  modelType: varchar("model_type", { length: 50 }),
+  // Which component mesh variant to load when this fabric is applied.
+  // Matches component_meshes.variant. Null = fabric works with any mesh variant.
+  meshVariant: varchar("mesh_variant", { length: 20 }).$type<MeshVariant>(),
   priceMarkup: numeric("price_markup", { precision: 10, scale: 2 })
     .notNull()
     .default("0"),

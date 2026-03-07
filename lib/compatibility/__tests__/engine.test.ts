@@ -335,10 +335,10 @@ function makeMockComponent(
     name,
     code,
     componentTypeId: `${typeSlug}-type`,
-    modelPath: null,
     typeName: typeSlug.charAt(0).toUpperCase() + typeSlug.slice(1),
     typeSlug,
     stage,
     isFirstLeaf,
+    garmentPart: null,
   };
 }

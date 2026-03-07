@@ -16,7 +16,7 @@ export async function GET() {
         name: fabricSkins.name,
         fabricCode: fabricSkins.fabricCode,
         categoryId: fabricSkins.categoryId,
-        modelType: fabricSkins.modelType,
+        meshVariant: fabricSkins.meshVariant,
         priceMarkup: fabricSkins.priceMarkup,
         hidden: fabricSkins.hidden,
         createdAt: fabricSkins.createdAt,
@@ -38,7 +38,7 @@ const createSchema = z.object({
   name: z.string().min(1).max(200),
   fabricCode: z.string().min(1).max(50),
   categoryId: z.string().uuid(),
-  modelType: z.string().max(50).nullable().optional(),
+  meshVariant: z.enum(["heavy", "light", "standard"]).nullable().optional(),
   priceMarkup: z.string().default("0"),
   hidden: z.boolean().default(false),
 });
@@ -48,7 +48,7 @@ const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   fabricCode: z.string().min(1).max(50).optional(),
   categoryId: z.string().uuid().optional(),
-  modelType: z.string().max(50).nullable().optional(),
+  meshVariant: z.enum(["heavy", "light", "standard"]).nullable().optional(),
   priceMarkup: z.string().optional(),
   hidden: z.boolean().optional(),
 });
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         name: body.name,
         fabricCode: body.fabricCode,
         categoryId: body.categoryId,
-        modelType: body.modelType ?? null,
+        meshVariant: body.meshVariant ?? null,
         priceMarkup: body.priceMarkup,
         hidden: body.hidden,
       })
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
         name: fabricSkins.name,
         fabricCode: fabricSkins.fabricCode,
         categoryId: fabricSkins.categoryId,
-        modelType: fabricSkins.modelType,
+        meshVariant: fabricSkins.meshVariant,
         priceMarkup: fabricSkins.priceMarkup,
         hidden: fabricSkins.hidden,
         createdAt: fabricSkins.createdAt,
@@ -136,7 +136,7 @@ export async function PUT(request: Request) {
     if (body.name !== undefined) updates.name = body.name;
     if (body.fabricCode !== undefined) updates.fabricCode = body.fabricCode;
     if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
-    if (body.modelType !== undefined) updates.modelType = body.modelType;
+    if (body.meshVariant !== undefined) updates.meshVariant = body.meshVariant;
     if (body.priceMarkup !== undefined) updates.priceMarkup = body.priceMarkup;
     if (body.hidden !== undefined) updates.hidden = body.hidden;
 
@@ -156,7 +156,7 @@ export async function PUT(request: Request) {
         name: fabricSkins.name,
         fabricCode: fabricSkins.fabricCode,
         categoryId: fabricSkins.categoryId,
-        modelType: fabricSkins.modelType,
+        meshVariant: fabricSkins.meshVariant,
         priceMarkup: fabricSkins.priceMarkup,
         hidden: fabricSkins.hidden,
         createdAt: fabricSkins.createdAt,

@@ -20,12 +20,13 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   components,
   componentTypes,
-  componentCompatibility,
+  bodiceSkirtCompatibility,
+  bodiceSleeveCompatibility,
   fabricSkinCategories,
   fabricSkins,
   componentFabricCategories,
 } from "../db/schema";
-import type { ComponentStage } from "../db/schema/component-types";
+import type { ComponentStage, GarmentPart } from "../db/schema/component-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,11 +39,11 @@ export interface ComponentWithType {
   name: string;
   code: string;
   componentTypeId: string;
-  modelPath: string | null;
   typeName: string;
   typeSlug: string;
   stage: ComponentStage;
   isFirstLeaf: boolean;
+  garmentPart: GarmentPart | null;
 }
 
 export interface CompatibleComponentsResult {
@@ -138,11 +139,11 @@ export async function getCompatibleComponents(
         name: components.name,
         code: components.code,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
         stage: componentTypes.stage,
         isFirstLeaf: componentTypes.isFirstLeaf,
+        garmentPart: componentTypes.garmentPart,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
@@ -163,11 +164,11 @@ export async function getCompatibleComponents(
         name: components.name,
         code: components.code,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
         stage: componentTypes.stage,
         isFirstLeaf: componentTypes.isFirstLeaf,
+        garmentPart: componentTypes.garmentPart,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
@@ -185,25 +186,41 @@ export async function getCompatibleComponents(
   let compatibleIds: Set<string> | null = null;
 
   for (const selId of selectedComponentIds) {
-    // Get IDs compatible with this selected component (bidirectional)
-    const edges = await db
-      .select({
-        compatId: componentCompatibility.componentBId,
-      })
-      .from(componentCompatibility)
-      .where(eq(componentCompatibility.componentAId, selId));
+    const selComp = selectedComps.find((c) => c.id === selId);
+    const { garmentPart } = selComp ?? { garmentPart: null };
 
-    const reverseEdges = await db
-      .select({
-        compatId: componentCompatibility.componentAId,
-      })
-      .from(componentCompatibility)
-      .where(eq(componentCompatibility.componentBId, selId));
+    // Embellishment/finishing components don't participate in the typed graph
+    if (!garmentPart || !["bodice", "skirt", "sleeve"].includes(garmentPart)) {
+      continue;
+    }
 
-    const thisSet = new Set([
-      ...edges.map((e) => e.compatId),
-      ...reverseEdges.map((e) => e.compatId),
-    ]);
+    const thisSet = new Set<string>();
+
+    if (garmentPart === "bodice") {
+      const [skirtEdges, sleeveEdges] = await Promise.all([
+        db
+          .select({ compatId: bodiceSkirtCompatibility.skirtId })
+          .from(bodiceSkirtCompatibility)
+          .where(eq(bodiceSkirtCompatibility.bodiceId, selId)),
+        db
+          .select({ compatId: bodiceSleeveCompatibility.sleeveId })
+          .from(bodiceSleeveCompatibility)
+          .where(eq(bodiceSleeveCompatibility.bodiceId, selId)),
+      ]);
+      for (const e of [...skirtEdges, ...sleeveEdges]) thisSet.add(e.compatId);
+    } else if (garmentPart === "skirt") {
+      const edges = await db
+        .select({ compatId: bodiceSkirtCompatibility.bodiceId })
+        .from(bodiceSkirtCompatibility)
+        .where(eq(bodiceSkirtCompatibility.skirtId, selId));
+      for (const e of edges) thisSet.add(e.compatId);
+    } else if (garmentPart === "sleeve") {
+      const edges = await db
+        .select({ compatId: bodiceSleeveCompatibility.bodiceId })
+        .from(bodiceSleeveCompatibility)
+        .where(eq(bodiceSleeveCompatibility.sleeveId, selId));
+      for (const e of edges) thisSet.add(e.compatId);
+    }
 
     if (compatibleIds === null) {
       compatibleIds = thisSet;
@@ -233,11 +250,11 @@ export async function getCompatibleComponents(
       name: components.name,
       code: components.code,
       componentTypeId: components.componentTypeId,
-      modelPath: components.modelPath,
       typeName: componentTypes.name,
       typeSlug: componentTypes.slug,
       stage: componentTypes.stage,
       isFirstLeaf: componentTypes.isFirstLeaf,
+      garmentPart: componentTypes.garmentPart,
     })
     .from(components)
     .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))

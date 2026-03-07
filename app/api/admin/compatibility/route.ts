@@ -4,14 +4,28 @@ import { db } from "@/lib/db";
 import {
   components,
   componentTypes,
-  componentCompatibility,
+  bodiceSkirtCompatibility,
+  bodiceSleeveCompatibility,
 } from "@/lib/db/schema";
-import { eq, and, or, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
+
+type EdgeType = "bodice_skirt" | "bodice_sleeve";
+
+function resolveEdgeType(
+  partA: string | null,
+  partB: string | null,
+): EdgeType | null {
+  const parts = new Set([partA, partB]);
+  if (parts.has("bodice") && parts.has("skirt")) return "bodice_skirt";
+  if (parts.has("bodice") && parts.has("sleeve")) return "bodice_sleeve";
+  return null;
+}
 
 const edgeSchema = z.object({
   componentAId: z.string().uuid(),
   componentBId: z.string().uuid(),
+  sleeveStyleCode: z.enum(["ST", "DS", "OS"]).nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -28,10 +42,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate both component IDs exist
+    // Fetch both components with their garment parts
     const found = await db
-      .select({ id: components.id })
+      .select({
+        id: components.id,
+        garmentPart: componentTypes.garmentPart,
+      })
       .from(components)
+      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
       .where(inArray(components.id, [body.componentAId, body.componentBId]));
 
     if (found.length < 2) {
@@ -45,47 +63,79 @@ export async function POST(request: Request) {
       );
     }
 
-    // Store in canonical order (smaller UUID first) to prevent duplicates
-    const [canonA, canonB] =
-      body.componentAId < body.componentBId
-        ? [body.componentAId, body.componentBId]
-        : [body.componentBId, body.componentAId];
+    const compA = found.find((r) => r.id === body.componentAId)!;
+    const compB = found.find((r) => r.id === body.componentBId)!;
+    const edgeType = resolveEdgeType(compA.garmentPart, compB.garmentPart);
 
-    // Check if edge already exists
-    const [existing] = await db
-      .select({
-        componentAId: componentCompatibility.componentAId,
-        componentBId: componentCompatibility.componentBId,
-      })
-      .from(componentCompatibility)
-      .where(
-        and(
-          eq(componentCompatibility.componentAId, canonA),
-          eq(componentCompatibility.componentBId, canonB),
-        ),
-      )
-      .limit(1);
-
-    if (existing) {
+    if (!edgeType) {
       return NextResponse.json(
-        {
-          componentAId: existing.componentAId,
-          componentBId: existing.componentBId,
-        },
-        { status: 200 },
+        { error: "No compatibility table exists for this component type pair" },
+        { status: 400 },
       );
     }
 
-    const [row] = await db
-      .insert(componentCompatibility)
-      .values({ componentAId: canonA, componentBId: canonB })
-      .returning({
-        componentAId: componentCompatibility.componentAId,
-        componentBId: componentCompatibility.componentBId,
-        createdAt: componentCompatibility.createdAt,
-      });
+    if (edgeType === "bodice_skirt") {
+      const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
+      const skirtId = compA.garmentPart === "skirt" ? compA.id : compB.id;
 
-    return NextResponse.json(row, { status: 201 });
+      const [existing] = await db
+        .select({ bodiceId: bodiceSkirtCompatibility.bodiceId })
+        .from(bodiceSkirtCompatibility)
+        .where(
+          and(
+            eq(bodiceSkirtCompatibility.bodiceId, bodiceId),
+            eq(bodiceSkirtCompatibility.skirtId, skirtId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        return NextResponse.json({ bodiceId, skirtId }, { status: 200 });
+      }
+
+      const [row] = await db
+        .insert(bodiceSkirtCompatibility)
+        .values({ bodiceId, skirtId })
+        .returning({
+          bodiceId: bodiceSkirtCompatibility.bodiceId,
+          skirtId: bodiceSkirtCompatibility.skirtId,
+          createdAt: bodiceSkirtCompatibility.createdAt,
+        });
+
+      return NextResponse.json(row, { status: 201 });
+    } else {
+      // bodice_sleeve
+      const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
+      const sleeveId = compA.garmentPart === "sleeve" ? compA.id : compB.id;
+      const sleeveStyleCode = body.sleeveStyleCode ?? null;
+
+      const [existing] = await db
+        .select({ bodiceId: bodiceSleeveCompatibility.bodiceId })
+        .from(bodiceSleeveCompatibility)
+        .where(
+          and(
+            eq(bodiceSleeveCompatibility.bodiceId, bodiceId),
+            eq(bodiceSleeveCompatibility.sleeveId, sleeveId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        return NextResponse.json({ bodiceId, sleeveId }, { status: 200 });
+      }
+
+      const [row] = await db
+        .insert(bodiceSleeveCompatibility)
+        .values({ bodiceId, sleeveId, sleeveStyleCode })
+        .returning({
+          bodiceId: bodiceSleeveCompatibility.bodiceId,
+          sleeveId: bodiceSleeveCompatibility.sleeveId,
+          sleeveStyleCode: bodiceSleeveCompatibility.sleeveStyleCode,
+          createdAt: bodiceSleeveCompatibility.createdAt,
+        });
+
+      return NextResponse.json(row, { status: 201 });
+    }
   } catch (err) {
     if (err instanceof ZodError) {
       return NextResponse.json(
@@ -108,21 +158,46 @@ export async function DELETE(request: Request) {
   try {
     const body = edgeSchema.parse(await request.json());
 
-    // Delete both directions (A,B) and (B,A) if they exist
-    await db
-      .delete(componentCompatibility)
-      .where(
-        or(
-          and(
-            eq(componentCompatibility.componentAId, body.componentAId),
-            eq(componentCompatibility.componentBId, body.componentBId),
-          ),
-          and(
-            eq(componentCompatibility.componentAId, body.componentBId),
-            eq(componentCompatibility.componentBId, body.componentAId),
-          ),
-        ),
-      );
+    // Fetch both components with garment parts
+    const found = await db
+      .select({
+        id: components.id,
+        garmentPart: componentTypes.garmentPart,
+      })
+      .from(components)
+      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+      .where(inArray(components.id, [body.componentAId, body.componentBId]));
+
+    const compA = found.find((r) => r.id === body.componentAId);
+    const compB = found.find((r) => r.id === body.componentBId);
+
+    if (compA && compB) {
+      const edgeType = resolveEdgeType(compA.garmentPart, compB.garmentPart);
+
+      if (edgeType === "bodice_skirt") {
+        const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
+        const skirtId = compA.garmentPart === "skirt" ? compA.id : compB.id;
+        await db
+          .delete(bodiceSkirtCompatibility)
+          .where(
+            and(
+              eq(bodiceSkirtCompatibility.bodiceId, bodiceId),
+              eq(bodiceSkirtCompatibility.skirtId, skirtId),
+            ),
+          );
+      } else if (edgeType === "bodice_sleeve") {
+        const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
+        const sleeveId = compA.garmentPart === "sleeve" ? compA.id : compB.id;
+        await db
+          .delete(bodiceSleeveCompatibility)
+          .where(
+            and(
+              eq(bodiceSleeveCompatibility.bodiceId, bodiceId),
+              eq(bodiceSleeveCompatibility.sleeveId, sleeveId),
+            ),
+          );
+      }
+    }
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
@@ -156,15 +231,15 @@ export async function GET(request: Request) {
       );
     }
 
-    // Resolve type slugs to IDs
+    // Resolve type slugs to IDs and garment parts
     const [typeARows, typeBRows] = await Promise.all([
       db
-        .select({ id: componentTypes.id })
+        .select({ id: componentTypes.id, garmentPart: componentTypes.garmentPart })
         .from(componentTypes)
         .where(eq(componentTypes.slug, typeASlug))
         .limit(1),
       db
-        .select({ id: componentTypes.id })
+        .select({ id: componentTypes.id, garmentPart: componentTypes.garmentPart })
         .from(componentTypes)
         .where(eq(componentTypes.slug, typeBSlug))
         .limit(1),
@@ -183,70 +258,87 @@ export async function GET(request: Request) {
       );
     }
 
-    const typeAId = typeARows[0].id;
-    const typeBId = typeBRows[0].id;
+    const typeA = typeARows[0];
+    const typeB = typeBRows[0];
+    const edgeType = resolveEdgeType(typeA.garmentPart, typeB.garmentPart);
+
+    if (!edgeType) {
+      return NextResponse.json(
+        { error: "No compatibility table exists for this component type pair" },
+        { status: 400 },
+      );
+    }
 
     // Fetch components for each type
     const [rowComponents, colComponents] = await Promise.all([
       db
-        .select({
-          id: components.id,
-          name: components.name,
-          code: components.code,
-        })
+        .select({ id: components.id, name: components.name, code: components.code })
         .from(components)
-        .where(eq(components.componentTypeId, typeAId))
+        .where(eq(components.componentTypeId, typeA.id))
         .orderBy(components.name),
       db
-        .select({
-          id: components.id,
-          name: components.name,
-          code: components.code,
-        })
+        .select({ id: components.id, name: components.name, code: components.code })
         .from(components)
-        .where(eq(components.componentTypeId, typeBId))
+        .where(eq(components.componentTypeId, typeB.id))
         .orderBy(components.name),
     ]);
 
     const rowIds = rowComponents.map((c) => c.id);
     const colIds = colComponents.map((c) => c.id);
 
-    // Fetch edges between the two groups (both directions)
     let edges: string[] = [];
 
     if (rowIds.length > 0 && colIds.length > 0) {
-      const edgeRows = await db
-        .select({
-          componentAId: componentCompatibility.componentAId,
-          componentBId: componentCompatibility.componentBId,
-        })
-        .from(componentCompatibility)
-        .where(
-          or(
-            // A in rows, B in cols
+      const rowIsBodice = typeA.garmentPart === "bodice";
+
+      if (edgeType === "bodice_skirt") {
+        const bodiceIds = rowIsBodice ? rowIds : colIds;
+        const skirtIds = rowIsBodice ? colIds : rowIds;
+
+        const edgeRows = await db
+          .select({
+            bodiceId: bodiceSkirtCompatibility.bodiceId,
+            skirtId: bodiceSkirtCompatibility.skirtId,
+          })
+          .from(bodiceSkirtCompatibility)
+          .where(
             and(
-              inArray(componentCompatibility.componentAId, rowIds),
-              inArray(componentCompatibility.componentBId, colIds),
+              inArray(bodiceSkirtCompatibility.bodiceId, bodiceIds),
+              inArray(bodiceSkirtCompatibility.skirtId, skirtIds),
             ),
-            // A in cols, B in rows
-            and(
-              inArray(componentCompatibility.componentAId, colIds),
-              inArray(componentCompatibility.componentBId, rowIds),
-            ),
-          ),
+          );
+
+        edges = edgeRows.map((e) =>
+          rowIsBodice
+            ? `${e.bodiceId}:${e.skirtId}`
+            : `${e.skirtId}:${e.bodiceId}`,
         );
+      } else {
+        // bodice_sleeve
+        const bodiceIds = rowIsBodice ? rowIds : colIds;
+        const sleeveIds = rowIsBodice ? colIds : rowIds;
 
-      const rowIdSet = new Set(rowIds);
-      const colIdSet = new Set(colIds);
+        const edgeRows = await db
+          .select({
+            bodiceId: bodiceSleeveCompatibility.bodiceId,
+            sleeveId: bodiceSleeveCompatibility.sleeveId,
+            sleeveStyleCode: bodiceSleeveCompatibility.sleeveStyleCode,
+          })
+          .from(bodiceSleeveCompatibility)
+          .where(
+            and(
+              inArray(bodiceSleeveCompatibility.bodiceId, bodiceIds),
+              inArray(bodiceSleeveCompatibility.sleeveId, sleeveIds),
+            ),
+          );
 
-      edges = edgeRows.map((e) => {
-        // Normalize to rowId:colId format
-        if (rowIdSet.has(e.componentAId) && colIdSet.has(e.componentBId)) {
-          return `${e.componentAId}:${e.componentBId}`;
-        }
-        // Reverse direction: A is col, B is row
-        return `${e.componentBId}:${e.componentAId}`;
-      });
+        edges = edgeRows.map((e) => {
+          const suffix = e.sleeveStyleCode ? `:${e.sleeveStyleCode}` : "";
+          return rowIsBodice
+            ? `${e.bodiceId}:${e.sleeveId}${suffix}`
+            : `${e.sleeveId}:${e.bodiceId}${suffix}`;
+        });
+      }
     }
 
     return NextResponse.json({

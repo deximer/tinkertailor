@@ -1,6 +1,7 @@
 export * from "./categories";
 export * from "./component-types";
 export * from "./components";
+export * from "./component-meshes";
 export * from "./component-compatibility";
 export * from "./fabrics";
 export * from "./silhouettes";

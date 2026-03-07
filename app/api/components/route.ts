@@ -49,7 +49,6 @@ export async function GET(request: Request) {
         name: components.name,
         code: components.code,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
         stage: componentTypes.stage,

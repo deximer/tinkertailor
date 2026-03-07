@@ -22,7 +22,8 @@ import {
   categories,
   componentTypes,
   components,
-  componentCompatibility,
+  bodiceSkirtCompatibility,
+  bodiceSleeveCompatibility,
   fabricSkinCategories,
   fabricSkins,
   componentFabricCategories,
@@ -62,7 +63,7 @@ async function upsertBySlug(
 
 async function upsertByCode(
   code: string,
-  row: { name: string; code: string; componentTypeId: string; modelPath?: string },
+  row: { name: string; code: string; componentTypeId: string; legacyCode?: string },
 ) {
   const existing = await db
     .select()
@@ -265,23 +266,23 @@ async function seedCompatibilityMatrices(
 
       const val = skirtsSheet.getRow(r).getCell(c).value;
       if (Number(val) === 1) {
-        const aId = componentMap[bodCode];
-        const bId = componentMap[skCode];
+        const bodiceId = componentMap[bodCode];
+        const skirtId = componentMap[skCode];
         // Idempotent insert
         const existing = await db
           .select()
-          .from(componentCompatibility)
+          .from(bodiceSkirtCompatibility)
           .where(
             and(
-              eq(componentCompatibility.componentAId, aId),
-              eq(componentCompatibility.componentBId, bId),
+              eq(bodiceSkirtCompatibility.bodiceId, bodiceId),
+              eq(bodiceSkirtCompatibility.skirtId, skirtId),
             ),
           )
           .limit(1);
         if (existing.length === 0) {
           await db
-            .insert(componentCompatibility)
-            .values({ componentAId: aId, componentBId: bId });
+            .insert(bodiceSkirtCompatibility)
+            .values({ bodiceId, skirtId });
           bodSkirtCount++;
         }
       }
@@ -314,22 +315,22 @@ async function seedCompatibilityMatrices(
 
       const val = sleevesSheet.getRow(r).getCell(col).value;
       if (Number(val) === 1) {
-        const aId = componentMap[bodCode];
-        const bId = componentMap[slvCode];
+        const bodiceId = componentMap[bodCode];
+        const sleeveId = componentMap[slvCode];
         const existing = await db
           .select()
-          .from(componentCompatibility)
+          .from(bodiceSleeveCompatibility)
           .where(
             and(
-              eq(componentCompatibility.componentAId, aId),
-              eq(componentCompatibility.componentBId, bId),
+              eq(bodiceSleeveCompatibility.bodiceId, bodiceId),
+              eq(bodiceSleeveCompatibility.sleeveId, sleeveId),
             ),
           )
           .limit(1);
         if (existing.length === 0) {
           await db
-            .insert(componentCompatibility)
-            .values({ componentAId: aId, componentBId: bId });
+            .insert(bodiceSleeveCompatibility)
+            .values({ bodiceId, sleeveId });
           bodSlvCount++;
         }
       }
@@ -455,7 +456,7 @@ async function seedFabrics() {
           name,
           fabricCode: code,
           categoryId: catId,
-          modelType: null,
+          meshVariant: null,
           priceMarkup: "0",
         })
         .returning();

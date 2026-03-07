@@ -118,7 +118,7 @@ export async function GET(request: Request) {
             id: fabricSkins.id,
             name: fabricSkins.name,
             fabricCode: fabricSkins.fabricCode,
-            modelType: fabricSkins.modelType,
+            meshVariant: fabricSkins.meshVariant,
             priceMarkup: fabricSkins.priceMarkup,
           })
           .from(fabricSkins)

@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   varchar,
+  boolean,
   numeric,
   timestamp,
   primaryKey,
@@ -21,6 +22,9 @@ export const silhouetteTemplates = pgTable("silhouette_templates", {
     .notNull()
     .default("0"),
   description: varchar("description", { length: 2000 }),
+  // true = assembled from modular components (bodice + skirt + optional sleeve).
+  // false = legacy combined mesh that cannot be broken into independent components.
+  isComposable: boolean("is_composable").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

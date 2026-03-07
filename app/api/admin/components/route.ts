@@ -3,19 +3,18 @@ import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
 import {
   components,
-  componentCompatibility,
   silhouetteComponents,
   productComponents,
 } from "@/lib/db/schema";
 import { componentFabricCategories } from "@/lib/db/schema/fabrics";
-import { eq, or, count } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   code: z.string().min(1).max(50),
   componentTypeId: z.string().uuid(),
-  modelPath: z.string().max(500).nullable().optional(),
+  legacyCode: z.string().max(20).nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -23,7 +22,7 @@ const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   code: z.string().min(1).max(50).optional(),
   componentTypeId: z.string().uuid().optional(),
-  modelPath: z.string().max(500).nullable().optional(),
+  legacyCode: z.string().max(20).nullable().optional(),
 });
 
 export async function GET() {
@@ -37,7 +36,7 @@ export async function GET() {
         name: components.name,
         code: components.code,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
+        legacyCode: components.legacyCode,
         createdAt: components.createdAt,
       })
       .from(components)
@@ -79,14 +78,14 @@ export async function POST(request: Request) {
         name: body.name,
         code: body.code,
         componentTypeId: body.componentTypeId,
-        modelPath: body.modelPath ?? null,
+        legacyCode: body.legacyCode ?? null,
       })
       .returning({
         id: components.id,
         name: components.name,
         code: components.code,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
+        legacyCode: components.legacyCode,
         createdAt: components.createdAt,
       });
 
@@ -133,7 +132,7 @@ export async function PUT(request: Request) {
     if (body.code !== undefined) updates.code = body.code;
     if (body.componentTypeId !== undefined)
       updates.componentTypeId = body.componentTypeId;
-    if (body.modelPath !== undefined) updates.modelPath = body.modelPath;
+    if (body.legacyCode !== undefined) updates.legacyCode = body.legacyCode;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -151,7 +150,7 @@ export async function PUT(request: Request) {
         name: components.name,
         code: components.code,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
+        legacyCode: components.legacyCode,
         createdAt: components.createdAt,
       });
 
@@ -208,16 +207,6 @@ export async function DELETE(request: Request) {
         { status: 409 },
       );
     }
-
-    // Cascade-delete compatibility edges (both directions)
-    await db
-      .delete(componentCompatibility)
-      .where(
-        or(
-          eq(componentCompatibility.componentAId, id),
-          eq(componentCompatibility.componentBId, id),
-        ),
-      );
 
     // Cascade-delete silhouette assignments
     await db
