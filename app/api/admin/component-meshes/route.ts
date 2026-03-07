@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { componentMeshes, components } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@supabase/supabase-js";
 
@@ -32,11 +32,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const componentId = searchParams.get("componentId");
 
+    // Bulk mode: return distinct component IDs that have at least one mesh
     if (!componentId) {
-      return NextResponse.json(
-        { error: "componentId query param required" },
-        { status: 400 },
-      );
+      const rows = await db
+        .selectDistinct({ componentId: componentMeshes.componentId })
+        .from(componentMeshes);
+      return NextResponse.json(rows.map((r) => r.componentId));
     }
 
     const rows = await db

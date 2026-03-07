@@ -67,6 +67,8 @@ export default function ViewerPage() {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<"heavy" | "light" | "standard">("heavy");
 
+  const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
+
   const [fabrics, setFabrics] = useState<FabricSkin[]>([]);
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ViewerSettings>(DEFAULT_SETTINGS);
@@ -89,6 +91,11 @@ export default function ViewerPage() {
     fetch("/api/admin/fabric-skins")
       .then((r) => r.json())
       .then((data: FabricSkin[]) => setFabrics(data))
+      .catch(console.error);
+
+    fetch("/api/admin/component-meshes")
+      .then((r) => r.json())
+      .then((ids: string[]) => setComponentIdsWithMeshes(new Set(ids)))
       .catch(console.error);
   }, []);
 
@@ -126,7 +133,9 @@ export default function ViewerPage() {
     selectedFabricId !== null &&
     JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
-  const filteredComponents = components.filter((c) => c.typeName === activeTab);
+  const filteredComponents = components.filter(
+    (c) => c.typeName === activeTab && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
+  );
 
   // ── Handlers ──
 
