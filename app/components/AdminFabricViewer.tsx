@@ -28,6 +28,8 @@ export default function AdminFabricViewer({
   const materialRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
   const frameIdRef = useRef<number>(0);
   const currentUrlRef = useRef<string | null>(null);
+  const settingsRef = useRef<ViewerSettings | null>(settings);
+  settingsRef.current = settings;
 
   // Initialize scene once
   useEffect(() => {
@@ -191,8 +193,8 @@ export default function AdminFabricViewer({
         }
       });
 
-      // Apply material
-      const mat = buildMaterial(settings);
+      // Apply material using current settings without depending on them
+      const mat = buildMaterial(settingsRef.current);
       materialRef.current = mat;
 
       group.traverse((child) => {
@@ -228,7 +230,7 @@ export default function AdminFabricViewer({
     } else {
       new OBJLoader().load(modelUrl, onLoad);
     }
-  }, [modelUrl, settings]);
+  }, [modelUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update material when settings change
   useEffect(() => {
