@@ -22,20 +22,12 @@ interface Component {
   stage: string;
 }
 
-interface Mesh {
-  id: string;
-  componentId: string;
-  variant: string;
-  storagePath: string;
-  publicUrl: string;
-}
-
 interface FabricSkin {
   id: string;
   name: string;
   fabricCode: string;
   categoryId: string;
-  modelType: string | null;
+  meshVariant: string | null;
   priceMarkup: string;
   hidden: boolean;
   viewerSettings: ViewerSettings | null;
@@ -70,15 +62,11 @@ const DEFAULT_SETTINGS: ViewerSettings = {
 };
 
 export default function ViewerPage() {
-  // Component state
   const [components, setComponents] = useState<Component[]>([]);
   const [activeTab, setActiveTab] = useState<string>("Bodice");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [meshes, setMeshes] = useState<Mesh[]>([]);
-  const [selectedVariant, setSelectedVariant] = useState<string>("heavy");
-  const [meshLoading, setMeshLoading] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<"heavy" | "light" | "standard">("heavy");
 
-  // Fabric state
   const [fabrics, setFabrics] = useState<FabricSkin[]>([]);
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ViewerSettings>(DEFAULT_SETTINGS);
@@ -87,25 +75,7 @@ export default function ViewerPage() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  // Resolved signed URL for the selected mesh
   const [modelUrl, setModelUrl] = useState<string | null>(null);
-
-  const selectedMesh = meshes.find((m) => m.variant === selectedVariant);
-
-  useEffect(() => {
-    if (!selectedMesh) {
-      setModelUrl(null);
-      return;
-    }
-    fetch(`/api/models/signed-url?name=${encodeURIComponent(selectedMesh.storagePath)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setModelUrl(data?.url ?? null))
-      .catch(() => setModelUrl(null));
-  }, [selectedMesh?.storagePath]);
-
-  const isDirty =
-    selectedFabricId !== null &&
-    JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   // ── Data fetching ──
 
@@ -121,63 +91,37 @@ export default function ViewerPage() {
       .catch(console.error);
   }, []);
 
-  // Mesh counts per component for indicators
-  const [meshCounts, setMeshCounts] = useState<Record<string, number>>({});
+  // Resolve signed URL from component code + variant (no DB lookup needed —
+  // storage paths are deterministic: {code}/{variant}.obj)
+  const selectedComponent = components.find((c) => c.id === selectedComponentId);
 
-  // Fetch meshes when a component is selected
   useEffect(() => {
-    if (!selectedComponentId) {
-      setMeshes([]);
+    if (!selectedComponent) {
+      setModelUrl(null);
       return;
     }
-    setMeshLoading(true);
-    fetch(`/api/admin/component-meshes?componentId=${selectedComponentId}`)
-      .then((r) => r.json())
-      .then((data: Mesh[]) => {
-        setMeshes(data);
-        // Default to heavy variant, fall back to first available
-        const hasHeavy = data.some((m) => m.variant === "heavy");
-        if (!hasHeavy && data.length > 0) {
-          setSelectedVariant(data[0].variant);
-        } else {
-          setSelectedVariant("heavy");
-        }
-      })
-      .catch(console.error)
-      .finally(() => setMeshLoading(false));
-  }, [selectedComponentId]);
+    const storagePath = `${selectedComponent.code}/${selectedVariant}.obj`;
+    setModelUrl(null);
+    fetch(`/api/models/signed-url?name=${encodeURIComponent(storagePath)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setModelUrl(data?.url ?? null))
+      .catch(() => setModelUrl(null));
+  }, [selectedComponent?.id, selectedVariant]);
 
-  // Lazy-load mesh counts for visible components
+  const isDirty =
+    selectedFabricId !== null &&
+    JSON.stringify(settings) !== JSON.stringify(savedSettings);
+
   const filteredComponents = components.filter((c) => c.typeName === activeTab);
-
-  useEffect(() => {
-    const toFetch = filteredComponents.filter(
-      (c) => meshCounts[c.id] === undefined,
-    );
-    toFetch.forEach((c) => {
-      fetch(`/api/admin/component-meshes?componentId=${c.id}`)
-        .then((r) => r.json())
-        .then((data: Mesh[]) => {
-          setMeshCounts((prev) => ({ ...prev, [c.id]: data.length }));
-        })
-        .catch(() => {
-          setMeshCounts((prev) => ({ ...prev, [c.id]: 0 }));
-        });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, components]);
 
   // ── Handlers ──
 
-  const handleSelectFabric = useCallback(
-    (fabric: FabricSkin) => {
-      setSelectedFabricId(fabric.id);
-      const s = fabric.viewerSettings ?? DEFAULT_SETTINGS;
-      setSettings(s);
-      setSavedSettings({ ...s });
-    },
-    [],
-  );
+  const handleSelectFabric = useCallback((fabric: FabricSkin) => {
+    setSelectedFabricId(fabric.id);
+    const s = fabric.viewerSettings ?? DEFAULT_SETTINGS;
+    setSettings(s);
+    setSavedSettings({ ...s });
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!selectedFabricId || saving) return;
@@ -191,9 +135,7 @@ export default function ViewerPage() {
       });
       if (res.ok) {
         const updated: FabricSkin = await res.json();
-        setFabrics((prev) =>
-          prev.map((f) => (f.id === updated.id ? updated : f)),
-        );
+        setFabrics((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
         setSavedSettings({ ...settings });
         setSaveFlash(true);
         setTimeout(() => setSaveFlash(false), 1500);
@@ -210,10 +152,7 @@ export default function ViewerPage() {
     }
   }, [selectedFabricId, settings, saving]);
 
-  const updateSetting = <K extends keyof ViewerSettings>(
-    key: K,
-    value: ViewerSettings[K],
-  ) => {
+  const updateSetting = <K extends keyof ViewerSettings>(key: K, value: ViewerSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -224,10 +163,7 @@ export default function ViewerPage() {
       {/* Left panel: components */}
       <div className="flex w-[240px] shrink-0 flex-col border-r border-gray-700">
         <div className="flex items-center justify-between border-b border-gray-700 px-3 py-2">
-          <Link
-            href="/admin"
-            className="text-xs text-gray-400 hover:text-white"
-          >
+          <Link href="/admin" className="text-xs text-gray-400 hover:text-white">
             &larr; Admin
           </Link>
           <span className="text-xs font-medium text-gray-400">Components</span>
@@ -245,7 +181,7 @@ export default function ViewerPage() {
                   : "text-gray-500 hover:text-gray-300"
               }`}
             >
-              {tab}
+              {tab === "Skirt Section" ? "Skirt" : tab}
             </button>
           ))}
         </div>
@@ -253,59 +189,41 @@ export default function ViewerPage() {
         {/* Component list */}
         <div className="flex-1 overflow-y-auto">
           {filteredComponents.length === 0 && (
-            <p className="px-3 py-4 text-xs text-gray-500">
-              No components found
-            </p>
+            <p className="px-3 py-4 text-xs text-gray-500">No components found</p>
           )}
-          {filteredComponents.map((c) => {
-            const count = meshCounts[c.id];
-            const hasMeshes = count !== undefined && count > 0;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedComponentId(c.id)}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                  selectedComponentId === c.id
-                    ? "bg-[#2a2a2a] text-white"
-                    : "text-gray-300 hover:bg-[#222]"
-                }`}
-              >
-                <span
-                  className={`text-xs ${hasMeshes ? "text-green-400" : "text-gray-600"}`}
-                  title={hasMeshes ? "Has meshes" : "No meshes"}
-                >
-                  {hasMeshes ? "✓" : "—"}
-                </span>
-                <span className="truncate">{c.name}</span>
-              </button>
-            );
-          })}
+          {filteredComponents.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelectedComponentId(c.id)}
+              className={`flex w-full items-center px-3 py-2 text-left text-sm transition-colors ${
+                selectedComponentId === c.id
+                  ? "bg-[#2a2a2a] text-white"
+                  : "text-gray-300 hover:bg-[#222]"
+              }`}
+            >
+              <span className="truncate">{c.name}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Variant toggle */}
-        {meshes.length > 0 && (
+        {/* Variant toggle — always shown when a component is selected */}
+        {selectedComponentId && (
           <div className="border-t border-gray-700 px-3 py-2">
             <p className="mb-1 text-xs text-gray-500">Mesh Variant</p>
             <div className="flex gap-1">
-              {VARIANTS.map((v) => {
-                const available = meshes.some((m) => m.variant === v);
-                return (
-                  <button
-                    key={v}
-                    disabled={!available}
-                    onClick={() => setSelectedVariant(v)}
-                    className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
-                      selectedVariant === v
-                        ? "bg-white text-black"
-                        : available
-                          ? "bg-[#333] text-gray-300 hover:bg-[#444]"
-                          : "bg-[#222] text-gray-600 cursor-not-allowed"
-                    }`}
-                  >
-                    {v}
-                  </button>
-                );
-              })}
+              {VARIANTS.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setSelectedVariant(v)}
+                  className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
+                    selectedVariant === v
+                      ? "bg-white text-black"
+                      : "bg-[#333] text-gray-300 hover:bg-[#444]"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -313,15 +231,12 @@ export default function ViewerPage() {
 
       {/* Center panel: 3D viewer */}
       <div className="relative flex-1">
-        {meshLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1a1a1a]/80">
-            <span className="text-sm text-gray-400">Loading mesh...</span>
-          </div>
-        )}
-        {!modelUrl && !meshLoading && (
+        {!modelUrl && (
           <div className="flex h-full items-center justify-center">
             <span className="text-sm text-gray-500">
-              Select a component with meshes to preview
+              {selectedComponentId
+                ? "No model file found for this component"
+                : "Select a component to preview"}
             </span>
           </div>
         )}
@@ -330,36 +245,26 @@ export default function ViewerPage() {
 
       {/* Right panel: fabrics & settings */}
       <div className="flex w-[280px] shrink-0 flex-col border-l border-gray-700">
-        {/* Fabric list */}
         <div className="border-b border-gray-700 px-3 py-2">
           <span className="text-xs font-medium text-gray-400">Fabrics</span>
         </div>
         <div className="max-h-[280px] overflow-y-auto border-b border-gray-700">
           {fabrics.map((f) => {
             const isSelected = selectedFabricId === f.id;
-            const fabricDirty =
-              isSelected && isDirty;
             return (
               <button
                 key={f.id}
                 onClick={() => handleSelectFabric(f)}
                 className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
-                  isSelected
-                    ? "bg-[#2a2a2a] text-white"
-                    : "text-gray-300 hover:bg-[#222]"
+                  isSelected ? "bg-[#2a2a2a] text-white" : "text-gray-300 hover:bg-[#222]"
                 }`}
               >
                 <span className="flex-1 truncate">
-                  {fabricDirty && (
+                  {isSelected && isDirty && (
                     <span className="mr-1 text-amber-400" title="Unsaved changes">●</span>
                   )}
                   {f.name}
                 </span>
-                {f.modelType && (
-                  <span className="shrink-0 rounded bg-[#333] px-1.5 py-0.5 text-[10px] text-gray-400">
-                    {f.modelType}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -367,18 +272,13 @@ export default function ViewerPage() {
 
         {/* Material settings */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
-          <p className="mb-3 text-xs font-medium text-gray-400">
-            Material Settings
-          </p>
+          <p className="mb-3 text-xs font-medium text-gray-400">Material Settings</p>
 
-          {/* Texture type */}
           <label className="mb-2 block">
             <span className="mb-1 block text-xs text-gray-500">Texture</span>
             <select
               value={settings.textureType}
-              onChange={(e) =>
-                updateSetting("textureType", e.target.value as TextureType)
-              }
+              onChange={(e) => updateSetting("textureType", e.target.value as TextureType)}
               className="w-full rounded border border-gray-600 bg-[#222] px-2 py-1 text-sm text-white"
             >
               {TEXTURE_OPTIONS.map((t) => (
@@ -389,7 +289,6 @@ export default function ViewerPage() {
             </select>
           </label>
 
-          {/* Color */}
           <label className="mb-2 block">
             <span className="mb-1 block text-xs text-gray-500">Color</span>
             <div className="flex gap-2">
@@ -408,29 +307,11 @@ export default function ViewerPage() {
             </div>
           </label>
 
-          {/* Sliders */}
-          <Slider
-            label="Roughness"
-            value={settings.roughness}
-            onChange={(v) => updateSetting("roughness", v)}
-          />
-          <Slider
-            label="Metalness"
-            value={settings.metalness}
-            onChange={(v) => updateSetting("metalness", v)}
-          />
-          <Slider
-            label="Sheen"
-            value={settings.sheen ?? 0}
-            onChange={(v) => updateSetting("sheen", v)}
-          />
-          <Slider
-            label="Sheen Roughness"
-            value={settings.sheenRoughness ?? 0}
-            onChange={(v) => updateSetting("sheenRoughness", v)}
-          />
+          <Slider label="Roughness" value={settings.roughness} onChange={(v) => updateSetting("roughness", v)} />
+          <Slider label="Metalness" value={settings.metalness} onChange={(v) => updateSetting("metalness", v)} />
+          <Slider label="Sheen" value={settings.sheen ?? 0} onChange={(v) => updateSetting("sheen", v)} />
+          <Slider label="Sheen Roughness" value={settings.sheenRoughness ?? 0} onChange={(v) => updateSetting("sheenRoughness", v)} />
 
-          {/* Sheen color */}
           <label className="mb-2 block">
             <span className="mb-1 block text-xs text-gray-500">Sheen Color</span>
             <div className="flex gap-2">
@@ -449,17 +330,8 @@ export default function ViewerPage() {
             </div>
           </label>
 
-          <Slider
-            label="Transmission"
-            value={settings.transmission ?? 0}
-            onChange={(v) => updateSetting("transmission", v)}
-          />
-          <Slider
-            label="Thickness"
-            value={settings.thickness ?? 0}
-            onChange={(v) => updateSetting("thickness", v)}
-            max={2}
-          />
+          <Slider label="Transmission" value={settings.transmission ?? 0} onChange={(v) => updateSetting("transmission", v)} />
+          <Slider label="Thickness" value={settings.thickness ?? 0} onChange={(v) => updateSetting("thickness", v)} max={2} />
         </div>
 
         {/* Save button */}
@@ -479,21 +351,13 @@ export default function ViewerPage() {
                       : "bg-[#333] text-gray-300 hover:bg-[#444]"
             }`}
           >
-            {saveError
-              ? "Save failed"
-              : saveFlash
-                ? "Saved!"
-                : saving
-                  ? "Saving..."
-                  : "Save to Fabric"}
+            {saveError ? "Save failed" : saveFlash ? "Saved!" : saving ? "Saving..." : "Save to Fabric"}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-// ── Slider component ──
 
 function Slider({
   label,
