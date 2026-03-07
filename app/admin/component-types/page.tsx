@@ -15,6 +15,7 @@ type ComponentType = {
   categoryId: string;
   stage: "silhouette" | "embellishment" | "finishing";
   isFirstLeaf: boolean;
+  garmentPart: "bodice" | "skirt" | "sleeve" | "embellishment" | "finishing" | null;
   componentCount: number;
 };
 
@@ -26,8 +27,18 @@ type ComponentRow = {
 
 const STAGES = ["silhouette", "embellishment", "finishing"] as const;
 
+const GARMENT_PARTS = ["bodice", "skirt", "sleeve", "embellishment", "finishing"] as const;
+
 const stageBadgeColors: Record<string, string> = {
   silhouette: "bg-blue-900/50 text-blue-300",
+  embellishment: "bg-purple-900/50 text-purple-300",
+  finishing: "bg-amber-900/50 text-amber-300",
+};
+
+const garmentPartBadgeColors: Record<string, string> = {
+  bodice: "bg-pink-900/50 text-pink-300",
+  skirt: "bg-teal-900/50 text-teal-300",
+  sleeve: "bg-cyan-900/50 text-cyan-300",
   embellishment: "bg-purple-900/50 text-purple-300",
   finishing: "bg-amber-900/50 text-amber-300",
 };
@@ -43,14 +54,15 @@ export default function ComponentTypesPage() {
   const [savingCategory, setSavingCategory] = useState(false);
 
   const [newTypeForms, setNewTypeForms] = useState<
-    Record<string, { name: string; stage: string; isFirstLeaf: boolean }>
+    Record<string, { name: string; stage: string; isFirstLeaf: boolean; garmentPart: string | null }>
   >({});
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [editingTypeFields, setEditingTypeFields] = useState<{
     name: string;
     stage: string;
     isFirstLeaf: boolean;
-  }>({ name: "", stage: "silhouette", isFirstLeaf: false });
+    garmentPart: string | null;
+  }>({ name: "", stage: "silhouette", isFirstLeaf: false, garmentPart: null });
   const [savingType, setSavingType] = useState(false);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -180,6 +192,7 @@ export default function ComponentTypesPage() {
           categoryId,
           stage: form.stage || "silhouette",
           isFirstLeaf: form.isFirstLeaf,
+          garmentPart: form.garmentPart || null,
         }),
       });
       if (res.ok) {
@@ -212,6 +225,7 @@ export default function ComponentTypesPage() {
           name: editingTypeFields.name.trim(),
           stage: editingTypeFields.stage,
           isFirstLeaf: editingTypeFields.isFirstLeaf,
+          garmentPart: editingTypeFields.garmentPart,
         }),
       });
       if (res.ok) {
@@ -251,15 +265,16 @@ export default function ComponentTypesPage() {
       name: t.name,
       stage: t.stage,
       isFirstLeaf: t.isFirstLeaf,
+      garmentPart: t.garmentPart,
     });
   };
 
   const getNewTypeForm = (categoryId: string) =>
-    newTypeForms[categoryId] ?? { name: "", stage: "silhouette", isFirstLeaf: false };
+    newTypeForms[categoryId] ?? { name: "", stage: "silhouette", isFirstLeaf: false, garmentPart: null };
 
   const setNewTypeForm = (
     categoryId: string,
-    patch: Partial<{ name: string; stage: string; isFirstLeaf: boolean }>,
+    patch: Partial<{ name: string; stage: string; isFirstLeaf: boolean; garmentPart: string | null }>,
   ) => {
     setNewTypeForms((prev) => ({
       ...prev,
@@ -417,6 +432,7 @@ export default function ComponentTypesPage() {
                         <th className="pb-2">Name</th>
                         <th className="pb-2">Slug</th>
                         <th className="pb-2">Stage</th>
+                        <th className="pb-2">Garment Part</th>
                         <th className="pb-2">First Leaf</th>
                         <th className="pb-2 text-right">Components</th>
                         <th className="pb-2" />
@@ -459,6 +475,25 @@ export default function ComponentTypesPage() {
                                   {STAGES.map((s) => (
                                     <option key={s} value={s}>
                                       {s}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="py-2">
+                                <select
+                                  value={editingTypeFields.garmentPart ?? ""}
+                                  onChange={(e) =>
+                                    setEditingTypeFields((f) => ({
+                                      ...f,
+                                      garmentPart: e.target.value || null,
+                                    }))
+                                  }
+                                  className="rounded border border-gray-600 bg-[#2a2a2a] px-2 py-1 text-sm text-white outline-none"
+                                >
+                                  <option value="">Unset</option>
+                                  {GARMENT_PARTS.map((gp) => (
+                                    <option key={gp} value={gp}>
+                                      {gp}
                                     </option>
                                   ))}
                                 </select>
@@ -519,6 +554,15 @@ export default function ComponentTypesPage() {
                               >
                                 {t.stage}
                               </span>
+                            </td>
+                            <td className="py-2">
+                              {t.garmentPart ? (
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${garmentPartBadgeColors[t.garmentPart]}`}>
+                                  {t.garmentPart}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-600">—</span>
+                              )}
                             </td>
                             <td className="py-2">
                               {t.isFirstLeaf && (
@@ -623,6 +667,22 @@ export default function ComponentTypesPage() {
                     />
                     First Leaf
                   </label>
+                  <select
+                    value={form.garmentPart ?? ""}
+                    onChange={(e) =>
+                      setNewTypeForm(cat.id, {
+                        garmentPart: e.target.value || null,
+                      })
+                    }
+                    className="rounded border border-gray-700 bg-[#2a2a2a] px-2 py-1 text-sm text-white outline-none"
+                  >
+                    <option value="">Part...</option>
+                    {GARMENT_PARTS.map((gp) => (
+                      <option key={gp} value={gp}>
+                        {gp}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => handleCreateType(cat.id)}
                     disabled={savingType || !form.name.trim()}

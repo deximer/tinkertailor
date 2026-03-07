@@ -26,16 +26,12 @@ interface Component {
   createdAt: string;
 }
 
-interface Asset {
-  name: string;
-  size: number;
-  updatedAt: string;
-}
-
-interface ImportResult {
-  created: number;
-  skipped: number;
-  errors: { row: number; message: string }[];
+interface Mesh {
+  id: string;
+  componentId: string;
+  variant: string;
+  storagePath: string;
+  publicUrl: string;
 }
 
 interface GroupedTypes {
@@ -43,11 +39,12 @@ interface GroupedTypes {
   types: ComponentType[];
 }
 
+const MESH_VARIANTS = ["heavy", "light", "standard"] as const;
+
 export default function AdminComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
   const [componentTypes, setComponentTypes] = useState<ComponentType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Inline create form state per component type
@@ -63,10 +60,11 @@ export default function AdminComponentsPage() {
     modelPath: string;
   }>({ name: "", code: "", modelPath: "" });
 
-  // CSV import
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  // Mesh management
+  const [expandedMeshId, setExpandedMeshId] = useState<string | null>(null);
+  const [meshes, setMeshes] = useState<Record<string, Mesh[]>>({});
+  const [meshLoading, setMeshLoading] = useState<string | null>(null);
+  const [uploadingVariant, setUploadingVariant] = useState<string | null>(null);
 
   // Operation feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -75,17 +73,15 @@ export default function AdminComponentsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [compRes, typesRes, catsRes, assetsRes] = await Promise.all([
+      const [compRes, typesRes, catsRes] = await Promise.all([
         fetch("/api/admin/components"),
         fetch("/api/component-types"),
         fetch("/api/categories"),
-        fetch("/api/admin/assets"),
       ]);
 
       if (compRes.ok) setComponents(await compRes.json());
       if (typesRes.ok) setComponentTypes(await typesRes.json());
       if (catsRes.ok) setCategories(await catsRes.json());
-      if (assetsRes.ok) setAssets(await assetsRes.json());
     } catch {
       setErrorMsg("Failed to load data");
     }
@@ -202,6 +198,7 @@ export default function AdminComponentsPage() {
     if (res.ok) {
       setComponents((prev) => prev.filter((c) => c.id !== id));
       if (editingId === id) setEditingId(null);
+      if (expandedMeshId === id) setExpandedMeshId(null);
     } else {
       const data = await res.json();
       setErrorMsg(data.error ?? "Failed to delete component");
@@ -209,35 +206,90 @@ export default function AdminComponentsPage() {
     setDeleting(null);
   };
 
-  const handleImport = async () => {
-    if (!importFile) return;
+  // Mesh management
+  const fetchMeshes = async (componentId: string) => {
+    setMeshLoading(componentId);
+    try {
+      const res = await fetch(
+        `/api/admin/component-meshes?componentId=${componentId}`,
+      );
+      if (res.ok) {
+        const data: Mesh[] = await res.json();
+        setMeshes((prev) => ({ ...prev, [componentId]: data }));
+      }
+    } catch {
+      setErrorMsg("Failed to load meshes");
+    }
+    setMeshLoading(null);
+  };
 
-    setImporting(true);
-    setImportResult(null);
+  const toggleMeshPanel = (componentId: string) => {
+    if (expandedMeshId === componentId) {
+      setExpandedMeshId(null);
+    } else {
+      setExpandedMeshId(componentId);
+      if (!meshes[componentId]) {
+        fetchMeshes(componentId);
+      }
+    }
+  };
+
+  const handleMeshUpload = async (
+    componentId: string,
+    variant: string,
+    file: File,
+  ) => {
+    setUploadingVariant(`${componentId}:${variant}`);
     setErrorMsg(null);
 
     const formData = new FormData();
-    formData.append("file", importFile);
+    formData.append("componentId", componentId);
+    formData.append("variant", variant);
+    formData.append("file", file);
 
-    const res = await fetch("/api/admin/components/import", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const res = await fetch("/api/admin/component-meshes", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (res.ok) {
-      const result: ImportResult = await res.json();
-      setImportResult(result);
-      setImportFile(null);
-      // Refresh component list to include newly imported rows
-      const compRes = await fetch("/api/admin/components");
-      if (compRes.ok) setComponents(await compRes.json());
-    } else {
-      const data = await res.json();
-      setErrorMsg(data.error ?? "Import failed");
+      if (res.ok) {
+        await fetchMeshes(componentId);
+      } else {
+        const data = await res.json();
+        setErrorMsg(data.error ?? "Failed to upload mesh");
+      }
+    } catch {
+      setErrorMsg("Failed to upload mesh");
     }
-
-    setImporting(false);
+    setUploadingVariant(null);
   };
+
+  const handleMeshDelete = async (meshId: string, componentId: string) => {
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/admin/component-meshes?id=${meshId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setMeshes((prev) => ({
+          ...prev,
+          [componentId]: (prev[componentId] ?? []).filter(
+            (m) => m.id !== meshId,
+          ),
+        }));
+      } else {
+        const data = await res.json();
+        setErrorMsg(data.error ?? "Failed to delete mesh");
+      }
+    } catch {
+      setErrorMsg("Failed to delete mesh");
+    }
+  };
+
+  const getMeshForVariant = (componentId: string, variant: string) =>
+    (meshes[componentId] ?? []).find((m) => m.variant === variant);
 
   if (loading) {
     return (
@@ -270,53 +322,6 @@ export default function AdminComponentsPage() {
           </div>
         )}
 
-        {/* CSV Import Section */}
-        <section className="mb-10">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
-            CSV Import
-          </h2>
-          <div className="rounded border border-gray-700 bg-[#222] p-4">
-            <p className="mb-3 text-xs text-gray-400">
-              Upload a CSV with columns: name, code, type_slug
-            </p>
-            <div className="flex items-center gap-3">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
-                className="text-sm text-gray-300 file:mr-3 file:rounded file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-black hover:file:bg-gray-200"
-              />
-              <button
-                onClick={handleImport}
-                disabled={!importFile || importing}
-                className="rounded bg-white px-4 py-1.5 text-sm font-medium text-black hover:bg-gray-200 disabled:opacity-50 transition-colors"
-              >
-                {importing ? "Importing..." : "Import"}
-              </button>
-            </div>
-            {importResult && (
-              <div className="mt-3 text-sm">
-                <p className="text-green-400">
-                  Created: {importResult.created} | Skipped:{" "}
-                  {importResult.skipped}
-                </p>
-                {importResult.errors.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-red-400 mb-1">Errors:</p>
-                    <ul className="list-disc pl-5 text-xs text-red-300 space-y-0.5">
-                      {importResult.errors.map((e, i) => (
-                        <li key={i}>
-                          Row {e.row}: {e.message}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* Components grouped by category, then by type */}
         {groupedByCategory.map((group) => (
           <section key={group.category.id} className="mb-10">
@@ -346,111 +351,212 @@ export default function AdminComponentsPage() {
                         <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                           <th className="pb-2">Name</th>
                           <th className="pb-2">Code</th>
-                          <th className="pb-2">Model Path</th>
+                          <th className="pb-2">Legacy Code</th>
+                          <th className="pb-2">Meshes</th>
                           <th className="pb-2" />
                         </tr>
                       </thead>
                       <tbody>
                         {typeComponents.map((comp) => (
-                          <tr
-                            key={comp.id}
-                            className="border-b border-gray-800"
-                          >
-                            {editingId === comp.id ? (
-                              <>
-                                <td className="py-2 pr-2">
-                                  <input
-                                    type="text"
-                                    value={editForm.name}
-                                    onChange={(e) =>
-                                      setEditForm((f) => ({
-                                        ...f,
-                                        name: e.target.value,
-                                      }))
-                                    }
-                                    className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
-                                  />
-                                </td>
-                                <td className="py-2 pr-2">
-                                  <input
-                                    type="text"
-                                    value={editForm.code}
-                                    onChange={(e) =>
-                                      setEditForm((f) => ({
-                                        ...f,
-                                        code: e.target.value,
-                                      }))
-                                    }
-                                    className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
-                                  />
-                                </td>
-                                <td className="py-2 pr-2">
-                                  <select
-                                    value={editForm.modelPath}
-                                    onChange={(e) =>
-                                      setEditForm((f) => ({
-                                        ...f,
-                                        modelPath: e.target.value,
-                                      }))
-                                    }
-                                    className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
-                                  >
-                                    <option value="">None</option>
-                                    {assets.map((a) => (
-                                      <option key={a.name} value={a.name}>
-                                        {a.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="py-2 text-right space-x-2">
-                                  <button
-                                    onClick={handleUpdate}
-                                    className="rounded bg-white px-2 py-1 text-xs font-medium text-black hover:bg-gray-200 transition-colors"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={cancelEdit}
-                                    className="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-[#2a2a2a] transition-colors"
-                                  >
-                                    Cancel
-                                  </button>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="py-2 text-white">
-                                  {comp.name}
-                                </td>
-                                <td className="py-2 text-gray-400">
-                                  {comp.code}
-                                </td>
-                                <td className="py-2 text-gray-400">
-                                  {comp.modelPath ?? (
-                                    <span className="text-gray-600">-</span>
+                          <>
+                            <tr
+                              key={comp.id}
+                              className="border-b border-gray-800"
+                            >
+                              {editingId === comp.id ? (
+                                <>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      type="text"
+                                      value={editForm.name}
+                                      onChange={(e) =>
+                                        setEditForm((f) => ({
+                                          ...f,
+                                          name: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      type="text"
+                                      value={editForm.code}
+                                      onChange={(e) =>
+                                        setEditForm((f) => ({
+                                          ...f,
+                                          code: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      type="text"
+                                      value={editForm.modelPath}
+                                      onChange={(e) =>
+                                        setEditForm((f) => ({
+                                          ...f,
+                                          modelPath: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="e.g. BOD-27"
+                                      className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
+                                    />
+                                  </td>
+                                  <td className="py-2" />
+                                  <td className="py-2 text-right space-x-2">
+                                    <button
+                                      onClick={handleUpdate}
+                                      className="rounded bg-white px-2 py-1 text-xs font-medium text-black hover:bg-gray-200 transition-colors"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={cancelEdit}
+                                      className="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-[#2a2a2a] transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="py-2 text-white">
+                                    {comp.name}
+                                  </td>
+                                  <td className="py-2 text-gray-400">
+                                    {comp.code}
+                                  </td>
+                                  <td className="py-2 text-gray-400">
+                                    {comp.modelPath ?? (
+                                      <span className="text-gray-600">—</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2">
+                                    <button
+                                      onClick={() => toggleMeshPanel(comp.id)}
+                                      className={`text-xs px-2 py-0.5 rounded ${
+                                        expandedMeshId === comp.id
+                                          ? "bg-blue-900/50 text-blue-300"
+                                          : "text-gray-400 hover:text-white"
+                                      }`}
+                                    >
+                                      {expandedMeshId === comp.id
+                                        ? "Hide"
+                                        : "Manage"}
+                                    </button>
+                                  </td>
+                                  <td className="py-2 text-right space-x-2">
+                                    <button
+                                      onClick={() => startEdit(comp)}
+                                      className="text-blue-400 hover:text-blue-300 text-xs"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(comp.id)}
+                                      disabled={deleting === comp.id}
+                                      className="text-red-400 hover:text-red-300 disabled:opacity-50 text-xs"
+                                    >
+                                      {deleting === comp.id
+                                        ? "Deleting..."
+                                        : "Delete"}
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                            {/* Mesh management panel */}
+                            {expandedMeshId === comp.id && (
+                              <tr key={`${comp.id}-mesh`}>
+                                <td
+                                  colSpan={5}
+                                  className="bg-[#1a1a1a] px-4 py-3"
+                                >
+                                  {meshLoading === comp.id ? (
+                                    <p className="text-xs text-gray-500">
+                                      Loading meshes...
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        Mesh Variants
+                                      </p>
+                                      {MESH_VARIANTS.map((variant) => {
+                                        const mesh = getMeshForVariant(
+                                          comp.id,
+                                          variant,
+                                        );
+                                        const isUploading =
+                                          uploadingVariant ===
+                                          `${comp.id}:${variant}`;
+
+                                        return (
+                                          <div
+                                            key={variant}
+                                            className="flex items-center gap-3 rounded border border-gray-700 bg-[#222] px-3 py-2"
+                                          >
+                                            <span className="w-20 text-xs font-medium text-gray-300 capitalize">
+                                              {variant}
+                                            </span>
+                                            {mesh ? (
+                                              <>
+                                                <span className="flex-1 truncate text-xs text-gray-500">
+                                                  {mesh.storagePath}
+                                                </span>
+                                                <button
+                                                  onClick={() =>
+                                                    handleMeshDelete(
+                                                      mesh.id,
+                                                      comp.id,
+                                                    )
+                                                  }
+                                                  className="text-xs text-red-400 hover:text-red-300"
+                                                >
+                                                  Delete
+                                                </button>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <span className="flex-1 text-xs text-gray-600">
+                                                  No file uploaded
+                                                </span>
+                                                <label className="cursor-pointer text-xs text-blue-400 hover:text-blue-300">
+                                                  {isUploading
+                                                    ? "Uploading..."
+                                                    : "Upload"}
+                                                  <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept=".obj,.glb,.gltf"
+                                                    disabled={isUploading}
+                                                    onChange={(e) => {
+                                                      const file =
+                                                        e.target.files?.[0];
+                                                      if (file) {
+                                                        handleMeshUpload(
+                                                          comp.id,
+                                                          variant,
+                                                          file,
+                                                        );
+                                                      }
+                                                      e.target.value = "";
+                                                    }}
+                                                  />
+                                                </label>
+                                              </>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   )}
                                 </td>
-                                <td className="py-2 text-right space-x-2">
-                                  <button
-                                    onClick={() => startEdit(comp)}
-                                    className="text-blue-400 hover:text-blue-300 text-xs"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(comp.id)}
-                                    disabled={deleting === comp.id}
-                                    className="text-red-400 hover:text-red-300 disabled:opacity-50 text-xs"
-                                  >
-                                    {deleting === comp.id
-                                      ? "Deleting..."
-                                      : "Delete"}
-                                  </button>
-                                </td>
-                              </>
+                              </tr>
                             )}
-                          </tr>
+                          </>
                         ))}
                       </tbody>
                     </table>
@@ -492,22 +598,17 @@ export default function AdminComponentsPage() {
                     </div>
                     <div className="flex-1">
                       <label className="mb-1 block text-xs text-gray-500">
-                        Model
+                        Legacy Code
                       </label>
-                      <select
+                      <input
+                        type="text"
                         value={form.modelPath}
                         onChange={(e) =>
                           updateCreateForm(ct.id, "modelPath", e.target.value)
                         }
-                        className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
-                      >
-                        <option value="">None</option>
-                        {assets.map((a) => (
-                          <option key={a.name} value={a.name}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="e.g. BOD-27"
+                        className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
+                      />
                     </div>
                     <button
                       onClick={() => handleCreate(ct.id)}
