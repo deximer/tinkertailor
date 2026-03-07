@@ -22,11 +22,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const componentId = searchParams.get("componentId");
 
+    // Bulk mode: return all rules as { componentId, fabricSkinCategoryId }[]
     if (!componentId) {
-      return NextResponse.json(
-        { error: "componentId query param required" },
-        { status: 400 },
-      );
+      const rows = await db
+        .select({
+          componentId: componentFabricCategories.componentId,
+          fabricSkinCategoryId: componentFabricCategories.fabricSkinCategoryId,
+        })
+        .from(componentFabricCategories);
+      return NextResponse.json(rows);
     }
 
     const [comp] = await db
@@ -49,9 +53,7 @@ export async function GET(request: Request) {
       .from(componentFabricCategories)
       .where(eq(componentFabricCategories.componentId, componentId));
 
-    return NextResponse.json(
-      rows.map((r) => r.fabricSkinCategoryId),
-    );
+    return NextResponse.json(rows.map((r) => r.fabricSkinCategoryId));
   } catch (err) {
     console.error("[admin/component-fabric-rules] GET error:", err);
     return NextResponse.json(

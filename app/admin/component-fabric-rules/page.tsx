@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+
+interface ComponentType {
+  id: string;
+  name: string;
+  slug: string;
+  stage: string;
+  garmentPart: string | null;
+}
 
 interface Component {
   id: string;
@@ -18,149 +26,139 @@ interface FabricCategory {
   hidden: boolean;
 }
 
-interface ParentGroup {
-  parent: FabricCategory;
-  children: FabricCategory[];
+interface Rule {
+  componentId: string;
+  fabricSkinCategoryId: string;
+}
+
+interface ColDef {
+  id: string;
+  name: string;
+  hidden: boolean;
+  parentId: string;
+}
+
+interface ColGroup {
+  parentName: string;
+  count: number;
 }
 
 export default function ComponentFabricRulesPage() {
-  const [components, setComponents] = useState<Component[]>([]);
+  const [componentTypes, setComponentTypes] = useState<ComponentType[]>([]);
+  const [allComponents, setAllComponents] = useState<Component[]>([]);
   const [categories, setCategories] = useState<FabricCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [selectedComponentId, setSelectedComponentId] = useState<string>("");
-  const [componentSearch, setComponentSearch] = useState("");
-  const [linkedCategoryIds, setLinkedCategoryIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const [loadingRules, setLoadingRules] = useState(false);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [compRes, catRes] = await Promise.all([
-        fetch("/api/admin/components"),
-        fetch("/api/admin/fabric-categories"),
-      ]);
-
-      if (compRes.ok) setComponents(await compRes.json());
-      if (catRes.ok) setCategories(await catRes.json());
-    } catch {
-      setErrorMsg("Failed to load data");
-    }
-    setLoading(false);
-  }, []);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [edgeSet, setEdgeSet] = useState<Set<string>>(new Set());
+  const [toggling, setToggling] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    async function load() {
+      try {
+        const [typesRes, compsRes, catRes, rulesRes] = await Promise.all([
+          fetch("/api/component-types"),
+          fetch("/api/admin/components"),
+          fetch("/api/admin/fabric-categories"),
+          fetch("/api/admin/component-fabric-rules"),
+        ]);
 
-  const fetchRulesForComponent = useCallback(async (componentId: string) => {
-    setLoadingRules(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch(
-        `/api/admin/component-fabric-rules?componentId=${componentId}`,
-      );
-      if (res.ok) {
-        const ids: string[] = await res.json();
-        setLinkedCategoryIds(new Set(ids));
-      } else {
-        const data = await res.json();
-        setErrorMsg(data.error ?? "Failed to load rules");
+        if (typesRes.ok) {
+          const types: ComponentType[] = await typesRes.json();
+          setComponentTypes(types);
+          if (types.length > 0) setSelectedTypeId(types[0].id);
+        }
+        if (compsRes.ok) setAllComponents(await compsRes.json());
+        if (catRes.ok) setCategories(await catRes.json());
+        if (rulesRes.ok) {
+          const rules: Rule[] = await rulesRes.json();
+          setEdgeSet(
+            new Set(rules.map((r) => `${r.componentId}:${r.fabricSkinCategoryId}`)),
+          );
+        }
+      } catch {
+        setErrorMsg("Failed to load data");
       }
-    } catch {
-      setErrorMsg("Failed to load rules");
+      setLoading(false);
     }
-    setLoadingRules(false);
+    load();
   }, []);
 
-  const handleSelectComponent = (componentId: string) => {
-    setSelectedComponentId(componentId);
-    setLinkedCategoryIds(new Set());
-    if (componentId) {
-      fetchRulesForComponent(componentId);
-    }
-  };
+  const handleToggle = async (componentId: string, categoryId: string) => {
+    const key = `${componentId}:${categoryId}`;
+    const isLinked = edgeSet.has(key);
 
-  const handleToggleCategory = async (categoryId: string) => {
-    if (!selectedComponentId) return;
-    setTogglingId(categoryId);
-    setErrorMsg(null);
-
-    const isLinked = linkedCategoryIds.has(categoryId);
-    const method = isLinked ? "DELETE" : "POST";
+    setToggling((prev) => new Set(prev).add(key));
+    setEdgeSet((prev) => {
+      const next = new Set(prev);
+      isLinked ? next.delete(key) : next.add(key);
+      return next;
+    });
 
     try {
       const res = await fetch("/api/admin/component-fabric-rules", {
-        method,
+        method: isLinked ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          componentId: selectedComponentId,
-          fabricSkinCategoryId: categoryId,
-        }),
+        body: JSON.stringify({ componentId, fabricSkinCategoryId: categoryId }),
       });
-
-      if (res.ok) {
-        setLinkedCategoryIds((prev) => {
+      if (!res.ok) {
+        setEdgeSet((prev) => {
           const next = new Set(prev);
-          if (isLinked) {
-            next.delete(categoryId);
-          } else {
-            next.add(categoryId);
-          }
+          isLinked ? next.add(key) : next.delete(key);
           return next;
         });
-      } else {
         const data = await res.json();
         setErrorMsg(data.error ?? "Failed to update rule");
       }
     } catch {
+      setEdgeSet((prev) => {
+        const next = new Set(prev);
+        isLinked ? next.add(key) : next.delete(key);
+        return next;
+      });
       setErrorMsg("Failed to update rule");
     }
-    setTogglingId(null);
+
+    setToggling((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   };
 
-  // Build parent groups for the category checklist
-  const parentCategories = categories
+  // Build column definitions grouped by parent
+  const parentCats = categories
     .filter((c) => c.parentId === null)
     .sort((a, b) => a.merchandisingOrder - b.merchandisingOrder);
 
-  const buildGroups = (): ParentGroup[] =>
-    parentCategories.map((parent) => ({
-      parent,
-      children: categories
-        .filter((c) => c.parentId === parent.id)
-        .sort((a, b) => a.merchandisingOrder - b.merchandisingOrder),
-    }));
+  const cols: ColDef[] = [];
+  const colGroups: ColGroup[] = [];
 
-  const groups = buildGroups();
+  for (const parent of parentCats) {
+    const children = categories
+      .filter((c) => c.parentId === parent.id)
+      .sort((a, b) => a.merchandisingOrder - b.merchandisingOrder);
 
-  // Also get leaf categories that have no parent (if any)
-  const allCategoryIds = categories.map((c) => c.id);
-  const orphanCategories = categories.filter(
-    (c) => c.parentId !== null && !allCategoryIds.includes(c.parentId),
-  );
+    if (children.length > 0) {
+      colGroups.push({ parentName: parent.name, count: children.length });
+      for (const child of children) {
+        cols.push({ id: child.id, name: child.name, hidden: child.hidden, parentId: parent.id });
+      }
+    } else {
+      colGroups.push({ parentName: parent.name, count: 1 });
+      cols.push({ id: parent.id, name: parent.name, hidden: parent.hidden, parentId: parent.id });
+    }
+  }
 
-  // Filter components by search
-  const filteredComponents = componentSearch.trim()
-    ? components.filter(
-        (c) =>
-          c.name.toLowerCase().includes(componentSearch.toLowerCase()) ||
-          c.code.toLowerCase().includes(componentSearch.toLowerCase()),
-      )
-    : components;
-
-  const selectedComponent = components.find(
-    (c) => c.id === selectedComponentId,
-  );
+  const rows = selectedTypeId
+    ? allComponents.filter((c) => c.componentTypeId === selectedTypeId)
+    : allComponents;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1a1a1a] text-white">
-        <div className="mx-auto max-w-5xl px-6 py-8">
+        <div className="mx-auto max-w-6xl px-6 py-8">
           <p className="text-gray-400 text-sm">Loading...</p>
         </div>
       </div>
@@ -169,7 +167,7 @@ export default function ComponentFabricRulesPage() {
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white">
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-xl font-bold tracking-tight">
             Tinker Tailor — Component Fabric Rules
@@ -194,166 +192,112 @@ export default function ComponentFabricRulesPage() {
           </div>
         )}
 
-        {/* Component selector */}
-        <section className="mb-8">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
-            Select Component
-          </h2>
-          <div className="rounded border border-gray-700 bg-[#222] p-4">
-            <input
-              type="text"
-              value={componentSearch}
-              onChange={(e) => setComponentSearch(e.target.value)}
-              placeholder="Search components by name or code..."
-              className="mb-3 w-full rounded border border-gray-700 bg-[#1a1a1a] px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-gray-500"
-            />
-            <select
-              value={selectedComponentId}
-              onChange={(e) => handleSelectComponent(e.target.value)}
-              className="w-full rounded border border-gray-700 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-gray-500"
-              size={Math.min(filteredComponents.length + 1, 10)}
-            >
-              <option value="">-- Select a component --</option>
-              {filteredComponents.map((comp) => (
-                <option key={comp.id} value={comp.id}>
-                  {comp.name} ({comp.code})
-                </option>
-              ))}
-            </select>
-          </div>
-        </section>
+        {/* Component type filter */}
+        <div className="mb-6 flex items-center gap-3">
+          <label className="text-xs text-gray-500 whitespace-nowrap">
+            Component Type
+          </label>
+          <select
+            value={selectedTypeId}
+            onChange={(e) => setSelectedTypeId(e.target.value)}
+            className="rounded border border-gray-700 bg-[#1a1a1a] px-3 py-2 text-sm text-white"
+          >
+            <option value="">All types</option>
+            {componentTypes.map((ct) => (
+              <option key={ct.id} value={ct.id}>
+                {ct.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-500">
+            {rows.length} component{rows.length !== 1 ? "s" : ""}
+          </span>
+        </div>
 
-        {/* Fabric category checklist */}
-        {selectedComponentId && (
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-gray-400">
-                Fabric Categories for: {selectedComponent?.name ?? "Unknown"}
-              </h2>
-              <span className="text-sm text-gray-400">
-                {linkedCategoryIds.size} categor
-                {linkedCategoryIds.size === 1 ? "y" : "ies"} linked
-              </span>
-            </div>
-
-            {loadingRules ? (
-              <p className="text-gray-400 text-sm">Loading rules...</p>
-            ) : (
-              <div className="space-y-4">
-                {groups.map((group) => {
-                  const hasChildren = group.children.length > 0;
-                  const categoriesToShow = hasChildren
-                    ? group.children
-                    : [group.parent];
-
-                  return (
-                    <div
-                      key={group.parent.id}
-                      className="rounded border border-gray-700 bg-[#222] p-4"
-                    >
-                      <h3 className="mb-3 text-sm font-semibold text-white">
-                        {group.parent.name}
-                        {group.parent.hidden && (
-                          <span className="ml-2 rounded bg-yellow-900/40 px-1.5 py-0.5 text-xs text-yellow-400">
-                            hidden
-                          </span>
-                        )}
-                      </h3>
-
-                      <div className="space-y-2">
-                        {categoriesToShow.map((cat) => {
-                          const isLinked = linkedCategoryIds.has(cat.id);
-                          const isToggling = togglingId === cat.id;
-
-                          return (
-                            <label
-                              key={cat.id}
-                              className={`flex cursor-pointer items-center gap-3 rounded px-3 py-2 transition-colors ${
-                                isLinked
-                                  ? "bg-green-900/20 border border-green-800/40"
-                                  : "hover:bg-[#2a2a2a]"
-                              } ${isToggling ? "opacity-50" : ""}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isLinked}
-                                onChange={() => handleToggleCategory(cat.id)}
-                                disabled={isToggling}
-                                className="h-4 w-4 accent-green-500"
-                              />
-                              <span className="text-sm text-white">
-                                {hasChildren ? cat.name : "All fabrics"}
-                              </span>
-                              {cat.hidden && (
-                                <span className="rounded bg-yellow-900/40 px-1.5 py-0.5 text-xs text-yellow-400">
-                                  hidden
-                                </span>
-                              )}
-                              <span className="text-xs text-gray-500">
-                                {cat.slug}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {orphanCategories.length > 0 && (
-                  <div className="rounded border border-gray-700 bg-[#222] p-4">
-                    <h3 className="mb-3 text-sm font-semibold text-white">
-                      Other Categories
-                    </h3>
-                    <div className="space-y-2">
-                      {orphanCategories.map((cat) => {
-                        const isLinked = linkedCategoryIds.has(cat.id);
-                        const isToggling = togglingId === cat.id;
-
-                        return (
-                          <label
-                            key={cat.id}
-                            className={`flex cursor-pointer items-center gap-3 rounded px-3 py-2 transition-colors ${
-                              isLinked
-                                ? "bg-green-900/20 border border-green-800/40"
-                                : "hover:bg-[#2a2a2a]"
-                            } ${isToggling ? "opacity-50" : ""}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isLinked}
-                              onChange={() => handleToggleCategory(cat.id)}
-                              disabled={isToggling}
-                              className="h-4 w-4 accent-green-500"
-                            />
-                            <span className="text-sm text-white">
-                              {cat.name}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {cat.slug}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {groups.length === 0 && (
-              <p className="text-gray-500 text-sm">
-                No fabric categories found. Create categories on the Fabrics
-                page first.
-              </p>
-            )}
-          </section>
+        {cols.length === 0 && (
+          <p className="text-gray-500 text-sm">
+            No fabric categories found. Create categories on the Fabrics page
+            first.
+          </p>
         )}
 
-        {!selectedComponentId && (
+        {cols.length > 0 && rows.length === 0 && (
           <p className="text-gray-500 text-sm">
-            Select a component above to manage its fabric category rules.
+            No components found for this type.
           </p>
+        )}
+
+        {cols.length > 0 && rows.length > 0 && (
+          <div className="rounded border border-gray-700 bg-[#222] overflow-auto">
+            <table className="text-sm border-collapse">
+              <thead>
+                {/* Parent group header row */}
+                <tr className="sticky top-0 z-10 bg-[#222]">
+                  <th
+                    rowSpan={2}
+                    className="sticky left-0 z-20 bg-[#222] border-b border-r border-gray-700 px-3 py-2 min-w-[180px] text-left text-xs uppercase tracking-wider text-gray-500"
+                  >
+                    Component
+                  </th>
+                  {colGroups.map((group, i) => (
+                    <th
+                      key={i}
+                      colSpan={group.count}
+                      className="border-b border-l border-gray-700 px-2 py-1.5 text-center text-xs font-medium text-gray-300 whitespace-nowrap"
+                    >
+                      {group.parentName}
+                    </th>
+                  ))}
+                </tr>
+                {/* Leaf column headers */}
+                <tr className="sticky top-[33px] z-10 bg-[#222]">
+                  {cols.map((col) => (
+                    <th
+                      key={col.id}
+                      className="border-b border-l border-gray-700 px-2 py-1.5 text-center text-xs text-gray-400 font-normal min-w-[48px]"
+                      title={col.name}
+                    >
+                      <div className="truncate max-w-[60px]">{col.name}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((comp) => (
+                  <tr
+                    key={comp.id}
+                    className="border-b border-gray-800 hover:bg-[#2a2a2a]"
+                  >
+                    <td
+                      className="sticky left-0 bg-[#222] border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap"
+                      title={comp.code}
+                    >
+                      {comp.name}
+                    </td>
+                    {cols.map((col) => {
+                      const key = `${comp.id}:${col.id}`;
+                      const isChecked = edgeSet.has(key);
+                      const isToggling = toggling.has(key);
+                      return (
+                        <td
+                          key={col.id}
+                          className="border-l border-gray-800 px-2 py-1.5 text-center"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isToggling}
+                            onChange={() => handleToggle(comp.id, col.id)}
+                            className="h-4 w-4 rounded border-gray-600 bg-[#1a1a1a] accent-white cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
