@@ -75,6 +75,7 @@ export default function ViewerPage() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
+  const [storagePath, setStoragePath] = useState<string | null>(null);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
 
   // ── Data fetching ──
@@ -91,22 +92,35 @@ export default function ViewerPage() {
       .catch(console.error);
   }, []);
 
-  // Resolve signed URL from component code + variant (no DB lookup needed —
-  // storage paths are deterministic: {code}/{variant}.obj)
-  const selectedComponent = components.find((c) => c.id === selectedComponentId);
-
+  // Load meshes for selected component (one call per selection)
   useEffect(() => {
-    if (!selectedComponent) {
+    if (!selectedComponentId) {
+      setStoragePath(null);
+      return;
+    }
+    fetch(`/api/admin/component-meshes?componentId=${selectedComponentId}`)
+      .then((r) => r.json())
+      .then((meshes: { variant: string; storagePath: string }[]) => {
+        const mesh =
+          meshes.find((m) => m.variant === selectedVariant) ??
+          meshes[0] ??
+          null;
+        setStoragePath(mesh?.storagePath ?? null);
+      })
+      .catch(() => setStoragePath(null));
+  }, [selectedComponentId, selectedVariant]);
+
+  // Resolve signed URL from storage path
+  useEffect(() => {
+    if (!storagePath) {
       setModelUrl(null);
       return;
     }
-    const storagePath = `${selectedComponent.code}/${selectedVariant}.obj`;
-    setModelUrl(null);
     fetch(`/api/models/signed-url?name=${encodeURIComponent(storagePath)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setModelUrl(data?.url ?? null))
       .catch(() => setModelUrl(null));
-  }, [selectedComponent?.id, selectedVariant]);
+  }, [storagePath]);
 
   const isDirty =
     selectedFabricId !== null &&
