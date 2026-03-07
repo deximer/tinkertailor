@@ -5,22 +5,50 @@ import { fabricSkins, silhouetteComponents } from "@/lib/db/schema";
 import { eq, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
+const viewerSettingsSchema = z
+  .object({
+    textureType: z.enum([
+      "silk",
+      "satin",
+      "cotton",
+      "linen",
+      "chiffon",
+      "velvet",
+      "denim",
+      "wool",
+      "solid",
+    ]),
+    color: z.string(),
+    roughness: z.number(),
+    metalness: z.number(),
+    sheen: z.number().optional(),
+    sheenRoughness: z.number().optional(),
+    sheenColor: z.string().optional(),
+    transmission: z.number().optional(),
+    thickness: z.number().optional(),
+  })
+  .nullable()
+  .optional();
+
+const returningFields = {
+  id: fabricSkins.id,
+  name: fabricSkins.name,
+  fabricCode: fabricSkins.fabricCode,
+  categoryId: fabricSkins.categoryId,
+  meshVariant: fabricSkins.meshVariant,
+  priceMarkup: fabricSkins.priceMarkup,
+  hidden: fabricSkins.hidden,
+  viewerSettings: fabricSkins.viewerSettings,
+  createdAt: fabricSkins.createdAt,
+};
+
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
 
   try {
     const rows = await db
-      .select({
-        id: fabricSkins.id,
-        name: fabricSkins.name,
-        fabricCode: fabricSkins.fabricCode,
-        categoryId: fabricSkins.categoryId,
-        meshVariant: fabricSkins.meshVariant,
-        priceMarkup: fabricSkins.priceMarkup,
-        hidden: fabricSkins.hidden,
-        createdAt: fabricSkins.createdAt,
-      })
+      .select(returningFields)
       .from(fabricSkins)
       .orderBy(fabricSkins.name);
 
@@ -41,6 +69,7 @@ const createSchema = z.object({
   meshVariant: z.enum(["heavy", "light", "standard"]).nullable().optional(),
   priceMarkup: z.string().default("0"),
   hidden: z.boolean().default(false),
+  viewerSettings: viewerSettingsSchema,
 });
 
 const updateSchema = z.object({
@@ -51,6 +80,7 @@ const updateSchema = z.object({
   meshVariant: z.enum(["heavy", "light", "standard"]).nullable().optional(),
   priceMarkup: z.string().optional(),
   hidden: z.boolean().optional(),
+  viewerSettings: viewerSettingsSchema,
 });
 
 export async function POST(request: Request) {
@@ -82,17 +112,9 @@ export async function POST(request: Request) {
         meshVariant: body.meshVariant ?? null,
         priceMarkup: body.priceMarkup,
         hidden: body.hidden,
+        viewerSettings: body.viewerSettings ?? null,
       })
-      .returning({
-        id: fabricSkins.id,
-        name: fabricSkins.name,
-        fabricCode: fabricSkins.fabricCode,
-        categoryId: fabricSkins.categoryId,
-        meshVariant: fabricSkins.meshVariant,
-        priceMarkup: fabricSkins.priceMarkup,
-        hidden: fabricSkins.hidden,
-        createdAt: fabricSkins.createdAt,
-      });
+      .returning(returningFields);
 
     return NextResponse.json(row, { status: 201 });
   } catch (err) {
@@ -139,6 +161,8 @@ export async function PUT(request: Request) {
     if (body.meshVariant !== undefined) updates.meshVariant = body.meshVariant;
     if (body.priceMarkup !== undefined) updates.priceMarkup = body.priceMarkup;
     if (body.hidden !== undefined) updates.hidden = body.hidden;
+    if (body.viewerSettings !== undefined)
+      updates.viewerSettings = body.viewerSettings;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -151,16 +175,7 @@ export async function PUT(request: Request) {
       .update(fabricSkins)
       .set(updates)
       .where(eq(fabricSkins.id, body.id))
-      .returning({
-        id: fabricSkins.id,
-        name: fabricSkins.name,
-        fabricCode: fabricSkins.fabricCode,
-        categoryId: fabricSkins.categoryId,
-        meshVariant: fabricSkins.meshVariant,
-        priceMarkup: fabricSkins.priceMarkup,
-        hidden: fabricSkins.hidden,
-        createdAt: fabricSkins.createdAt,
-      });
+      .returning(returningFields);
 
     if (!row) {
       return NextResponse.json(
@@ -208,7 +223,8 @@ export async function DELETE(request: Request) {
     if (linked.value > 0) {
       return NextResponse.json(
         {
-          error: "Cannot delete fabric skin referenced as default in silhouette components",
+          error:
+            "Cannot delete fabric skin referenced as default in silhouette components",
           linkedCount: linked.value,
         },
         { status: 409 },

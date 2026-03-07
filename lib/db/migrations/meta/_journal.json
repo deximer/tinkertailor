@@ -78,6 +78,13 @@
       "when": 1772897545910,
       "tag": "0010_stormy_gabe_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772970000000,
+      "tag": "0011_add_viewer_settings",
+      "breakpoints": true
     }
   ]
 }

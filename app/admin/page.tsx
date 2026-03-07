@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/admin/component-fabric-rules", label: "Component Fabric Rules" },
   { href: "/admin/tags", label: "Tag Dimensions & Values" },
   { href: "/admin/silhouettes", label: "Silhouettes" },
+  { href: "/admin/viewer", label: "3D Viewer" },
 ];
 
 export default function AdminPage() {

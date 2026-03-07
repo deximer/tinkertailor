@@ -8,6 +8,7 @@ import {
   numeric,
   timestamp,
   primaryKey,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { type MeshVariant } from "./component-meshes";
 import { components } from "./components";
@@ -38,6 +39,7 @@ export const fabricSkins = pgTable("fabric_skins", {
     .notNull()
     .default("0"),
   hidden: boolean("hidden").notNull().default(false),
+  viewerSettings: jsonb("viewer_settings"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
