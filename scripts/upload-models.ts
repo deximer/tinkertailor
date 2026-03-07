@@ -98,10 +98,11 @@ async function uploadMesh(
 
   const storagePath = `${componentCode}/${mesh.variant}.obj`;
   const fileBuffer = fs.readFileSync(localPath);
+  const blob = new Blob([fileBuffer], { type: "model/obj" });
 
   const { error } = await supabase.storage
     .from(BUCKET)
-    .upload(storagePath, fileBuffer, {
+    .upload(storagePath, blob, {
       contentType: "model/obj",
       upsert: true,
     });
