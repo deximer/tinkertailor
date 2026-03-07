@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 const NAV_LINKS = [
   { href: "/admin/component-types", label: "Component Types & Categories" },
   { href: "/admin/components", label: "Components" },
-  { href: "/admin/component-meshes", label: "Component Meshes" },
   { href: "/admin/compatibility", label: "Compatibility Graph" },
   { href: "/admin/fabrics", label: "Fabric Catalog" },
   { href: "/admin/component-fabric-rules", label: "Component Fabric Rules" },
