@@ -18,6 +18,7 @@ import { eq, and } from "drizzle-orm";
 import postgres from "postgres";
 import ExcelJS from "exceljs";
 import path from "path";
+import fs from "fs";
 import {
   categories,
   componentTypes,
@@ -36,6 +37,21 @@ if (!DATABASE_URL) {
 
 const client = postgres(DATABASE_URL, { max: 1 });
 const db = drizzle(client);
+
+// ---------------------------------------------------------------------------
+// Name map from seed-data JSON (real names extracted from OBJ library)
+// ---------------------------------------------------------------------------
+
+const seedDataPath = path.resolve("nogit/assets/seed-data/components.json");
+const seedData = JSON.parse(fs.readFileSync(seedDataPath, "utf-8")) as {
+  bodices: { code: string; name: string }[];
+  skirts: { code: string; name: string }[];
+  sleeves: { code: string; name: string }[];
+};
+const nameMap: Record<string, string> = {};
+for (const c of [...seedData.bodices, ...seedData.skirts, ...seedData.sleeves]) {
+  nameMap[c.code] = c.name;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -115,6 +131,7 @@ async function seedComponentTypes(categoryIds: Record<string, string>) {
       categoryId: categoryIds.dress,
       stage: "silhouette" as const,
       isFirstLeaf: true,
+      garmentPart: "bodice" as const,
     },
     {
       name: "Skirt Section",
@@ -122,6 +139,7 @@ async function seedComponentTypes(categoryIds: Record<string, string>) {
       categoryId: categoryIds.dress,
       stage: "silhouette" as const,
       isFirstLeaf: false,
+      garmentPart: "skirt" as const,
     },
     {
       name: "Sleeve",
@@ -129,6 +147,7 @@ async function seedComponentTypes(categoryIds: Record<string, string>) {
       categoryId: categoryIds.dress,
       stage: "silhouette" as const,
       isFirstLeaf: false,
+      garmentPart: "sleeve" as const,
     },
   ];
 
@@ -175,9 +194,10 @@ async function seedComponentsFromSpreadsheet(
   for (const code of bodiceCodes) {
     const num = code.replace("BOD-", "");
     const row = await upsertByCode(code, {
-      name: `Bodice ${num}`,
+      name: nameMap[code] || `Bodice ${num}`,
       code,
       componentTypeId: typeIds.bodice,
+      legacyCode: code,
     });
     componentMap[code] = row.id;
   }
@@ -196,9 +216,10 @@ async function seedComponentsFromSpreadsheet(
   for (const code of skirtCodes) {
     const num = code.replace("SK-", "");
     const row = await upsertByCode(code, {
-      name: `Skirt ${num}`,
+      name: nameMap[code] || `Skirt ${num}`,
       code,
       componentTypeId: typeIds["skirt-section"],
+      legacyCode: code,
     });
     componentMap[code] = row.id;
   }
@@ -226,9 +247,10 @@ async function seedComponentsFromSpreadsheet(
             typeIndicator
           : "";
         const row = await upsertByCode(code, {
-          name: `Sleeve ${num}${typeName ? ` (${typeName})` : ""}`,
+          name: nameMap[code] || `Sleeve ${num}${typeName ? ` (${typeName})` : ""}`,
           code,
           componentTypeId: typeIds.sleeve,
+          legacyCode: code,
         });
         componentMap[code] = row.id;
       }
@@ -237,6 +259,25 @@ async function seedComponentsFromSpreadsheet(
   console.log(`  ${sleeveCodes.length} sleeves seeded.`);
 
   return { componentMap, bodiceCodes, skirtCodes, sleeveCodes, wb };
+}
+
+// ---------------------------------------------------------------------------
+// Step 4b: Update garment_part on existing component types (idempotent)
+// ---------------------------------------------------------------------------
+
+async function ensureGarmentParts() {
+  const updates: { slug: string; garmentPart: string }[] = [
+    { slug: "bodice", garmentPart: "bodice" },
+    { slug: "skirt-section", garmentPart: "skirt" },
+    { slug: "sleeve", garmentPart: "sleeve" },
+  ];
+  for (const { slug, garmentPart } of updates) {
+    await db
+      .update(componentTypes)
+      .set({ garmentPart: garmentPart as "bodice" | "skirt" | "sleeve" })
+      .where(eq(componentTypes.slug, slug));
+  }
+  console.log("  garment_part values ensured on component types.");
 }
 
 // ---------------------------------------------------------------------------
@@ -294,14 +335,20 @@ async function seedCompatibilityMatrices(
   const sleevesSheet = wb.getWorksheet("Sleeves")!;
   let bodSlvCount = 0;
 
-  // Build sleeve code lookup from header
-  const slvCodeByCol: Record<number, string> = {};
+  // Build sleeve code + style code lookup from header
+  const slvMetaByCol: Record<number, { code: string; styleCode: string | null }> = {};
   const slvHeader = sleevesSheet.getRow(1);
   for (let c = 2; c <= sleevesSheet.columnCount; c++) {
     const val = slvHeader.getCell(c).value;
     if (val) {
-      const match = String(val).trim().match(/^(SLV-\d+)/);
-      if (match) slvCodeByCol[c] = match[1];
+      const raw = String(val).trim();
+      const match = raw.match(/^(SLV-\d+)\s*([A-Z]+)?/);
+      if (match) {
+        slvMetaByCol[c] = {
+          code: match[1],
+          styleCode: match[2] || null,
+        };
+      }
     }
   }
 
@@ -309,14 +356,14 @@ async function seedCompatibilityMatrices(
     const bodCode = String(sleevesSheet.getRow(r).getCell(1).value || "").trim();
     if (!bodCode.startsWith("BOD-") || !componentMap[bodCode]) continue;
 
-    for (const [colStr, slvCode] of Object.entries(slvCodeByCol)) {
+    for (const [colStr, meta] of Object.entries(slvMetaByCol)) {
       const col = Number(colStr);
-      if (!componentMap[slvCode]) continue;
+      if (!componentMap[meta.code]) continue;
 
       const val = sleevesSheet.getRow(r).getCell(col).value;
       if (Number(val) === 1) {
         const bodiceId = componentMap[bodCode];
-        const sleeveId = componentMap[slvCode];
+        const sleeveId = componentMap[meta.code];
         const existing = await db
           .select()
           .from(bodiceSleeveCompatibility)
@@ -328,9 +375,11 @@ async function seedCompatibilityMatrices(
           )
           .limit(1);
         if (existing.length === 0) {
-          await db
-            .insert(bodiceSleeveCompatibility)
-            .values({ bodiceId, sleeveId });
+          await db.insert(bodiceSleeveCompatibility).values({
+            bodiceId,
+            sleeveId,
+            sleeveStyleCode: meta.styleCode as "ST" | "DS" | "OS" | null,
+          });
           bodSlvCount++;
         }
       }
@@ -583,6 +632,7 @@ async function main() {
 
   const categoryIds = await seedCategories();
   const typeIds = await seedComponentTypes(categoryIds);
+  await ensureGarmentParts();
   const { componentMap, bodiceCodes, skirtCodes, sleeveCodes, wb } =
     await seedComponentsFromSpreadsheet(typeIds);
   await seedCompatibilityMatrices(
