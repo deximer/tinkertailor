@@ -16,6 +16,7 @@ const createSchema = z.object({
   categoryId: z.string().uuid(),
   basePrice: z.string().default("0"),
   description: z.string().max(2000).nullable().optional(),
+  isComposable: z.boolean().optional(),
 });
 
 const updateSchema = z.object({
@@ -25,6 +26,7 @@ const updateSchema = z.object({
   categoryId: z.string().uuid().optional(),
   basePrice: z.string().optional(),
   description: z.string().max(2000).nullable().optional(),
+  isComposable: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -40,6 +42,7 @@ export async function GET() {
         categoryId: silhouetteTemplates.categoryId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
+        isComposable: silhouetteTemplates.isComposable,
         createdAt: silhouetteTemplates.createdAt,
       })
       .from(silhouetteTemplates)
@@ -83,6 +86,7 @@ export async function POST(request: Request) {
         categoryId: body.categoryId,
         basePrice: body.basePrice,
         description: body.description ?? null,
+        isComposable: body.isComposable ?? false,
       })
       .returning({
         id: silhouetteTemplates.id,
@@ -91,6 +95,7 @@ export async function POST(request: Request) {
         categoryId: silhouetteTemplates.categoryId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
+        isComposable: silhouetteTemplates.isComposable,
         createdAt: silhouetteTemplates.createdAt,
       });
 
@@ -138,6 +143,7 @@ export async function PUT(request: Request) {
     if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
     if (body.basePrice !== undefined) updates.basePrice = body.basePrice;
     if (body.description !== undefined) updates.description = body.description;
+    if (body.isComposable !== undefined) updates.isComposable = body.isComposable;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -157,6 +163,7 @@ export async function PUT(request: Request) {
         categoryId: silhouetteTemplates.categoryId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
+        isComposable: silhouetteTemplates.isComposable,
         createdAt: silhouetteTemplates.createdAt,
       });
 

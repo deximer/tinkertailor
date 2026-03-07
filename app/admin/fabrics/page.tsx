@@ -29,6 +29,8 @@ interface CategoryNode {
   skinCount: number;
 }
 
+const MESH_VARIANTS = ["heavy", "light", "standard", "none"] as const;
+
 export default function AdminFabricsPage() {
   const [categories, setCategories] = useState<FabricCategory[]>([]);
   const [skins, setSkins] = useState<FabricSkin[]>([]);
@@ -64,7 +66,7 @@ export default function AdminFabricsPage() {
   const [editSkinForm, setEditSkinForm] = useState({
     name: "",
     fabricCode: "",
-    modelType: "",
+    modelType: "none",
     priceMarkup: "0",
   });
 
@@ -240,7 +242,7 @@ export default function AdminFabricsPage() {
     skinCreateForms[categoryId] ?? {
       name: "",
       fabricCode: "",
-      modelType: "",
+      modelType: "none",
       priceMarkup: "0",
     };
 
@@ -267,7 +269,7 @@ export default function AdminFabricsPage() {
         name: form.name,
         fabricCode: form.fabricCode,
         categoryId,
-        modelType: form.modelType || null,
+        modelType: form.modelType === "none" || !form.modelType ? null : form.modelType,
         priceMarkup: form.priceMarkup || "0",
       }),
     });
@@ -280,7 +282,7 @@ export default function AdminFabricsPage() {
         [categoryId]: {
           name: "",
           fabricCode: "",
-          modelType: "",
+          modelType: "none",
           priceMarkup: "0",
         },
       }));
@@ -295,7 +297,7 @@ export default function AdminFabricsPage() {
     setEditSkinForm({
       name: skin.name,
       fabricCode: skin.fabricCode,
-      modelType: skin.modelType ?? "",
+      modelType: skin.modelType ?? "none",
       priceMarkup: skin.priceMarkup,
     });
     setErrorMsg(null);
@@ -312,7 +314,7 @@ export default function AdminFabricsPage() {
         id: editingSkinId,
         name: editSkinForm.name,
         fabricCode: editSkinForm.fabricCode,
-        modelType: editSkinForm.modelType || null,
+        modelType: editSkinForm.modelType === "none" || !editSkinForm.modelType ? null : editSkinForm.modelType,
         priceMarkup: editSkinForm.priceMarkup,
       }),
     });
@@ -712,7 +714,7 @@ export default function AdminFabricsPage() {
                       <th className="pb-2">Code</th>
                       <th className="pb-2">Name</th>
                       <th className="pb-2">Category</th>
-                      <th className="pb-2">Model Type</th>
+                      <th className="pb-2">Mesh Variant</th>
                       <th className="pb-2">Price Markup</th>
                       <th className="pb-2">Hidden</th>
                     </tr>
@@ -790,7 +792,7 @@ export default function AdminFabricsPage() {
                             <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                               <th className="pb-2">Code</th>
                               <th className="pb-2">Name</th>
-                              <th className="pb-2">Model Type</th>
+                              <th className="pb-2">Mesh Variant</th>
                               <th className="pb-2">Price Markup</th>
                               <th className="pb-2">Hidden</th>
                               <th className="pb-2" />
@@ -831,8 +833,7 @@ export default function AdminFabricsPage() {
                                       />
                                     </td>
                                     <td className="py-2 pr-2">
-                                      <input
-                                        type="text"
+                                      <select
                                         value={editSkinForm.modelType}
                                         onChange={(e) =>
                                           setEditSkinForm((f) => ({
@@ -840,9 +841,14 @@ export default function AdminFabricsPage() {
                                             modelType: e.target.value,
                                           }))
                                         }
-                                        placeholder="optional"
-                                        className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
-                                      />
+                                        className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
+                                      >
+                                        {MESH_VARIANTS.map((v) => (
+                                          <option key={v} value={v}>
+                                            {v === "none" ? "None" : v}
+                                          </option>
+                                        ))}
+                                      </select>
                                     </td>
                                     <td className="py-2 pr-2">
                                       <input
@@ -1001,10 +1007,9 @@ export default function AdminFabricsPage() {
                         </div>
                         <div className="w-28">
                           <label className="mb-1 block text-xs text-gray-500">
-                            Model Type
+                            Mesh Variant
                           </label>
-                          <input
-                            type="text"
+                          <select
                             value={getSkinCreateForm(cat.id).modelType}
                             onChange={(e) =>
                               updateSkinCreateForm(
@@ -1013,9 +1018,14 @@ export default function AdminFabricsPage() {
                                 e.target.value,
                               )
                             }
-                            placeholder="optional"
-                            className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
-                          />
+                            className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
+                          >
+                            {MESH_VARIANTS.map((v) => (
+                              <option key={v} value={v}>
+                                {v === "none" ? "None" : v}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div className="w-24">
                           <label className="mb-1 block text-xs text-gray-500">

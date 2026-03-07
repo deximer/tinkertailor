@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import AssetUploader from "@/app/components/admin/AssetUploader";
-import AssetList from "@/app/components/admin/AssetList";
 
 const NAV_LINKS = [
   { href: "/admin/component-types", label: "Component Types & Categories" },
@@ -19,7 +16,6 @@ const NAV_LINKS = [
 
 export default function AdminPage() {
   const router = useRouter();
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -80,19 +76,6 @@ export default function AdminPage() {
           </nav>
         </section>
 
-        <section className="mb-8">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
-            Upload Assets
-          </h2>
-          <AssetUploader onUploaded={() => setRefreshKey((k) => k + 1)} />
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-400">
-            Bucket Contents
-          </h2>
-          <AssetList refreshKey={refreshKey} />
-        </section>
       </div>
     </div>
   );

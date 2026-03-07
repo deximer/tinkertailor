@@ -7,12 +7,14 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { slugify } from "@/lib/utils/slugify";
 
 const stageEnum = z.enum(["silhouette", "embellishment", "finishing"]);
+const garmentPartZodEnum = z.enum(["bodice", "skirt", "sleeve", "embellishment", "finishing"]);
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   categoryId: z.string().uuid(),
   stage: stageEnum,
   isFirstLeaf: z.boolean(),
+  garmentPart: garmentPartZodEnum.nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -21,6 +23,7 @@ const updateSchema = z.object({
   categoryId: z.string().uuid().optional(),
   stage: stageEnum.optional(),
   isFirstLeaf: z.boolean().optional(),
+  garmentPart: garmentPartZodEnum.nullable().optional(),
 });
 
 const deleteBodySchema = z.object({
@@ -43,6 +46,7 @@ export async function POST(request: Request) {
         categoryId: body.categoryId,
         stage: body.stage,
         isFirstLeaf: body.isFirstLeaf,
+        garmentPart: body.garmentPart ?? null,
       })
       .returning({
         id: componentTypes.id,
@@ -51,6 +55,7 @@ export async function POST(request: Request) {
         categoryId: componentTypes.categoryId,
         stage: componentTypes.stage,
         isFirstLeaf: componentTypes.isFirstLeaf,
+        garmentPart: componentTypes.garmentPart,
       });
 
     return NextResponse.json(row, { status: 201 });
@@ -84,6 +89,7 @@ export async function PUT(request: Request) {
     if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
     if (body.stage !== undefined) updates.stage = body.stage;
     if (body.isFirstLeaf !== undefined) updates.isFirstLeaf = body.isFirstLeaf;
+    if (body.garmentPart !== undefined) updates.garmentPart = body.garmentPart;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -103,6 +109,7 @@ export async function PUT(request: Request) {
         categoryId: componentTypes.categoryId,
         stage: componentTypes.stage,
         isFirstLeaf: componentTypes.isFirstLeaf,
+        garmentPart: componentTypes.garmentPart,
       });
 
     if (!row) {
