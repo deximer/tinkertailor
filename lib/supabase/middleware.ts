@@ -30,16 +30,27 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users to /login (except for /login and /auth/callback)
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth/callback")
-  ) {
+  // Public routes that don't require authentication
+  const publicPaths = ["/login", "/signup", "/auth/"];
+  const isPublic = publicPaths.some((p) =>
+    request.nextUrl.pathname.startsWith(p),
+  );
+
+  // Redirect unauthenticated users to /login (except public routes)
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Forward the user's role as a request header so API routes and server
+  // components can read it without calling getUser() again.
+  if (user) {
+    const appRole = user.app_metadata?.app_role as string | undefined;
+    if (appRole) {
+      supabaseResponse.headers.set("x-user-role", appRole);
+    }
   }
 
   return supabaseResponse;

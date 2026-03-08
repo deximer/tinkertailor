@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -11,22 +12,16 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
+import { useDesignSession } from "@/lib/store/design-session";
+import { FABRICS } from "@/lib/three/textures";
 
 // ── Constants ──
 
-const MODEL_FILES: Record<string, string> = {
-  heavy: "TT-PAT-SIL-038-000-000-140709-heavy.obj",
-  light: "TT-PAT-SIL-038-000-000-140709-light.obj",
-};
-
-// Cache signed URLs so we don't re-fetch for the same variant
+// Cache signed URLs so we don't re-fetch for the same filename
 const signedUrlCache: Record<string, { url: string; expiresAt: number }> = {};
 
-async function getModelUrl(variant: string): Promise<string> {
-  const filename = MODEL_FILES[variant];
-  if (!filename) throw new Error(`Unknown variant: ${variant}`);
-
-  const cached = signedUrlCache[variant];
+async function getSignedModelUrl(cacheKey: string, filename: string): Promise<string> {
+  const cached = signedUrlCache[cacheKey];
   // Use cached URL if it expires more than 5 minutes from now
   if (cached && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
     return cached.url;
@@ -42,210 +37,69 @@ async function getModelUrl(variant: string): Promise<string> {
     );
   }
   const { url } = (await res.json()) as { url: string };
-  signedUrlCache[variant] = { url, expiresAt: Date.now() + 3600 * 1000 };
+  signedUrlCache[cacheKey] = { url, expiresAt: Date.now() + 3600 * 1000 };
   return url;
+}
+
+// Generate planar UVs for a geometry that has no UV attribute.
+// Projects vertex positions onto the XY plane, normalized to [0,1].
+function generatePlanarUVs(geo: THREE.BufferGeometry): void {
+  const pos = geo.attributes.position;
+  if (!pos) return;
+  const box = new THREE.Box3().setFromBufferAttribute(pos as THREE.BufferAttribute);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const uvs = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uvs[i * 2] = size.x > 0 ? (pos.getX(i) - box.min.x) / size.x : 0;
+    uvs[i * 2 + 1] = size.y > 0 ? (pos.getY(i) - box.min.y) / size.y : 0;
+  }
+  geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+}
+
+// Scales a GLB group so its bounding box height matches targetHeight,
+// then centers it on the ground plane (y=0 at base).
+function normalizeModel(group: THREE.Group, targetHeight = 20): void {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (size.y === 0) return;
+  const scale = targetHeight / size.y;
+  group.scale.setScalar(scale);
+  box.setFromObject(group);
+  group.position.y = -box.min.y;
+}
+
+// Loads a model as a THREE.Group, picking OBJLoader or GLTFLoader by extension.
+// Returns { group, isGlb } so callers can apply GLB-specific post-processing.
+async function loadGroup(
+  url: string,
+  onProgress?: (e: ProgressEvent) => void,
+): Promise<{ group: THREE.Group; isGlb: boolean }> {
+  const path = url.split("?")[0].toLowerCase();
+  const isGlb = path.endsWith(".glb") || path.endsWith(".gltf");
+  return new Promise((resolve, reject) => {
+    if (isGlb) {
+      new GLTFLoader().load(
+        url,
+        (gltf) => resolve({ group: gltf.scene, isGlb: true }),
+        onProgress,
+        reject,
+      );
+    } else {
+      new OBJLoader().load(
+        url,
+        (group) => resolve({ group, isGlb: false }),
+        onProgress,
+        reject,
+      );
+    }
+  });
 }
 
 // ── Procedural fabric texture helpers ──
 
-const S = 512;
-
-function createCanvas(size = S): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
-  return c;
-}
-
-function canvasToTexture(canvas: HTMLCanvasElement, repeat = 8): THREE.CanvasTexture {
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(repeat, repeat);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function seeded(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-function texSilk(): THREE.CanvasTexture {
-  const c = createCanvas(256);
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#c8c8c8";
-  ctx.fillRect(0, 0, 256, 256);
-  const rng = seeded(101);
-  for (let y = 0; y < 256; y++) {
-    const v = 180 + rng() * 20;
-    ctx.fillStyle = `rgb(${v},${v},${v})`;
-    ctx.fillRect(0, y, 256, 1);
-  }
-  return canvasToTexture(c, 10);
-}
-
-function texSatin(): THREE.CanvasTexture {
-  const size = 256;
-  const c = createCanvas(size);
-  const ctx = c.getContext("2d")!;
-  const rng = seeded(303);
-  const img = ctx.createImageData(size, size);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = 200 + Math.round(rng() * 12);
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-    img.data[i + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  return canvasToTexture(c, 10);
-}
-
-function texCotton(): THREE.CanvasTexture {
-  const c = createCanvas(128);
-  const ctx = c.getContext("2d")!;
-  const rng = seeded(202);
-  ctx.fillStyle = "#b0b0b0";
-  ctx.fillRect(0, 0, 128, 128);
-  for (let y = 0; y < 128; y += 4) {
-    for (let x = 0; x < 128; x += 4) {
-      const v = 155 + rng() * 40;
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
-      ctx.fillRect(x, y, 3, 3);
-    }
-  }
-  return canvasToTexture(c, 12);
-}
-
-function texLinen(): THREE.CanvasTexture {
-  const c = createCanvas(256);
-  const ctx = c.getContext("2d")!;
-  const rng = seeded(303);
-  ctx.fillStyle = "#b8b0a0";
-  ctx.fillRect(0, 0, 256, 256);
-  for (let y = 0; y < 256; y += 3) {
-    const v = 140 + rng() * 50;
-    const h = 1 + Math.floor(rng() * 2);
-    ctx.fillStyle = `rgb(${v},${v},${Math.round(v * 0.9)})`;
-    ctx.fillRect(0, y, 256, h);
-  }
-  for (let x = 0; x < 256; x += 4) {
-    const v = 150 + rng() * 40;
-    ctx.fillStyle = `rgba(${v},${v},${Math.round(v * 0.9)},0.4)`;
-    ctx.fillRect(x, 0, 1, 256);
-  }
-  for (let i = 0; i < 40; i++) {
-    const x = rng() * 256;
-    const y = rng() * 256;
-    const w = 2 + rng() * 6;
-    const v = 120 + rng() * 40;
-    ctx.fillStyle = `rgba(${v},${v},${v},0.5)`;
-    ctx.fillRect(x, y, w, 2);
-  }
-  return canvasToTexture(c, 8);
-}
-
-function texChiffon(): THREE.CanvasTexture {
-  const c = createCanvas(128);
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#d8d8d8";
-  ctx.fillRect(0, 0, 128, 128);
-  const rng = seeded(404);
-  for (let y = 0; y < 128; y += 6) {
-    for (let x = 0; x < 128; x += 6) {
-      const v = 200 + rng() * 30;
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
-      ctx.fillRect(x, y, 5, 5);
-      ctx.fillStyle = `rgb(${v - 15},${v - 15},${v - 15})`;
-      ctx.fillRect(x + 5, y, 1, 6);
-      ctx.fillRect(x, y + 5, 6, 1);
-    }
-  }
-  return canvasToTexture(c, 12);
-}
-
-function texVelvet(): THREE.CanvasTexture {
-  const c = createCanvas(256);
-  const ctx = c.getContext("2d")!;
-  const rng = seeded(505);
-  for (let x = 0; x < 256; x++) {
-    for (let y = 0; y < 256; y += 2) {
-      const pile = Math.sin(x * 0.3 + rng() * 2) * 8;
-      const v = 140 + pile + rng() * 15;
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
-      ctx.fillRect(x, y, 1, 2);
-    }
-  }
-  return canvasToTexture(c, 8);
-}
-
-function texDenim(): THREE.CanvasTexture {
-  const c = createCanvas(128);
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#a0a0a0";
-  ctx.fillRect(0, 0, 128, 128);
-  const rng = seeded(606);
-  for (let y = 0; y < 128; y += 2) {
-    for (let x = 0; x < 128; x += 2) {
-      const diag = (x + y) % 8 < 4 ? 1 : 0;
-      const v = diag ? 155 + rng() * 25 : 130 + rng() * 20;
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
-      ctx.fillRect(x, y, 2, 2);
-    }
-  }
-  return canvasToTexture(c, 10);
-}
-
-function texWool(): THREE.CanvasTexture {
-  const c = createCanvas(256);
-  const ctx = c.getContext("2d")!;
-  const rng = seeded(707);
-  ctx.fillStyle = "#b0a898";
-  ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 6000; i++) {
-    const x = rng() * 256;
-    const y = rng() * 256;
-    const len = 3 + rng() * 8;
-    const angle = rng() * Math.PI;
-    const v = 100 + rng() * 80;
-    ctx.strokeStyle = `rgba(${v},${v},${v},0.3)`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
-    ctx.stroke();
-  }
-  return canvasToTexture(c, 6);
-}
-
-
 // ── Data definitions ──
-
-interface FabricDef {
-  name: string;
-  roughness: number;
-  metalness: number;
-  texture: () => THREE.CanvasTexture;
-  sheen?: number;
-  sheenRoughness?: number;
-  sheenColor?: string;
-  transmission?: number;
-  thickness?: number;
-
-}
-
-const FABRICS: FabricDef[] = [
-  { name: "Silk", roughness: 0.5, metalness: 0.0, texture: texSilk, sheen: 0.3, sheenRoughness: 0.4, transmission: 0.08, thickness: 0.5 },
-  { name: "Satin", roughness: 0.4, metalness: 0.0, texture: texSatin },
-  { name: "Cotton", roughness: 0.65, metalness: 0.0, texture: texCotton },
-  { name: "Linen", roughness: 0.75, metalness: 0.0, texture: texLinen },
-  { name: "Chiffon", roughness: 0.55, metalness: 0.0, texture: texChiffon, transmission: 0.15, thickness: 0.3, sheen: 0.1 },
-  { name: "Velvet", roughness: 0.85, metalness: 0.0, texture: texVelvet, sheen: 0.9, sheenRoughness: 0.6, sheenColor: "#6a4a6a" },
-  { name: "Denim", roughness: 0.7, metalness: 0.0, texture: texDenim },
-  { name: "Wool", roughness: 0.8, metalness: 0.0, texture: texWool, sheen: 0.5, sheenRoughness: 0.8 },
-];
 
 interface ColorDef {
   name: string;
@@ -846,7 +700,7 @@ const SCENES: SceneDef[] = [
     name: "Studio",
     build: buildStudio,
     lighting: [
-      { name: "Standard", ambient: { color: 0xffffff, intensity: 0.4 }, key: { color: 0xffffff, intensity: 1.2, pos: [30, 80, 60] }, fill: { color: 0xc4b5a0, intensity: 0.5, pos: [-40, 60, -30] }, rim: { color: 0x8b9dc3, intensity: 0.3, pos: [0, 30, -80] }, exposure: 1.2 },
+      { name: "Standard", ambient: { color: 0xffffff, intensity: 0.6 }, key: { color: 0xffffff, intensity: 1.2, pos: [30, 80, 60] }, fill: { color: 0xc4b5a0, intensity: 0.5, pos: [-40, 60, -30] }, rim: { color: 0x8b9dc3, intensity: 0.3, pos: [0, 30, -80] }, exposure: 1.4 },
       { name: "Natural", ambient: { color: 0xf5f0e8, intensity: 0.6 }, key: { color: 0xfff8e7, intensity: 1.0, pos: [50, 100, 40] }, fill: { color: 0xc8d8e8, intensity: 0.35, pos: [-30, 40, 20] }, rim: { color: 0xe8dcc8, intensity: 0.15, pos: [0, 20, -60] }, exposure: 1.3 },
       { name: "Dramatic", ambient: { color: 0x202020, intensity: 0.15 }, key: { color: 0xffffff, intensity: 1.8, pos: [60, 90, 30] }, fill: { color: 0x1a1a2e, intensity: 0.1, pos: [-50, 40, -20] }, rim: { color: 0xffffff, intensity: 0.6, pos: [-20, 50, -70] }, exposure: 1.0 },
       { name: "Cool", ambient: { color: 0xd0e0f0, intensity: 0.45 }, key: { color: 0xe8f0ff, intensity: 1.1, pos: [30, 80, 60] }, fill: { color: 0x8899bb, intensity: 0.4, pos: [-40, 60, -30] }, rim: { color: 0x6688bb, intensity: 0.35, pos: [0, 30, -80] }, exposure: 1.15 },
@@ -907,7 +761,14 @@ const SCENES: SceneDef[] = [
 
 // ── Component ──
 
-export default function ModelViewer() {
+interface ModelViewerProps {
+  /** When true, subscribes to design session store and hides showcase sidebar */
+  designMode?: boolean;
+  /** Storage path (within the models bucket) to load as the showcase model, e.g. "BOD-89/heavy.obj" */
+  showcaseStoragePath?: string;
+}
+
+export default function ModelViewer({ designMode = false, showcaseStoragePath }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -937,7 +798,8 @@ export default function ModelViewer() {
   const turntableRef = useRef(false);
   const sceneBackgroundRef = useRef<THREE.Color | THREE.Texture | null>(null);
 
-  const [activeVariant, setActiveVariant] = useState("heavy");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [activeModel, setActiveModel] = useState<string | null>(null);
   const [activeCameraPreset, setActiveCameraPreset] = useState(-1);
   const [activeFabricIdx, setActiveFabricIdx] = useState(0);
   const [activeColorIdx, setActiveColorIdx] = useState(3);
@@ -963,13 +825,232 @@ export default function ModelViewer() {
   const [vignetteDarkness, setVignetteDarkness] = useState(1.4);
 
   // Material controls state — initialised from first fabric's defaults
+  const [matRoughness, setMatRoughness] = useState(FABRICS[0].roughness);
   const [matSheen, setMatSheen] = useState(FABRICS[0].sheen ?? 0);
   const [matSheenRoughness, setMatSheenRoughness] = useState(FABRICS[0].sheenRoughness ?? 0);
   const [matSheenColor, setMatSheenColor] = useState(FABRICS[0].sheenColor ?? "#ffffff");
   const [matTransmission, setMatTransmission] = useState(FABRICS[0].transmission ?? 0);
   const [matThickness, setMatThickness] = useState(FABRICS[0].thickness ?? 0);
 
+  // Design session store subscription
+  const selectedComponentIds = useDesignSession((s) => s.selectedComponentIds);
+  const designModelsRef = useRef<THREE.Group[]>([]);
+  const designLoadAbortRef = useRef(0);
 
+  // Load component models from design session
+  const loadDesignModels = useCallback(
+    async (componentIds: string[]) => {
+      const scene = sceneRef.current;
+      const mat = garmentMatRef.current;
+      if (!scene || !mat) return;
+
+      // Bump abort counter to cancel stale loads
+      const loadId = ++designLoadAbortRef.current;
+
+      // Remove previous design models
+      for (const m of designModelsRef.current) {
+        scene.remove(m);
+      }
+      designModelsRef.current = [];
+
+      if (componentIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setLoadError(null);
+
+      // Fetch component data to get mesh storagePaths
+      const params = new URLSearchParams({
+        compatible_with: componentIds.join(","),
+      });
+      let selectedComps: {
+        id: string;
+        storagePath: string | null;
+      }[] = [];
+
+      try {
+        const res = await fetch(`/api/components?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as {
+          selectedComponents: { id: string; storagePath: string | null }[];
+        };
+        selectedComps = data.selectedComponents;
+      } catch (err) {
+        if (loadId !== designLoadAbortRef.current) return;
+        setLoadError(
+          `Failed to fetch components: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (loadId !== designLoadAbortRef.current) return;
+
+      // Load each component's model
+      const loadedModels: THREE.Group[] = [];
+
+      for (const comp of selectedComps) {
+        if (!comp.storagePath) continue;
+        if (loadId !== designLoadAbortRef.current) return;
+
+        try {
+          const url = await getSignedModelUrl(comp.id, comp.storagePath);
+          const { group: obj, isGlb } = await loadGroup(url);
+          if (isGlb) normalizeModel(obj);
+
+          obj.traverse((child) => {
+            const mesh = child as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            if (isGlb) {
+              const geo = mesh.geometry;
+              if (geo.attributes.uv1) geo.attributes.uv = geo.attributes.uv1;
+              if (!geo.attributes.uv) generatePlanarUVs(geo);
+              if (geo.attributes.uv) geo.attributes.uv.needsUpdate = true;
+            }
+            mesh.material = mat;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          });
+          if (isGlb) {
+            mat.needsUpdate = true;
+            if (mat.map) mat.map.needsUpdate = true;
+          }
+
+          loadedModels.push(obj);
+          scene.add(obj);
+        } catch {
+          // Skip components whose models fail to load
+          console.warn(`Failed to load model for component ${comp.id}`);
+        }
+      }
+
+      if (loadId !== designLoadAbortRef.current) {
+        // Stale — clean up
+        for (const m of loadedModels) scene.remove(m);
+        return;
+      }
+
+      designModelsRef.current = loadedModels;
+
+      // Hide the showcase model when design models are active
+      if (loadedModels.length > 0 && currentModelRef.current) {
+        scene.remove(currentModelRef.current);
+      }
+
+      setLoading(false);
+    },
+    [],
+  );
+
+  // When design session component selection changes, load models
+  useEffect(() => {
+    if (!designMode) return;
+
+    if (selectedComponentIds.length === 0) {
+      // No components selected — restore showcase model
+      const scene = sceneRef.current;
+      if (scene) {
+        for (const m of designModelsRef.current) scene.remove(m);
+        designModelsRef.current = [];
+      }
+      if (currentModelRef.current && scene && !scene.children.includes(currentModelRef.current)) {
+        scene.add(currentModelRef.current);
+      }
+      return;
+    }
+
+    loadDesignModels(selectedComponentIds);
+  }, [designMode, selectedComponentIds, loadDesignModels]);
+
+  // Design mode: respond to fabric selection
+  const selectedFabricCode = useDesignSession((s) => s.selectedFabricCode);
+
+  useEffect(() => {
+    if (!designMode || !selectedFabricCode) return;
+
+    const mat = garmentMatRef.current;
+    if (!mat) return;
+
+    // Map fabric code to closest FABRICS texture preset index.
+    // Strategy: exact match → 2-char prefix → keyword search → default (Silk).
+    const FABRIC_CODE_MAP: Record<string, number> = {
+      // Exact code matches
+      "SILK": 0, "SC": 0, "SI": 0,
+      "SATIN": 1, "SS": 1, "SA": 1,
+      "COTTON": 2, "CC": 2, "CO": 2, "CT": 2,
+      "LINEN": 3, "LI": 3, "LN": 3,
+      "CHIFFON": 4, "CH": 4, "CF": 4,
+      "VELVET": 5, "VE": 5, "VL": 5,
+      "DENIM": 6, "DE": 6, "DN": 6,
+      "WOOL": 7, "WO": 7, "WL": 7,
+      // Additional type keywords
+      "CREPE": 0, "CHARMEUSE": 1, "ORGANZA": 4,
+      "TULLE": 4, "TWEED": 7, "CASHMERE": 7, "JERSEY": 2,
+      "POPLIN": 2, "CHAMBRAY": 6, "TAFFETA": 1,
+    };
+
+    const FABRIC_KEYWORDS: readonly [string, number][] = [
+      ["SILK", 0], ["SATIN", 1], ["COTTON", 2], ["LINEN", 3],
+      ["CHIFFON", 4], ["VELVET", 5], ["DENIM", 6], ["WOOL", 7],
+      ["CREPE", 0], ["CHARMEUSE", 1], ["ORGANZA", 4], ["TULLE", 4],
+      ["TWEED", 7], ["CASHMERE", 7], ["JERSEY", 2], ["POPLIN", 2],
+      ["CHAMBRAY", 6], ["TAFFETA", 1],
+    ] as const;
+
+    const codeUpper = selectedFabricCode.toUpperCase();
+    let fabricIdx: number | undefined;
+
+    // 1. Exact match on full code
+    fabricIdx = FABRIC_CODE_MAP[codeUpper];
+
+    // 2. Prefix match on first 2 characters
+    if (fabricIdx === undefined && codeUpper.length >= 2) {
+      fabricIdx = FABRIC_CODE_MAP[codeUpper.slice(0, 2)];
+    }
+
+    // 3. Keyword search within the code string
+    if (fabricIdx === undefined) {
+      for (const [keyword, idx] of FABRIC_KEYWORDS) {
+        if (codeUpper.includes(keyword)) {
+          fabricIdx = idx;
+          break;
+        }
+      }
+    }
+
+    // 4. Default to Silk (0) with a warning
+    if (fabricIdx === undefined) {
+      console.warn(
+        `[ModelViewer] No fabric texture preset found for code "${selectedFabricCode}". Defaulting to Silk.`,
+      );
+      fabricIdx = 0;
+    }
+
+    const fab = FABRICS[fabricIdx];
+    if (!textureCacheRef.current[fabricIdx]) {
+      textureCacheRef.current[fabricIdx] = fab.texture();
+    }
+    mat.map = textureCacheRef.current[fabricIdx];
+    mat.roughness = fab.roughness;
+    mat.metalness = fab.metalness;
+    mat.sheen = fab.sheen ?? 0;
+    mat.sheenRoughness = fab.sheenRoughness ?? 0;
+    mat.sheenColor.set(fab.sheenColor ?? "#ffffff");
+    mat.transmission = fab.transmission ?? 0;
+    mat.thickness = fab.thickness ?? 0;
+    mat.needsUpdate = true;
+
+    // Sync material control state
+    setActiveFabricIdx(fabricIdx);
+    setMatRoughness(fab.roughness);
+    setMatSheen(fab.sheen ?? 0);
+    setMatSheenRoughness(fab.sheenRoughness ?? 0);
+    setMatSheenColor(fab.sheenColor ?? "#ffffff");
+    setMatTransmission(fab.transmission ?? 0);
+    setMatThickness(fab.thickness ?? 0);
+  }, [designMode, selectedFabricCode]);
 
   // Apply lighting preset
   const applyLighting = useCallback((preset: LightingPreset) => {
@@ -1052,9 +1133,9 @@ export default function ModelViewer() {
     [],
   );
 
-  // Load model
+  // Load model by filename
   const loadModel = useCallback(
-    async (variant: string) => {
+    async (filename: string) => {
       const scene = sceneRef.current;
       const mat = garmentMatRef.current;
       if (!scene || !mat) return;
@@ -1067,8 +1148,8 @@ export default function ModelViewer() {
         scene.remove(currentModelRef.current);
       }
 
-      if (modelCacheRef.current[variant]) {
-        const cached = modelCacheRef.current[variant];
+      if (modelCacheRef.current[filename]) {
+        const cached = modelCacheRef.current[filename];
         currentModelRef.current = cached;
         scene.add(cached);
         setLoading(false);
@@ -1077,7 +1158,7 @@ export default function ModelViewer() {
 
       let modelUrl: string;
       try {
-        modelUrl = await getModelUrl(variant);
+        modelUrl = await getSignedModelUrl(filename, filename);
       } catch (err) {
         setLoadError(
           `Failed to get model URL: ${err instanceof Error ? err.message : String(err)}`,
@@ -1086,35 +1167,82 @@ export default function ModelViewer() {
         return;
       }
 
-      const loader = new OBJLoader();
-      loader.load(
-        modelUrl,
-        (obj) => {
-          obj.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              (child as THREE.Mesh).material = mat;
-              (child as THREE.Mesh).castShadow = true;
-              (child as THREE.Mesh).receiveShadow = true;
-            }
-          });
-          modelCacheRef.current[variant] = obj;
-          currentModelRef.current = obj;
-          scene.add(obj);
-
-          setLoading(false);
-        },
-        (progress) => {
+      try {
+        const { group: obj, isGlb } = await loadGroup(modelUrl, (progress) => {
           if (progress.total) {
-            setLoadProgress(
-              Math.round((progress.loaded / progress.total) * 100),
-            );
+            setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
           }
-        },
-        () => {
-          setLoadError("Failed to load model. Check that model files exist in the storage bucket.");
-          setLoading(false);
-        },
-      );
+        });
+        if (isGlb) {
+          // Clo3D GLB exports are in meters; OBJ files are in inches.
+          // Scaling by 39.3701 (m→in) preserves world-space Y so garment pieces
+          // sit at their correct body height (e.g. bodice aligns to upper dress).
+          obj.scale.setScalar(39.3701);
+        }
+        obj.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          if (isGlb) {
+            const geo = mesh.geometry;
+            // Prefer uv1 (TEXCOORD_1) over uv (TEXCOORD_0) for Clo3D exports —
+            // Clo3D often places the fabric UV on channel 1.
+            if (geo.attributes.uv1) {
+              geo.attributes.uv = geo.attributes.uv1;
+            }
+            // If there are still no UVs, generate planar UVs from vertex positions
+            // so the fabric texture at least renders (even if not perfectly fitted).
+            if (!geo.attributes.uv) {
+              generatePlanarUVs(geo);
+            }
+            // Clo3D exports UVs in millimeter pattern space (e.g. -137..+124mm).
+            // Detect and normalize to [0,1] so the fabric texture maps correctly.
+            // We always build a fresh non-interleaved Float32Array so the renderer
+            // uploads clean data regardless of the source attribute type.
+            const uvSrc = geo.attributes.uv;
+            let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+            for (let i = 0; i < uvSrc.count; i++) {
+              const u = uvSrc.getX(i), v = uvSrc.getY(i);
+              if (u < uMin) uMin = u; if (u > uMax) uMax = u;
+              if (v < vMin) vMin = v; if (v > vMax) vMax = v;
+            }
+            const needsNorm = uMax > 1.5 || uMin < -0.5;
+            const arr = new Float32Array(uvSrc.count * 2);
+            if (needsNorm) {
+              const uRange = uMax - uMin || 1, vRange = vMax - vMin || 1;
+              for (let i = 0; i < uvSrc.count; i++) {
+                arr[i * 2]     = (uvSrc.getX(i) - uMin) / uRange;
+                arr[i * 2 + 1] = (uvSrc.getY(i) - vMin) / vRange;
+              }
+            } else {
+              for (let i = 0; i < uvSrc.count; i++) {
+                arr[i * 2]     = uvSrc.getX(i);
+                arr[i * 2 + 1] = uvSrc.getY(i);
+              }
+            }
+            const newUv = new THREE.BufferAttribute(arr, 2);
+            newUv.needsUpdate = true;
+            geo.setAttribute("uv", newUv);
+          }
+          mesh.material = mat;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+        });
+        if (isGlb && mat.map) {
+          // Ensure the fabric texture uses UV channel 0 (geo.attributes.uv)
+          // and force re-upload so the normalized UVs are picked up on first render.
+          mat.map.channel = 0;
+          mat.map.needsUpdate = true;
+          // Do NOT call mat.needsUpdate here — the shader was already compiled
+          // with USE_MAP from the initial OBJ render; recompiling can drop it.
+        }
+        modelCacheRef.current[filename] = obj;
+        currentModelRef.current = obj;
+        scene.add(obj);
+        setLoading(false);
+      } catch {
+        setLoadError("Failed to load model. Check that model files exist in the storage bucket.");
+        setLoading(false);
+      }
     },
     [],
   );
@@ -1123,13 +1251,23 @@ export default function ModelViewer() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const container = containerRef.current;
+    const getSize = () => {
+      if (designMode) {
+        return { w: container.clientWidth || window.innerWidth, h: container.clientHeight || window.innerHeight };
+      }
+      return { w: window.innerWidth, h: window.innerHeight };
+    };
+
+    const { w: initW, h: initH } = getSize();
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a1a);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
       40,
-      window.innerWidth / window.innerHeight,
+      initW / initH,
       0.1,
       1000,
     );
@@ -1137,7 +1275,7 @@ export default function ModelViewer() {
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(initW, initH);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -1155,11 +1293,11 @@ export default function ModelViewer() {
     controlsRef.current = controls;
 
     // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambient);
     ambientRef.current = ambient;
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
     keyLight.position.set(30, 80, 60);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 1024;
@@ -1173,12 +1311,12 @@ export default function ModelViewer() {
     scene.add(keyLight);
     keyLightRef.current = keyLight;
 
-    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.3);
+    const fillLight = new THREE.DirectionalLight(0xc4b5a0, 0.5);
     fillLight.position.set(-40, 60, -30);
     scene.add(fillLight);
     fillLightRef.current = fillLight;
 
-    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.2);
+    const rimLight = new THREE.DirectionalLight(0x8b9dc3, 0.3);
     rimLight.position.set(0, 30, -80);
     scene.add(rimLight);
     rimLightRef.current = rimLight;
@@ -1218,6 +1356,7 @@ export default function ModelViewer() {
       color: 0xf0ead6,
       roughness: 0.2,
       metalness: 0.02,
+      thickness: 0,
       side: THREE.DoubleSide,
     });
     garmentMatRef.current = garmentMat;
@@ -1238,7 +1377,7 @@ export default function ModelViewer() {
 
     const vignettePass = new ShaderPass(VignetteShader);
     vignettePass.uniforms["offset"].value = 0.2;
-    vignettePass.uniforms["darkness"].value = 1.4;
+    vignettePass.uniforms["darkness"].value = 1.1;
     vignettePass.enabled = true;
     composer.addPass(vignettePass);
     vignettePassRef.current = vignettePass;
@@ -1248,6 +1387,14 @@ export default function ModelViewer() {
 
     // Offset the camera frustum so the model centers in the content area (right of sidebar)
     const applySidebarOffset = () => {
+      if (designMode) {
+        // In design mode, clear any view offset and use container dimensions
+        camera.clearViewOffset();
+        const { w, h } = getSize();
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        return;
+      }
       const sidebarW = sidebarRef.current?.offsetWidth ?? 0;
       const fullW = window.innerWidth;
       const fullH = window.innerHeight;
@@ -1258,13 +1405,19 @@ export default function ModelViewer() {
 
     // Resize handler
     const onResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const { w, h } = getSize();
       renderer.setSize(w, h);
       composer.setSize(w, h);
       applySidebarOffset();
     };
     window.addEventListener("resize", onResize);
+
+    // In design mode, also observe container size changes
+    let resizeObserver: ResizeObserver | undefined;
+    if (designMode) {
+      resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(container);
+    }
 
     // Render loop
     function animate() {
@@ -1292,9 +1445,9 @@ export default function ModelViewer() {
     animate();
 
     // Cleanup
-    const container = containerRef.current;
     return () => {
       window.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
       cancelAnimationFrame(animFrameRef.current);
       for (const tex of Object.values(textureCacheRef.current)) {
         tex.dispose();
@@ -1308,7 +1461,7 @@ export default function ModelViewer() {
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [designMode]);
 
   // Apply initial material + scene + load model on mount
   useEffect(() => {
@@ -1326,7 +1479,24 @@ export default function ModelViewer() {
       sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
-    loadModel(activeVariant);
+    // Load showcase model: use explicit path if provided, otherwise list bucket root
+    if (showcaseStoragePath) {
+      loadModel(showcaseStoragePath);
+    } else {
+      fetch("/api/models")
+        .then((r) => r.json())
+        .then((files: { name: string }[]) => {
+          const names = files.map((f) => f.name);
+          setAvailableModels(names);
+          if (names.length > 0) {
+            setActiveModel(names[0]);
+            loadModel(names[0]);
+          }
+        })
+        .catch(() => {
+          // Not authenticated or bucket empty — viewer stays blank
+        });
+    }
     // Load initial HDR environment
     loadHDR(HDRI_PRESETS[0].file);
     // Only run once on mount
@@ -1358,12 +1528,13 @@ export default function ModelViewer() {
   useEffect(() => {
     const mat = garmentMatRef.current;
     if (!mat) return;
+    mat.roughness = matRoughness;
     mat.sheen = matSheen;
     mat.sheenRoughness = matSheenRoughness;
     mat.sheenColor.set(matSheenColor);
     mat.transmission = matTransmission;
     mat.thickness = matThickness;
-  }, [matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness]);
+  }, [matRoughness, matSheen, matSheenRoughness, matSheenColor, matTransmission, matThickness]);
 
   // Turntable
   useEffect(() => {
@@ -1456,15 +1627,16 @@ export default function ModelViewer() {
     loadHDR(HDRI_PRESETS[idx].file);
   };
 
-  const handleVariant = (variant: string) => {
-    setActiveVariant(variant);
-    loadModel(variant);
+  const handleModel = (filename: string) => {
+    setActiveModel(filename);
+    loadModel(filename);
   };
 
   const handleFabric = (idx: number) => {
     setActiveFabricIdx(idx);
     applyMaterial(idx, activeColorIdx);
     const fab = FABRICS[idx];
+    setMatRoughness(fab.roughness);
     setMatSheen(fab.sheen ?? 0);
     setMatSheenRoughness(fab.sheenRoughness ?? 0);
     setMatSheenColor(fab.sheenColor ?? "#ffffff");
@@ -1509,36 +1681,41 @@ export default function ModelViewer() {
   return (
     <>
       {/* Three.js canvas container */}
-      <div ref={containerRef} className="fixed inset-0" />
+      <div ref={containerRef} className={designMode ? "absolute inset-0" : "fixed inset-0"} />
 
       {/* Loading overlay */}
       {loading && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 text-white text-lg">
+        <div className={`${designMode ? "absolute" : "fixed"} inset-0 z-20 flex items-center justify-center bg-black/50 text-white text-lg`}>
           {loadError ?? `Loading model\u2026 ${loadProgress}%`}
         </div>
       )}
 
       {/* Error overlay (when not loading but error persists) */}
       {!loading && loadError && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 text-red-400 text-lg">
+        <div className={`${designMode ? "absolute" : "fixed"} inset-0 z-20 flex items-center justify-center bg-black/50 text-red-400 text-lg`}>
           {loadError}
         </div>
       )}
 
-      {/* Controls sidebar */}
-      <div ref={sidebarRef} className="fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin">
-        {/* Variant */}
-        <ControlGroup label="Variant">
-          {(["heavy", "light"] as const).map((v) => (
-            <SidebarButton
-              key={v}
-              active={activeVariant === v}
-              onClick={() => handleVariant(v)}
-            >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </SidebarButton>
-          ))}
-        </ControlGroup>
+      {/* Controls sidebar — hidden in design mode */}
+      <div ref={sidebarRef} className={`fixed top-4 left-4 bottom-4 z-10 flex flex-col gap-5 overflow-y-auto rounded-lg bg-black/60 p-4 backdrop-blur-sm scrollbar-thin ${designMode ? "hidden" : ""}`}>
+        {/* Model */}
+        {availableModels.length > 0 && (
+          <ControlGroup label="Model">
+            {availableModels.map((name) => {
+              const label = name.replace(/\.[^.]+$/, "");
+              return (
+                <SidebarButton
+                  key={name}
+                  active={activeModel === name}
+                  onClick={() => handleModel(name)}
+                >
+                  {label.length > 20 ? `…${label.slice(-18)}` : label}
+                </SidebarButton>
+              );
+            })}
+          </ControlGroup>
+        )}
 
         {/* Fabric */}
         <ControlGroup label="Fabric">
@@ -1575,6 +1752,7 @@ export default function ModelViewer() {
         {/* Material */}
         <ControlGroup label="Material">
           <div className="flex flex-col gap-1.5">
+            <SliderRow label="Reflection" value={1 - matRoughness} min={0} max={1} step={0.01} onChange={(v) => setMatRoughness(1 - v)} />
             <SliderRow label="Sheen" value={matSheen} min={0} max={1} step={0.01} onChange={setMatSheen} />
             <SliderRow label="Sheen Rgh" value={matSheenRoughness} min={0} max={1} step={0.01} onChange={setMatSheenRoughness} />
             <div className="flex items-center gap-2 text-xs text-gray-400">
@@ -1714,10 +1892,12 @@ export default function ModelViewer() {
         </ControlGroup>
       </div>
 
-      {/* Info bar */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 text-xs text-gray-500">
-        Orbit: drag &middot; Zoom: scroll &middot; Pan: right-drag
-      </div>
+      {/* Info bar — hidden in design mode */}
+      {!designMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 text-xs text-gray-500">
+          Orbit: drag &middot; Zoom: scroll &middot; Pan: right-drag
+        </div>
+      )}
     </>
   );
 }

@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import type { UserRole } from "@/lib/db/schema/profiles";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -25,4 +27,28 @@ export async function createClient() {
       },
     },
   );
+}
+
+/**
+ * Read the user's role from the validated JWT app_metadata claim.
+ * Uses getUser() instead of getSession() to ensure the JWT is validated
+ * against the Supabase Auth server, preventing stale or tampered tokens.
+ *
+ * The `custom_access_token_hook` DB function stamps `app_role` into the JWT
+ * so this requires no additional DB query beyond the validation call.
+ *
+ * Setup: Register `public.custom_access_token_hook` as a Custom Access Token
+ * Hook in the Supabase Auth dashboard (Authentication → Hooks).
+ */
+export async function getUserRole(
+  supabase: SupabaseClient,
+): Promise<UserRole | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const role = user.app_metadata?.app_role as UserRole | undefined;
+  return role ?? null;
 }
