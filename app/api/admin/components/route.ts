@@ -3,6 +3,7 @@ import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
 import {
   components,
+  componentTypes,
   componentCompatibility,
   silhouetteComponents,
   productComponents,
@@ -38,6 +39,7 @@ export async function GET() {
         code: components.code,
         componentTypeId: components.componentTypeId,
         modelPath: components.modelPath,
+        garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       })
       .from(components)
@@ -73,6 +75,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Look up garmentPart from the component type to denormalize
+    const [ct] = await db
+      .select({ garmentPart: componentTypes.garmentPart })
+      .from(componentTypes)
+      .where(eq(componentTypes.id, body.componentTypeId))
+      .limit(1);
+
     const [row] = await db
       .insert(components)
       .values({
@@ -80,6 +89,7 @@ export async function POST(request: Request) {
         code: body.code,
         componentTypeId: body.componentTypeId,
         modelPath: body.modelPath ?? null,
+        garmentPart: ct?.garmentPart ?? null,
       })
       .returning({
         id: components.id,
@@ -87,6 +97,7 @@ export async function POST(request: Request) {
         code: components.code,
         componentTypeId: components.componentTypeId,
         modelPath: components.modelPath,
+        garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       });
 
@@ -131,8 +142,16 @@ export async function PUT(request: Request) {
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.code !== undefined) updates.code = body.code;
-    if (body.componentTypeId !== undefined)
+    if (body.componentTypeId !== undefined) {
       updates.componentTypeId = body.componentTypeId;
+      // Re-sync garmentPart from new component type
+      const [ct] = await db
+        .select({ garmentPart: componentTypes.garmentPart })
+        .from(componentTypes)
+        .where(eq(componentTypes.id, body.componentTypeId))
+        .limit(1);
+      updates.garmentPart = ct?.garmentPart ?? null;
+    }
     if (body.modelPath !== undefined) updates.modelPath = body.modelPath;
 
     if (Object.keys(updates).length === 0) {
@@ -152,6 +171,7 @@ export async function PUT(request: Request) {
         code: components.code,
         componentTypeId: components.componentTypeId,
         modelPath: components.modelPath,
+        garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       });
 

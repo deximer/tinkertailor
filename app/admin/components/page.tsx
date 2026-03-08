@@ -23,6 +23,7 @@ interface Component {
   code: string;
   componentTypeId: string;
   modelPath: string | null;
+  garmentPart: string | null;
   createdAt: string;
 }
 
