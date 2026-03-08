@@ -22,7 +22,6 @@ interface Component {
   name: string;
   assetCode: string;
   componentTypeId: string;
-  modelPath: string | null;
   garmentPart: string | null;
   createdAt: string;
 }
@@ -50,7 +49,7 @@ export default function AdminComponentsPage() {
 
   // Inline create form state per component type
   const [createForms, setCreateForms] = useState<
-    Record<string, { name: string; assetCode: string; modelPath: string }>
+    Record<string, { name: string; assetCode: string }>
   >({});
 
   // Edit state
@@ -58,8 +57,7 @@ export default function AdminComponentsPage() {
   const [editForm, setEditForm] = useState<{
     name: string;
     assetCode: string;
-    modelPath: string;
-  }>({ name: "", assetCode: "", modelPath: "" });
+  }>({ name: "", assetCode: "" });
 
   // Mesh management
   const [expandedMeshId, setExpandedMeshId] = useState<string | null>(null);
@@ -105,7 +103,7 @@ export default function AdminComponentsPage() {
     components.filter((c) => c.componentTypeId === typeId);
 
   const getCreateForm = (typeId: string) =>
-    createForms[typeId] ?? { name: "", assetCode: "", modelPath: "" };
+    createForms[typeId] ?? { name: "", assetCode: "" };
 
   const updateCreateForm = (
     typeId: string,
@@ -130,7 +128,6 @@ export default function AdminComponentsPage() {
         name: form.name,
         assetCode: form.assetCode,
         componentTypeId: typeId,
-        modelPath: form.modelPath || null,
       }),
     });
 
@@ -139,7 +136,7 @@ export default function AdminComponentsPage() {
       setComponents((prev) => [...prev, created]);
       setCreateForms((prev) => ({
         ...prev,
-        [typeId]: { name: "", assetCode: "", modelPath: "" },
+        [typeId]: { name: "", assetCode: "" },
       }));
     } else {
       const data = await res.json();
@@ -152,7 +149,6 @@ export default function AdminComponentsPage() {
     setEditForm({
       name: comp.name,
       assetCode: comp.assetCode,
-      modelPath: comp.modelPath ?? "",
     });
     setErrorMsg(null);
   };
@@ -173,7 +169,6 @@ export default function AdminComponentsPage() {
         id: editingId,
         name: editForm.name,
         assetCode: editForm.assetCode,
-        modelPath: editForm.modelPath || null,
       }),
     });
 
@@ -352,7 +347,6 @@ export default function AdminComponentsPage() {
                         <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                           <th className="pb-2">Name</th>
                           <th className="pb-2">Asset Code</th>
-                          <th className="pb-2">Model Path</th>
                           <th className="pb-2">Meshes</th>
                           <th className="pb-2" />
                         </tr>
@@ -392,20 +386,6 @@ export default function AdminComponentsPage() {
                                       className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                                     />
                                   </td>
-                                  <td className="py-2 pr-2">
-                                    <input
-                                      type="text"
-                                      value={editForm.modelPath}
-                                      onChange={(e) =>
-                                        setEditForm((f) => ({
-                                          ...f,
-                                          modelPath: e.target.value,
-                                        }))
-                                      }
-                                      placeholder="e.g. BOD-27"
-                                      className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
-                                    />
-                                  </td>
                                   <td className="py-2" />
                                   <td className="py-2 text-right space-x-2">
                                     <button
@@ -429,11 +409,6 @@ export default function AdminComponentsPage() {
                                   </td>
                                   <td className="py-2 text-gray-400">
                                     {comp.assetCode}
-                                  </td>
-                                  <td className="py-2 text-gray-400">
-                                    {comp.modelPath ?? (
-                                      <span className="text-gray-600">—</span>
-                                    )}
                                   </td>
                                   <td className="py-2">
                                     <button
@@ -473,7 +448,7 @@ export default function AdminComponentsPage() {
                             {expandedMeshId === comp.id && (
                               <tr key={`${comp.id}-mesh`}>
                                 <td
-                                  colSpan={5}
+                                  colSpan={4}
                                   className="bg-[#1a1a1a] px-4 py-3"
                                 >
                                   {meshLoading === comp.id ? (
@@ -592,20 +567,6 @@ export default function AdminComponentsPage() {
                         value={form.assetCode}
                         onChange={(e) =>
                           updateCreateForm(ct.id, "assetCode", e.target.value)
-                        }
-                        placeholder="e.g. BOD-27"
-                        className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="mb-1 block text-xs text-gray-500">
-                        Model Path
-                      </label>
-                      <input
-                        type="text"
-                        value={form.modelPath}
-                        onChange={(e) =>
-                          updateCreateForm(ct.id, "modelPath", e.target.value)
                         }
                         placeholder="e.g. BOD-27"
                         className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"

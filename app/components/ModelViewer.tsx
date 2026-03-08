@@ -865,14 +865,14 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       });
       let selectedComps: {
         id: string;
-        modelPath: string | null;
+        storagePath: string | null;
       }[] = [];
 
       try {
         const res = await fetch(`/api/components?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as {
-          selectedComponents: { id: string; modelPath: string | null }[];
+          selectedComponents: { id: string; storagePath: string | null }[];
         };
         selectedComps = data.selectedComponents;
       } catch (err) {
@@ -890,11 +890,11 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       const loadedModels: THREE.Group[] = [];
 
       for (const comp of selectedComps) {
-        if (!comp.modelPath) continue;
+        if (!comp.storagePath) continue;
         if (loadId !== designLoadAbortRef.current) return;
 
         try {
-          const url = await getSignedModelUrl(comp.id, comp.modelPath);
+          const url = await getSignedModelUrl(comp.id, comp.storagePath);
           const { group: obj, isGlb } = await loadGroup(url);
           if (isGlb) normalizeModel(obj);
 
