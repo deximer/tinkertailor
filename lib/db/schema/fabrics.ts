@@ -31,7 +31,7 @@ export const fabrics = pgTable("fabrics", {
   categoryId: uuid("category_id")
     .notNull()
     .references(() => fabricCategories.id),
-  modelType: varchar("model_type", { length: 50 }),
+  fabricWeight: varchar("fabric_weight", { length: 50 }),
   priceMarkup: numeric("price_markup", { precision: 10, scale: 2 })
     .notNull()
     .default("0"),

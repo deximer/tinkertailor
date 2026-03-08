@@ -35,7 +35,7 @@ const returningFields = {
   name: fabrics.name,
   fabricCode: fabrics.fabricCode,
   categoryId: fabrics.categoryId,
-  modelType: fabrics.modelType,
+  fabricWeight: fabrics.fabricWeight,
   priceMarkup: fabrics.priceMarkup,
   hidden: fabrics.hidden,
   viewerSettings: fabrics.viewerSettings,
@@ -66,7 +66,7 @@ const createSchema = z.object({
   name: z.string().min(1).max(200),
   fabricCode: z.string().min(1).max(50),
   categoryId: z.string().uuid(),
-  modelType: z.string().max(50).nullable().optional(),
+  fabricWeight: z.string().max(50).nullable().optional(),
   priceMarkup: z.string().default("0"),
   hidden: z.boolean().default(false),
   viewerSettings: viewerSettingsSchema,
@@ -77,7 +77,7 @@ const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   fabricCode: z.string().min(1).max(50).optional(),
   categoryId: z.string().uuid().optional(),
-  modelType: z.string().max(50).nullable().optional(),
+  fabricWeight: z.string().max(50).nullable().optional(),
   priceMarkup: z.string().optional(),
   hidden: z.boolean().optional(),
   viewerSettings: viewerSettingsSchema,
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
         name: body.name,
         fabricCode: body.fabricCode,
         categoryId: body.categoryId,
-        modelType: body.modelType ?? null,
+        fabricWeight: body.fabricWeight ?? null,
         priceMarkup: body.priceMarkup,
         hidden: body.hidden,
         viewerSettings: body.viewerSettings ?? null,
@@ -158,7 +158,7 @@ export async function PUT(request: Request) {
     if (body.name !== undefined) updates.name = body.name;
     if (body.fabricCode !== undefined) updates.fabricCode = body.fabricCode;
     if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
-    if (body.modelType !== undefined) updates.modelType = body.modelType;
+    if (body.fabricWeight !== undefined) updates.fabricWeight = body.fabricWeight;
     if (body.priceMarkup !== undefined) updates.priceMarkup = body.priceMarkup;
     if (body.hidden !== undefined) updates.hidden = body.hidden;
     if (body.viewerSettings !== undefined)

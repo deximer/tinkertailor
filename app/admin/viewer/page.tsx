@@ -42,7 +42,7 @@ interface Fabric {
   name: string;
   fabricCode: string;
   categoryId: string;
-  modelType: string | null;
+  fabricWeight: string | null;
   priceMarkup: string;
   hidden: boolean;
   viewerSettings: ViewerSettings | null;
@@ -358,9 +358,9 @@ export default function ViewerPage() {
                   )}
                   {f.name}
                 </span>
-                {f.modelType && (
+                {f.fabricWeight && (
                   <span className="shrink-0 rounded bg-[#333] px-1.5 py-0.5 text-[10px] text-gray-400">
-                    {f.modelType}
+                    {f.fabricWeight}
                   </span>
                 )}
               </button>

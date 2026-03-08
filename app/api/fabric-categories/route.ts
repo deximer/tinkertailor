@@ -118,7 +118,7 @@ export async function GET(request: Request) {
             id: fabrics.id,
             name: fabrics.name,
             fabricCode: fabrics.fabricCode,
-            modelType: fabrics.modelType,
+            fabricWeight: fabrics.fabricWeight,
             priceMarkup: fabrics.priceMarkup,
           })
           .from(fabrics)

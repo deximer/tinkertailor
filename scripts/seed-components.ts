@@ -455,7 +455,7 @@ async function seedFabrics() {
           name,
           fabricCode: code,
           categoryId: catId,
-          modelType: null,
+          fabricWeight: null,
           priceMarkup: "0",
         })
         .returning();
