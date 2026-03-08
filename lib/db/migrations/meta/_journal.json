@@ -134,6 +134,13 @@
       "when": 1772900800000,
       "tag": "0018_rename_model_type_to_fabric_weight",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1772900900000,
+      "tag": "0019_add_model_path_to_components",
+      "breakpoints": true
     }
   ]
 }
