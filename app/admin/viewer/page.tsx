@@ -82,6 +82,7 @@ export default function ViewerPage() {
   const [selectedWeight, setSelectedWeight] = useState<string>("heavy");
 
   const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
+  const [meshIdsLoading, setMeshIdsLoading] = useState(true);
 
   // Fabric state
   const [fabrics, setFabrics] = useState<Fabric[]>([]);
@@ -114,7 +115,8 @@ export default function ViewerPage() {
     fetch("/api/admin/component-meshes")
       .then((r) => r.json())
       .then((ids: string[]) => setComponentIdsWithMeshes(new Set(ids)))
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setMeshIdsLoading(false));
   }, []);
 
   // Load meshes for selected component; auto-select first available weight
@@ -161,9 +163,15 @@ export default function ViewerPage() {
       return;
     }
     fetch(`/api/models/signed-url?name=${encodeURIComponent(storagePath)}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) {
+          console.error("[viewer] signed-url failed", r.status, storagePath);
+          return null;
+        }
+        return r.json();
+      })
       .then((data) => setModelUrl(data?.url ?? null))
-      .catch(() => setModelUrl(null));
+      .catch((err) => { console.error("[viewer] signed-url error", err); setModelUrl(null); });
   }, [meshes, selectedWeight]);
 
   const isDirty =
@@ -175,9 +183,11 @@ export default function ViewerPage() {
       ? fabrics.filter((f) => componentFabricCategoryIds.has(f.categoryId))
       : fabrics;
 
-  const filteredComponents = components.filter(
-    (c) => c.typeSlug === TAB_SLUG[activeTab] && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
-  );
+  const filteredComponents = meshIdsLoading
+    ? []
+    : components.filter(
+        (c) => c.typeSlug === TAB_SLUG[activeTab] && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
+      );
 
   // ── Handlers ──
 
@@ -258,8 +268,13 @@ export default function ViewerPage() {
 
         {/* Component list */}
         <div className="flex-1 overflow-y-auto">
-          {filteredComponents.length === 0 && (
-            <p className="px-3 py-4 text-xs text-gray-500">No components found</p>
+          {meshIdsLoading && (
+            <p className="px-3 py-4 text-xs text-gray-500">Loading...</p>
+          )}
+          {!meshIdsLoading && filteredComponents.length === 0 && (
+            <p className="px-3 py-4 text-xs text-gray-500">
+              {componentIdsWithMeshes?.size === 0 ? "No models uploaded yet" : "No components found"}
+            </p>
           )}
           {filteredComponents.map((c) => (
             <button
