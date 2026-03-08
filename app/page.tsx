@@ -13,7 +13,7 @@ export default function Home() {
 
       {/* Viewer panel — right */}
       <div className="relative flex-1">
-        <ModelViewer />
+        <ModelViewer showcaseStoragePath="BOD-89/heavy.obj" />
         <UserNav />
         <div className="fixed bottom-4 right-4 z-10 flex items-center gap-3">
           <Link

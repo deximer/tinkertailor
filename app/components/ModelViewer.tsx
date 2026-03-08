@@ -764,9 +764,11 @@ const SCENES: SceneDef[] = [
 interface ModelViewerProps {
   /** When true, subscribes to design session store and hides showcase sidebar */
   designMode?: boolean;
+  /** Storage path (within the models bucket) to load as the showcase model, e.g. "BOD-89/heavy.obj" */
+  showcaseStoragePath?: string;
 }
 
-export default function ModelViewer({ designMode = false }: ModelViewerProps) {
+export default function ModelViewer({ designMode = false, showcaseStoragePath }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -1477,20 +1479,24 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
-    // Fetch available models from bucket, then load the first one
-    fetch("/api/models")
-      .then((r) => r.json())
-      .then((files: { name: string }[]) => {
-        const names = files.map((f) => f.name);
-        setAvailableModels(names);
-        if (names.length > 0) {
-          setActiveModel(names[0]);
-          loadModel(names[0]);
-        }
-      })
-      .catch(() => {
-        // Not authenticated or bucket empty — viewer stays blank
-      });
+    // Load showcase model: use explicit path if provided, otherwise list bucket root
+    if (showcaseStoragePath) {
+      loadModel(showcaseStoragePath);
+    } else {
+      fetch("/api/models")
+        .then((r) => r.json())
+        .then((files: { name: string }[]) => {
+          const names = files.map((f) => f.name);
+          setAvailableModels(names);
+          if (names.length > 0) {
+            setActiveModel(names[0]);
+            loadModel(names[0]);
+          }
+        })
+        .catch(() => {
+          // Not authenticated or bucket empty — viewer stays blank
+        });
+    }
     // Load initial HDR environment
     loadHDR(HDRI_PRESETS[0].file);
     // Only run once on mount
