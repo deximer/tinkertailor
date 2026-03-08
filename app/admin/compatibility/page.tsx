@@ -15,7 +15,7 @@ interface ComponentType {
 interface MatrixComponent {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
 }
 
 interface MatrixData {
@@ -349,9 +349,9 @@ export default function AdminCompatibilityPage() {
                       <th
                         key={col.id}
                         className="border-b border-gray-700 px-2 py-2 text-center text-xs text-gray-400 font-normal min-w-[60px]"
-                        title={`${col.name} (${col.code})`}
+                        title={`${col.name} (${col.assetCode})`}
                       >
-                        <div className="truncate max-w-[80px]">{col.code}</div>
+                        <div className="truncate max-w-[80px]">{col.assetCode}</div>
                       </th>
                     ))}
                     <th className="border-b border-l border-gray-700 px-3 py-2 text-center text-xs uppercase tracking-wider text-gray-500">
@@ -364,7 +364,7 @@ export default function AdminCompatibilityPage() {
                     <tr key={row.id} className="border-b border-gray-800 hover:bg-[#2a2a2a]">
                       <td
                         className="sticky left-0 bg-[#222] border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap"
-                        title={`${row.name} (${row.code})`}
+                        title={`${row.name} (${row.assetCode})`}
                       >
                         {row.name}
                       </td>
