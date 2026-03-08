@@ -9,7 +9,6 @@ export const components = pgTable("components", {
   componentTypeId: uuid("component_type_id")
     .notNull()
     .references(() => componentTypes.id),
-  modelPath: varchar("model_path", { length: 500 }),
   garmentPart: varchar("garment_part", { length: 20 }).$type<GarmentPart>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

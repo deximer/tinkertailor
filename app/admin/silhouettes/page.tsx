@@ -31,7 +31,6 @@ interface ComponentOption {
   name: string;
   assetCode: string;
   componentTypeId: string;
-  modelPath: string | null;
 }
 
 interface Fabric {

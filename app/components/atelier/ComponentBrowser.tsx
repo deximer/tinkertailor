@@ -20,7 +20,6 @@ interface ComponentData {
   name: string;
   assetCode: string;
   componentTypeId: string;
-  modelPath: string | null;
   typeName: string;
   typeSlug: string;
   designStage: "silhouette" | "embellishment" | "finishing";

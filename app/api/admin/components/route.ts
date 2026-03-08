@@ -15,7 +15,6 @@ const createSchema = z.object({
   name: z.string().min(1).max(200),
   assetCode: z.string().min(1).max(50),
   componentTypeId: z.string().uuid(),
-  modelPath: z.string().max(500).nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -23,7 +22,6 @@ const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   assetCode: z.string().min(1).max(50).optional(),
   componentTypeId: z.string().uuid().optional(),
-  modelPath: z.string().max(500).nullable().optional(),
 });
 
 export async function GET() {
@@ -37,7 +35,6 @@ export async function GET() {
         name: components.name,
         assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
         garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       })
@@ -87,7 +84,6 @@ export async function POST(request: Request) {
         name: body.name,
         assetCode: body.assetCode,
         componentTypeId: body.componentTypeId,
-        modelPath: body.modelPath ?? null,
         garmentPart: ct?.garmentPart ?? null,
       })
       .returning({
@@ -95,7 +91,6 @@ export async function POST(request: Request) {
         name: components.name,
         assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
         garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       });
@@ -151,8 +146,6 @@ export async function PUT(request: Request) {
         .limit(1);
       updates.garmentPart = ct?.garmentPart ?? null;
     }
-    if (body.modelPath !== undefined) updates.modelPath = body.modelPath;
-
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
         { error: "No fields to update" },
@@ -169,7 +162,6 @@ export async function PUT(request: Request) {
         name: components.name,
         assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
-        modelPath: components.modelPath,
         garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       });

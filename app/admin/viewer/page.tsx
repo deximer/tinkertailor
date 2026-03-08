@@ -15,7 +15,7 @@ const AdminFabricViewer = dynamic(
 interface Component {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
@@ -43,6 +43,11 @@ interface Fabric {
 }
 
 const TABS = ["Bodice", "Skirt", "Sleeve"] as const;
+const TAB_SLUG: Record<string, string> = {
+  Bodice: "bodice",
+  Skirt: "skirt-section",
+  Sleeve: "sleeve",
+};
 const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 
 const TEXTURE_OPTIONS: TextureType[] = [
@@ -77,6 +82,7 @@ export default function ViewerPage() {
   const [selectedWeight, setSelectedWeight] = useState<string>("heavy");
 
   const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
+  const [meshIdsLoading, setMeshIdsLoading] = useState(true);
 
   // Fabric state
   const [fabrics, setFabrics] = useState<Fabric[]>([]);
@@ -88,6 +94,10 @@ export default function ViewerPage() {
   const [saveError, setSaveError] = useState(false);
 
   const [modelUrl, setModelUrl] = useState<string | null>(null);
+
+  // Fabric filter state
+  const [filterToComponent, setFilterToComponent] = useState(false);
+  const [componentFabricCategoryIds, setComponentFabricCategoryIds] = useState<Set<string> | null>(null);
 
   // ── Data fetching ──
 
@@ -105,7 +115,8 @@ export default function ViewerPage() {
     fetch("/api/admin/component-meshes")
       .then((r) => r.json())
       .then((ids: string[]) => setComponentIdsWithMeshes(new Set(ids)))
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setMeshIdsLoading(false));
   }, []);
 
   // Load meshes for selected component; auto-select first available weight
@@ -130,6 +141,18 @@ export default function ViewerPage() {
       .catch(() => setMeshes([]));
   }, [selectedComponentId]);
 
+  // Fetch allowed fabric category IDs for the selected component when filter is on
+  useEffect(() => {
+    if (!filterToComponent || !selectedComponentId) {
+      setComponentFabricCategoryIds(null);
+      return;
+    }
+    fetch(`/api/admin/component-fabric-rules?componentId=${selectedComponentId}`)
+      .then((r) => r.json())
+      .then((ids: string[]) => setComponentFabricCategoryIds(new Set(ids)))
+      .catch(() => setComponentFabricCategoryIds(null));
+  }, [filterToComponent, selectedComponentId]);
+
   // Resolve signed URL whenever selected weight or meshes change
   useEffect(() => {
     const mesh = meshes.find((m) => m.fabricWeight === selectedWeight) ?? meshes[0];
@@ -140,18 +163,31 @@ export default function ViewerPage() {
       return;
     }
     fetch(`/api/models/signed-url?name=${encodeURIComponent(storagePath)}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) {
+          console.error("[viewer] signed-url failed", r.status, storagePath);
+          return null;
+        }
+        return r.json();
+      })
       .then((data) => setModelUrl(data?.url ?? null))
-      .catch(() => setModelUrl(null));
+      .catch((err) => { console.error("[viewer] signed-url error", err); setModelUrl(null); });
   }, [meshes, selectedWeight]);
 
   const isDirty =
     selectedFabricId !== null &&
     JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
-  const filteredComponents = components.filter(
-    (c) => c.typeName === activeTab && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
-  );
+  const displayedFabrics =
+    filterToComponent && componentFabricCategoryIds !== null
+      ? fabrics.filter((f) => componentFabricCategoryIds.has(f.categoryId))
+      : fabrics;
+
+  const filteredComponents = meshIdsLoading
+    ? []
+    : components.filter(
+        (c) => c.typeSlug === TAB_SLUG[activeTab] && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
+      );
 
   // ── Handlers ──
 
@@ -232,8 +268,13 @@ export default function ViewerPage() {
 
         {/* Component list */}
         <div className="flex-1 overflow-y-auto">
-          {filteredComponents.length === 0 && (
-            <p className="px-3 py-4 text-xs text-gray-500">No components found</p>
+          {meshIdsLoading && (
+            <p className="px-3 py-4 text-xs text-gray-500">Loading...</p>
+          )}
+          {!meshIdsLoading && filteredComponents.length === 0 && (
+            <p className="px-3 py-4 text-xs text-gray-500">
+              {componentIdsWithMeshes?.size === 0 ? "No models uploaded yet" : "No components found"}
+            </p>
           )}
           {filteredComponents.map((c) => (
             <button
@@ -295,11 +336,26 @@ export default function ViewerPage() {
 
       {/* Right panel: fabrics & settings */}
       <div className="flex w-[280px] shrink-0 flex-col border-l border-gray-700">
-        <div className="border-b border-gray-700 px-3 py-2">
+        <div className="flex items-center justify-between border-b border-gray-700 px-3 py-2">
           <span className="text-xs font-medium text-gray-400">Fabrics</span>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-400">
+            <input
+              type="checkbox"
+              checked={filterToComponent}
+              disabled={!selectedComponentId}
+              onChange={(e) => setFilterToComponent(e.target.checked)}
+              className="accent-white"
+            />
+            Filter to component
+          </label>
         </div>
         <div className="max-h-[280px] overflow-y-auto border-b border-gray-700">
-          {fabrics.map((f) => {
+          {displayedFabrics.length === 0 && (
+            <p className="px-3 py-3 text-xs text-gray-500">
+              {filterToComponent ? "No fabrics linked to this component" : "No fabrics found"}
+            </p>
+          )}
+          {displayedFabrics.map((f) => {
             const isSelected = selectedFabricId === f.id;
             return (
               <button

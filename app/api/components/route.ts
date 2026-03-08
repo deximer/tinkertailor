@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { components, componentTypes } from "@/lib/db/schema";
-import { eq, and, type SQL } from "drizzle-orm";
+import { components, componentTypes, componentMeshes } from "@/lib/db/schema";
+import { eq, and, inArray, type SQL } from "drizzle-orm";
 import { getCompatibleComponents } from "@/lib/compatibility";
 
 export async function GET(request: Request) {
@@ -30,10 +30,35 @@ export async function GET(request: Request) {
         filtered = filtered.filter((c) => c.typeSlug === typeSlug);
       }
 
+      // Fetch mesh storagePaths for selected components (prefer "standard" weight)
+      const meshMap = new Map<string, string>();
+      if (result.selectedComponents.length > 0) {
+        const meshRows = await db
+          .select({
+            componentId: componentMeshes.componentId,
+            fabricWeight: componentMeshes.fabricWeight,
+            storagePath: componentMeshes.storagePath,
+          })
+          .from(componentMeshes)
+          .where(inArray(componentMeshes.componentId, result.selectedComponents.map((c) => c.id)));
+
+        // Priority: standard > heavy > light
+        const weightPriority: Record<string, number> = { standard: 0, heavy: 1, light: 2 };
+        for (const row of meshRows) {
+          const existing = meshMap.get(row.componentId);
+          if (!existing || weightPriority[row.fabricWeight] < weightPriority[existing]) {
+            meshMap.set(row.componentId, row.storagePath);
+          }
+        }
+      }
+
       return NextResponse.json({
         designPhase: result.designPhase,
         components: filtered,
-        selectedComponents: result.selectedComponents,
+        selectedComponents: result.selectedComponents.map((c) => ({
+          ...c,
+          storagePath: meshMap.get(c.id) ?? null,
+        })),
       });
     }
 

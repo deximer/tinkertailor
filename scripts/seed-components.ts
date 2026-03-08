@@ -79,7 +79,7 @@ async function upsertBySlug(
 
 async function upsertByCode(
   code: string,
-  row: { name: string; assetCode: string; componentTypeId: string; modelPath?: string },
+  row: { name: string; assetCode: string; componentTypeId: string },
 ) {
   const existing = await db
     .select()
