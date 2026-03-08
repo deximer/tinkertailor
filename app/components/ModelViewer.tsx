@@ -859,7 +859,7 @@ export default function ModelViewer({ designMode = false }: ModelViewerProps) {
       setLoading(true);
       setLoadError(null);
 
-      // Fetch component data to get modelPaths
+      // Fetch component data to get mesh storagePaths
       const params = new URLSearchParams({
         compatible_with: componentIds.join(","),
       });
