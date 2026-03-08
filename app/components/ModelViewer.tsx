@@ -1484,14 +1484,15 @@ export default function ModelViewer({ designMode = false, showcaseStoragePath }:
       .then((r) => r.json())
       .then((files: { name: string }[]) => {
         const names = files.map((f) => f.name);
-        setAvailableModels(names);
-        // Load showcaseStoragePath as default if provided, otherwise load first bucket model
-        if (showcaseStoragePath) {
-          setActiveModel(showcaseStoragePath);
-          loadModel(showcaseStoragePath);
-        } else if (names.length > 0) {
-          setActiveModel(names[0]);
-          loadModel(names[0]);
+        // Prepend showcaseStoragePath if it isn't in the bucket root listing
+        const all = showcaseStoragePath && !names.includes(showcaseStoragePath)
+          ? [showcaseStoragePath, ...names]
+          : names;
+        setAvailableModels(all);
+        const first = showcaseStoragePath ?? all[0];
+        if (first) {
+          setActiveModel(first);
+          loadModel(first);
         }
       })
       .catch(() => {
