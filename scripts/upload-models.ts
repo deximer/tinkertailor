@@ -115,11 +115,11 @@ async function uploadMesh(
   return storagePath;
 }
 
-type MeshVariant = "heavy" | "light" | "standard";
+type FabricWeight = "heavy" | "light" | "standard";
 
 async function upsertComponentMesh(
   componentId: string,
-  variant: MeshVariant,
+  fabricWeight: FabricWeight,
   storagePath: string,
 ) {
   const existing = await db
@@ -128,7 +128,7 @@ async function upsertComponentMesh(
     .where(
       and(
         eq(componentMeshes.componentId, componentId),
-        eq(componentMeshes.variant, variant),
+        eq(componentMeshes.fabricWeight, fabricWeight),
       ),
     )
     .limit(1);
@@ -141,7 +141,7 @@ async function upsertComponentMesh(
   } else {
     await db.insert(componentMeshes).values({
       componentId,
-      variant: variant as "heavy" | "light" | "standard",
+      fabricWeight,
       storagePath,
     });
   }
@@ -193,7 +193,7 @@ async function main() {
         continue;
       }
 
-      await upsertComponentMesh(dbComp.id, mesh.variant as MeshVariant, storagePath);
+      await upsertComponentMesh(dbComp.id, mesh.variant as FabricWeight, storagePath);
       console.log(`    ✓ ${mesh.variant} → ${storagePath}`);
       uploaded++;
       meshRows++;
