@@ -80,12 +80,12 @@ async function main() {
     throw new Error("Categories not found — run seed-components.ts first");
   }
 
-  // Get all bodices with mesh files from the DB (have legacyCode set)
+  // Get all bodices with mesh files from the DB
   const bodiceLegacyCodes = seedData.bodices.map((b) => b.code);
   const dbBodices = await db
-    .select({ id: components.id, legacyCode: components.legacyCode, name: components.name })
+    .select({ id: components.id, assetCode: components.assetCode, name: components.name })
     .from(components)
-    .where(inArray(components.legacyCode, bodiceLegacyCodes));
+    .where(inArray(components.assetCode, bodiceLegacyCodes));
 
   if (dbBodices.length === 0) {
     throw new Error("No bodice components found in DB — run seed-components.ts first");
@@ -106,7 +106,7 @@ async function main() {
   let skipped = 0;
 
   for (const bodice of dbBodices) {
-    const patternId = toPatternId(bodice.legacyCode!);
+    const patternId = toPatternId(bodice.assetCode!);
     const hasSkirts = bodiceIdsWithSkirts.has(bodice.id);
     const categoryId = hasSkirts ? dressCat.id : topCat.id;
     const silhouetteName = hasSkirts

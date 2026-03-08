@@ -171,11 +171,11 @@ async function main() {
   for (const comp of allComponents) {
     if (comp.meshes.length === 0) continue;
 
-    // Find the component in DB by legacy_code
+    // Find the component in DB by asset_code
     const [dbComp] = await db
       .select({ id: components.id })
       .from(components)
-      .where(eq(components.legacyCode, comp.code))
+      .where(eq(components.assetCode, comp.code))
       .limit(1);
 
     if (!dbComp) {

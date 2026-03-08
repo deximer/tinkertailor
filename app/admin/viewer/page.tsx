@@ -128,7 +128,6 @@ export default function ViewerPage() {
         }
       })
       .catch(() => setMeshes([]));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponentId]);
 
   // Resolve signed URL whenever selected weight or meshes change
