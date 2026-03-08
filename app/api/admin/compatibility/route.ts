@@ -192,7 +192,7 @@ export async function GET(request: Request) {
         .select({
           id: components.id,
           name: components.name,
-          code: components.code,
+          assetCode: components.assetCode,
         })
         .from(components)
         .where(eq(components.componentTypeId, typeAId))
@@ -201,7 +201,7 @@ export async function GET(request: Request) {
         .select({
           id: components.id,
           name: components.name,
-          code: components.code,
+          assetCode: components.assetCode,
         })
         .from(components)
         .where(eq(components.componentTypeId, typeBId))

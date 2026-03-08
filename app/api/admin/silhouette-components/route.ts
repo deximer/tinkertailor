@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       .select({
         componentId: silhouetteComponents.componentId,
         componentName: components.name,
-        componentCode: components.code,
+        componentAssetCode: components.assetCode,
         defaultFabricId: silhouetteComponents.defaultFabricId,
       })
       .from(silhouetteComponents)

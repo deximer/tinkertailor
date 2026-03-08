@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
     // Look up the component to get its code for the storage path
     const [component] = await db
-      .select({ id: components.id, code: components.code })
+      .select({ id: components.id, assetCode: components.assetCode })
       .from(components)
       .where(eq(components.id, componentId))
       .limit(1);
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const assetCode = component.code;
+    const assetCode = component.assetCode;
     const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '.obj';
     const storagePath = `${assetCode}/${parsedWeight.data}${ext}`;
 

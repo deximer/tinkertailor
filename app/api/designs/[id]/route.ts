@@ -45,7 +45,7 @@ export async function GET(
         fabricId: productComponents.fabricId,
         displayOrder: productComponents.displayOrder,
         componentName: components.name,
-        componentCode: components.code,
+        componentAssetCode: components.assetCode,
         componentModelPath: components.modelPath,
         componentTypeName: componentTypes.name,
         componentTypeSlug: componentTypes.slug,
@@ -74,7 +74,7 @@ export async function GET(
       components: comps.map((c) => ({
         id: c.componentId,
         name: c.componentName,
-        code: c.componentCode,
+        assetCode: c.componentAssetCode,
         modelPath: c.componentModelPath,
         typeName: c.componentTypeName,
         typeSlug: c.componentTypeSlug,

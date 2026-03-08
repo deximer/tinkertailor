@@ -20,7 +20,7 @@ interface Category {
 interface Component {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
   garmentPart: string | null;
@@ -50,16 +50,16 @@ export default function AdminComponentsPage() {
 
   // Inline create form state per component type
   const [createForms, setCreateForms] = useState<
-    Record<string, { name: string; code: string; modelPath: string }>
+    Record<string, { name: string; assetCode: string; modelPath: string }>
   >({});
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
     name: string;
-    code: string;
+    assetCode: string;
     modelPath: string;
-  }>({ name: "", code: "", modelPath: "" });
+  }>({ name: "", assetCode: "", modelPath: "" });
 
   // Mesh management
   const [expandedMeshId, setExpandedMeshId] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export default function AdminComponentsPage() {
     components.filter((c) => c.componentTypeId === typeId);
 
   const getCreateForm = (typeId: string) =>
-    createForms[typeId] ?? { name: "", code: "", modelPath: "" };
+    createForms[typeId] ?? { name: "", assetCode: "", modelPath: "" };
 
   const updateCreateForm = (
     typeId: string,
@@ -120,7 +120,7 @@ export default function AdminComponentsPage() {
 
   const handleCreate = async (typeId: string) => {
     const form = getCreateForm(typeId);
-    if (!form.name || !form.code) return;
+    if (!form.name || !form.assetCode) return;
 
     setErrorMsg(null);
     const res = await fetch("/api/admin/components", {
@@ -128,7 +128,7 @@ export default function AdminComponentsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,
-        code: form.code,
+        assetCode: form.assetCode,
         componentTypeId: typeId,
         modelPath: form.modelPath || null,
       }),
@@ -139,7 +139,7 @@ export default function AdminComponentsPage() {
       setComponents((prev) => [...prev, created]);
       setCreateForms((prev) => ({
         ...prev,
-        [typeId]: { name: "", code: "", modelPath: "" },
+        [typeId]: { name: "", assetCode: "", modelPath: "" },
       }));
     } else {
       const data = await res.json();
@@ -151,7 +151,7 @@ export default function AdminComponentsPage() {
     setEditingId(comp.id);
     setEditForm({
       name: comp.name,
-      code: comp.code,
+      assetCode: comp.assetCode,
       modelPath: comp.modelPath ?? "",
     });
     setErrorMsg(null);
@@ -172,7 +172,7 @@ export default function AdminComponentsPage() {
       body: JSON.stringify({
         id: editingId,
         name: editForm.name,
-        code: editForm.code,
+        assetCode: editForm.assetCode,
         modelPath: editForm.modelPath || null,
       }),
     });
@@ -351,8 +351,8 @@ export default function AdminComponentsPage() {
                       <thead>
                         <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                           <th className="pb-2">Name</th>
-                          <th className="pb-2">Code</th>
                           <th className="pb-2">Asset Code</th>
+                          <th className="pb-2">Model Path</th>
                           <th className="pb-2">Meshes</th>
                           <th className="pb-2" />
                         </tr>
@@ -382,11 +382,11 @@ export default function AdminComponentsPage() {
                                   <td className="py-2 pr-2">
                                     <input
                                       type="text"
-                                      value={editForm.code}
+                                      value={editForm.assetCode}
                                       onChange={(e) =>
                                         setEditForm((f) => ({
                                           ...f,
-                                          code: e.target.value,
+                                          assetCode: e.target.value,
                                         }))
                                       }
                                       className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
@@ -428,7 +428,7 @@ export default function AdminComponentsPage() {
                                     {comp.name}
                                   </td>
                                   <td className="py-2 text-gray-400">
-                                    {comp.code}
+                                    {comp.assetCode}
                                   </td>
                                   <td className="py-2 text-gray-400">
                                     {comp.modelPath ?? (
@@ -585,21 +585,21 @@ export default function AdminComponentsPage() {
                     </div>
                     <div className="flex-1">
                       <label className="mb-1 block text-xs text-gray-500">
-                        Code
+                        Asset Code
                       </label>
                       <input
                         type="text"
-                        value={form.code}
+                        value={form.assetCode}
                         onChange={(e) =>
-                          updateCreateForm(ct.id, "code", e.target.value)
+                          updateCreateForm(ct.id, "assetCode", e.target.value)
                         }
-                        placeholder="unique-code"
+                        placeholder="e.g. BOD-27"
                         className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
                       />
                     </div>
                     <div className="flex-1">
                       <label className="mb-1 block text-xs text-gray-500">
-                        Asset Code
+                        Model Path
                       </label>
                       <input
                         type="text"
@@ -613,7 +613,7 @@ export default function AdminComponentsPage() {
                     </div>
                     <button
                       onClick={() => handleCreate(ct.id)}
-                      disabled={!form.name || !form.code}
+                      disabled={!form.name || !form.assetCode}
                       className="rounded bg-white px-3 py-1 text-sm font-medium text-black hover:bg-gray-200 disabled:opacity-50 transition-colors"
                     >
                       Add

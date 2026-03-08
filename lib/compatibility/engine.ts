@@ -36,7 +36,7 @@ export type DesignPhase = "silhouette" | "embellishment" | "finishing" | "comple
 export interface ComponentWithType {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
   typeName: string;
@@ -136,7 +136,7 @@ export async function getCompatibleComponents(
       .select({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
         modelPath: components.modelPath,
         typeName: componentTypes.name,
@@ -161,7 +161,7 @@ export async function getCompatibleComponents(
       .select({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
         modelPath: components.modelPath,
         typeName: componentTypes.name,
@@ -231,7 +231,7 @@ export async function getCompatibleComponents(
     .select({
       id: components.id,
       name: components.name,
-      code: components.code,
+      assetCode: components.assetCode,
       componentTypeId: components.componentTypeId,
       modelPath: components.modelPath,
       typeName: componentTypes.name,

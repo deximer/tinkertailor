@@ -18,7 +18,7 @@ interface ComponentType {
 interface ComponentData {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
   typeName: string;
@@ -287,7 +287,7 @@ export default function ComponentBrowser() {
                 >
                   <div className="text-sm font-medium">{comp.name}</div>
                   <div className="mt-0.5 text-xs text-gray-500">
-                    {comp.code}
+                    {comp.assetCode}
                   </div>
                   {isSelected && (
                     <div className="mt-1.5 text-xs font-medium text-green-400">

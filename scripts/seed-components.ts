@@ -62,12 +62,12 @@ async function upsertBySlug(
 
 async function upsertByCode(
   code: string,
-  row: { name: string; code: string; componentTypeId: string; modelPath?: string },
+  row: { name: string; assetCode: string; componentTypeId: string; modelPath?: string },
 ) {
   const existing = await db
     .select()
     .from(components)
-    .where(eq(components.code, code))
+    .where(eq(components.assetCode, code))
     .limit(1);
   if (existing.length > 0) return existing[0];
 
@@ -175,7 +175,7 @@ async function seedComponentsFromSpreadsheet(
     const num = code.replace("BOD-", "");
     const row = await upsertByCode(code, {
       name: `Bodice ${num}`,
-      code,
+      assetCode: code,
       componentTypeId: typeIds.bodice,
     });
     componentMap[code] = row.id;
@@ -196,7 +196,7 @@ async function seedComponentsFromSpreadsheet(
     const num = code.replace("SK-", "");
     const row = await upsertByCode(code, {
       name: `Skirt ${num}`,
-      code,
+      assetCode: code,
       componentTypeId: typeIds["skirt-section"],
     });
     componentMap[code] = row.id;
@@ -226,7 +226,7 @@ async function seedComponentsFromSpreadsheet(
           : "";
         const row = await upsertByCode(code, {
           name: `Sleeve ${num}${typeName ? ` (${typeName})` : ""}`,
-          code,
+          assetCode: code,
           componentTypeId: typeIds.sleeve,
         });
         componentMap[code] = row.id;

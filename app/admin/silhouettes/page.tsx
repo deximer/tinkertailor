@@ -22,14 +22,14 @@ interface Category {
 interface AssignedComponent {
   componentId: string;
   componentName: string;
-  componentCode: string;
+  componentAssetCode: string;
   defaultFabricId: string | null;
 }
 
 interface ComponentOption {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
 }
@@ -783,7 +783,7 @@ export default function AdminSilhouettesPage() {
                               {ac.componentName}
                             </td>
                             <td className="py-2 text-gray-400">
-                              {ac.componentCode}
+                              {ac.componentAssetCode}
                             </td>
                             <td className="py-2">
                               <select
@@ -837,7 +837,7 @@ export default function AdminSilhouettesPage() {
                         <option value="">Select component...</option>
                         {unassignedComponents.map((comp) => (
                           <option key={comp.id} value={comp.id}>
-                            {comp.name} ({comp.code})
+                            {comp.name} ({comp.assetCode})
                           </option>
                         ))}
                       </select>

@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       .select({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
         modelPath: components.modelPath,
         typeName: componentTypes.name,

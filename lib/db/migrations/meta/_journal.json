@@ -120,6 +120,13 @@
       "when": 1772900600000,
       "tag": "0016_rename_fabrics",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1772900700000,
+      "tag": "0017_rename_code_to_asset_code",
+      "breakpoints": true
     }
   ]
 }

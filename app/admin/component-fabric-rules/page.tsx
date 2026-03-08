@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 interface Component {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
 }
 
@@ -149,7 +149,7 @@ export default function ComponentFabricRulesPage() {
     ? components.filter(
         (c) =>
           c.name.toLowerCase().includes(componentSearch.toLowerCase()) ||
-          c.code.toLowerCase().includes(componentSearch.toLowerCase()),
+          c.assetCode.toLowerCase().includes(componentSearch.toLowerCase()),
       )
     : components;
 
@@ -216,7 +216,7 @@ export default function ComponentFabricRulesPage() {
               <option value="">-- Select a component --</option>
               {filteredComponents.map((comp) => (
                 <option key={comp.id} value={comp.id}>
-                  {comp.name} ({comp.code})
+                  {comp.name} ({comp.assetCode})
                 </option>
               ))}
             </select>

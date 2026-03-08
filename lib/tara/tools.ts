@@ -108,7 +108,7 @@ export const searchSilhouettes = tool({
             silhouetteId: silhouetteComponents.silhouetteId,
             componentId: components.id,
             componentName: components.name,
-            componentCode: components.code,
+            componentAssetCode: components.assetCode,
           })
           .from(silhouetteComponents)
           .innerJoin(components, eq(silhouetteComponents.componentId, components.id))
@@ -134,7 +134,7 @@ export const searchSilhouettes = tool({
           .map((c) => ({
             id: c.componentId,
             name: c.componentName,
-            code: c.componentCode,
+            assetCode: c.componentAssetCode,
           })),
       })),
     };
@@ -162,14 +162,14 @@ export const getCompatibleComponentsTool = tool({
       components: result.components.map((c) => ({
         id: c.id,
         name: c.name,
-        code: c.code,
+        assetCode: c.assetCode,
         type: c.typeName,
         designStage: c.designStage,
       })),
       selectedComponents: result.selectedComponents.map((c) => ({
         id: c.id,
         name: c.name,
-        code: c.code,
+        assetCode: c.assetCode,
         type: c.typeName,
         designStage: c.designStage,
       })),

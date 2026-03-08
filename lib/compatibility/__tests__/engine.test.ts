@@ -325,7 +325,7 @@ describe("Stage Gating", () => {
 function makeMockComponent(
   id: string,
   name: string,
-  code: string,
+  assetCode: string,
   typeSlug: string,
   designStage: ComponentWithType["designStage"],
   isAnchor: boolean,
@@ -333,7 +333,7 @@ function makeMockComponent(
   return {
     id,
     name,
-    code,
+    assetCode,
     componentTypeId: `${typeSlug}-type`,
     modelPath: null,
     typeName: typeSlug.charAt(0).toUpperCase() + typeSlug.slice(1),
