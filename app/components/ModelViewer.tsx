@@ -1479,24 +1479,24 @@ export default function ModelViewer({ designMode = false, showcaseStoragePath }:
       sceneBackgroundRef.current = sceneObj.background;
       applyLighting(sceneDef.lighting[0]);
     }
-    // Load showcase model: use explicit path if provided, otherwise list bucket root
-    if (showcaseStoragePath) {
-      loadModel(showcaseStoragePath);
-    } else {
-      fetch("/api/models")
-        .then((r) => r.json())
-        .then((files: { name: string }[]) => {
-          const names = files.map((f) => f.name);
-          setAvailableModels(names);
-          if (names.length > 0) {
-            setActiveModel(names[0]);
-            loadModel(names[0]);
-          }
-        })
-        .catch(() => {
-          // Not authenticated or bucket empty — viewer stays blank
-        });
-    }
+    // Fetch available models from bucket for the sidebar selector
+    fetch("/api/models")
+      .then((r) => r.json())
+      .then((files: { name: string }[]) => {
+        const names = files.map((f) => f.name);
+        setAvailableModels(names);
+        // Load showcaseStoragePath as default if provided, otherwise load first bucket model
+        if (showcaseStoragePath) {
+          setActiveModel(showcaseStoragePath);
+          loadModel(showcaseStoragePath);
+        } else if (names.length > 0) {
+          setActiveModel(names[0]);
+          loadModel(names[0]);
+        }
+      })
+      .catch(() => {
+        // Not authenticated or bucket empty — viewer stays blank
+      });
     // Load initial HDR environment
     loadHDR(HDRI_PRESETS[0].file);
     // Only run once on mount
