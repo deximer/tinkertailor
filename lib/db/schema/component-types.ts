@@ -1,8 +1,8 @@
 import { pgTable, uuid, varchar, boolean, timestamp } from "drizzle-orm/pg-core";
 import { categories } from "./categories";
 
-export const componentStageEnum = ["silhouette", "embellishment", "finishing"] as const;
-export type ComponentStage = (typeof componentStageEnum)[number];
+export const componentDesignStageEnum = ["silhouette", "embellishment", "finishing"] as const;
+export type ComponentDesignStage = (typeof componentDesignStageEnum)[number];
 
 export const garmentPartEnum = ["bodice", "skirt", "sleeve", "embellishment", "finishing"] as const;
 export type GarmentPart = (typeof garmentPartEnum)[number];
@@ -14,10 +14,8 @@ export const componentTypes = pgTable("component_types", {
   categoryId: uuid("category_id")
     .notNull()
     .references(() => categories.id),
-  stage: varchar("stage", { length: 20 }).notNull().$type<ComponentStage>(),
-  isFirstLeaf: boolean("is_first_leaf").notNull().default(false),
-  // Explicit garment part — makes compatibility queries and TARA routing self-documenting.
-  // Null for types that don't map cleanly to a single part (e.g. combined embellishments).
+  designStage: varchar("design_stage", { length: 20 }).notNull().$type<ComponentDesignStage>(),
+  isAnchor: boolean("is_anchor").notNull().default(false),
   garmentPart: varchar("garment_part", { length: 20 }).$type<GarmentPart>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

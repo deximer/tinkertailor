@@ -541,7 +541,7 @@ async function linkComponent(silhouetteId: string, compCode: string) {
   const comp = await db
     .select()
     .from(components)
-    .where(eq(components.code, compCode))
+    .where(eq(components.assetCode, compCode))
     .limit(1);
   if (comp.length === 0) return;
 

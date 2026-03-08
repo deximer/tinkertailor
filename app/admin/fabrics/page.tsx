@@ -12,12 +12,12 @@ interface FabricCategory {
   createdAt: string;
 }
 
-interface FabricSkin {
+interface Fabric {
   id: string;
   name: string;
   fabricCode: string;
   categoryId: string;
-  modelType: string | null;
+  fabricWeight: string | null;
   priceMarkup: string;
   hidden: boolean;
   createdAt: string;
@@ -29,11 +29,11 @@ interface CategoryNode {
   skinCount: number;
 }
 
-const MESH_VARIANTS = ["heavy", "light", "standard", "none"] as const;
+const FABRIC_WEIGHTS = ["heavy", "light", "standard", "none"] as const;
 
 export default function AdminFabricsPage() {
   const [categories, setCategories] = useState<FabricCategory[]>([]);
-  const [skins, setSkins] = useState<FabricSkin[]>([]);
+  const [skins, setSkins] = useState<Fabric[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -57,7 +57,7 @@ export default function AdminFabricsPage() {
       {
         name: string;
         fabricCode: string;
-        modelType: string;
+        fabricWeight: string;
         priceMarkup: string;
       }
     >
@@ -66,7 +66,7 @@ export default function AdminFabricsPage() {
   const [editSkinForm, setEditSkinForm] = useState({
     name: "",
     fabricCode: "",
-    modelType: "none",
+    fabricWeight: "none",
     priceMarkup: "0",
   });
 
@@ -83,7 +83,7 @@ export default function AdminFabricsPage() {
     try {
       const [catRes, skinRes] = await Promise.all([
         fetch("/api/admin/fabric-categories"),
-        fetch("/api/admin/fabric-skins"),
+        fetch("/api/admin/fabrics"),
       ]);
 
       if (catRes.ok) setCategories(await catRes.json());
@@ -242,7 +242,7 @@ export default function AdminFabricsPage() {
     skinCreateForms[categoryId] ?? {
       name: "",
       fabricCode: "",
-      modelType: "none",
+      fabricWeight: "none",
       priceMarkup: "0",
     };
 
@@ -262,27 +262,27 @@ export default function AdminFabricsPage() {
     if (!form.name || !form.fabricCode) return;
     setErrorMsg(null);
 
-    const res = await fetch("/api/admin/fabric-skins", {
+    const res = await fetch("/api/admin/fabrics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,
         fabricCode: form.fabricCode,
         categoryId,
-        modelType: form.modelType === "none" || !form.modelType ? null : form.modelType,
+        fabricWeight: form.fabricWeight === "none" || !form.fabricWeight ? null : form.fabricWeight,
         priceMarkup: form.priceMarkup || "0",
       }),
     });
 
     if (res.ok) {
-      const created: FabricSkin = await res.json();
+      const created: Fabric = await res.json();
       setSkins((prev) => [...prev, created]);
       setSkinCreateForms((prev) => ({
         ...prev,
         [categoryId]: {
           name: "",
           fabricCode: "",
-          modelType: "none",
+          fabricWeight: "none",
           priceMarkup: "0",
         },
       }));
@@ -292,12 +292,12 @@ export default function AdminFabricsPage() {
     }
   };
 
-  const startEditSkin = (skin: FabricSkin) => {
+  const startEditSkin = (skin: Fabric) => {
     setEditingSkinId(skin.id);
     setEditSkinForm({
       name: skin.name,
       fabricCode: skin.fabricCode,
-      modelType: skin.modelType ?? "none",
+      fabricWeight: skin.fabricWeight ?? "none",
       priceMarkup: skin.priceMarkup,
     });
     setErrorMsg(null);
@@ -307,20 +307,20 @@ export default function AdminFabricsPage() {
     if (!editingSkinId) return;
     setErrorMsg(null);
 
-    const res = await fetch("/api/admin/fabric-skins", {
+    const res = await fetch("/api/admin/fabrics", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: editingSkinId,
         name: editSkinForm.name,
         fabricCode: editSkinForm.fabricCode,
-        modelType: editSkinForm.modelType === "none" || !editSkinForm.modelType ? null : editSkinForm.modelType,
+        fabricWeight: editSkinForm.fabricWeight === "none" || !editSkinForm.fabricWeight ? null : editSkinForm.fabricWeight,
         priceMarkup: editSkinForm.priceMarkup,
       }),
     });
 
     if (res.ok) {
-      const updated: FabricSkin = await res.json();
+      const updated: Fabric = await res.json();
       setSkins((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
       setEditingSkinId(null);
     } else {
@@ -329,16 +329,16 @@ export default function AdminFabricsPage() {
     }
   };
 
-  const handleToggleSkinHidden = async (skin: FabricSkin) => {
+  const handleToggleSkinHidden = async (skin: Fabric) => {
     setErrorMsg(null);
-    const res = await fetch("/api/admin/fabric-skins", {
+    const res = await fetch("/api/admin/fabrics", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: skin.id, hidden: !skin.hidden }),
     });
 
     if (res.ok) {
-      const updated: FabricSkin = await res.json();
+      const updated: Fabric = await res.json();
       setSkins((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     } else {
       const data = await res.json();
@@ -350,7 +350,7 @@ export default function AdminFabricsPage() {
     setErrorMsg(null);
     setConfirmDeleteSkinId(null);
 
-    const res = await fetch(`/api/admin/fabric-skins?id=${id}`, {
+    const res = await fetch(`/api/admin/fabrics?id=${id}`, {
       method: "DELETE",
     });
 
@@ -714,7 +714,7 @@ export default function AdminFabricsPage() {
                       <th className="pb-2">Code</th>
                       <th className="pb-2">Name</th>
                       <th className="pb-2">Category</th>
-                      <th className="pb-2">Mesh Variant</th>
+                      <th className="pb-2">Fabric Weight</th>
                       <th className="pb-2">Price Markup</th>
                       <th className="pb-2">Hidden</th>
                     </tr>
@@ -730,7 +730,7 @@ export default function AdminFabricsPage() {
                           {getCategoryName(skin.categoryId)}
                         </td>
                         <td className="py-2 text-gray-400">
-                          {skin.modelType ?? (
+                          {skin.fabricWeight ?? (
                             <span className="text-gray-600">-</span>
                           )}
                         </td>
@@ -792,7 +792,7 @@ export default function AdminFabricsPage() {
                             <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                               <th className="pb-2">Code</th>
                               <th className="pb-2">Name</th>
-                              <th className="pb-2">Mesh Variant</th>
+                              <th className="pb-2">Fabric Weight</th>
                               <th className="pb-2">Price Markup</th>
                               <th className="pb-2">Hidden</th>
                               <th className="pb-2" />
@@ -834,16 +834,16 @@ export default function AdminFabricsPage() {
                                     </td>
                                     <td className="py-2 pr-2">
                                       <select
-                                        value={editSkinForm.modelType}
+                                        value={editSkinForm.fabricWeight}
                                         onChange={(e) =>
                                           setEditSkinForm((f) => ({
                                             ...f,
-                                            modelType: e.target.value,
+                                            fabricWeight: e.target.value,
                                           }))
                                         }
                                         className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                                       >
-                                        {MESH_VARIANTS.map((v) => (
+                                        {FABRIC_WEIGHTS.map((v) => (
                                           <option key={v} value={v}>
                                             {v === "none" ? "None" : v}
                                           </option>
@@ -888,7 +888,7 @@ export default function AdminFabricsPage() {
                                       {skin.name}
                                     </td>
                                     <td className="py-2 text-gray-400">
-                                      {skin.modelType ?? (
+                                      {skin.fabricWeight ?? (
                                         <span className="text-gray-600">-</span>
                                       )}
                                     </td>
@@ -1007,20 +1007,20 @@ export default function AdminFabricsPage() {
                         </div>
                         <div className="w-28">
                           <label className="mb-1 block text-xs text-gray-500">
-                            Mesh Variant
+                            Fabric Weight
                           </label>
                           <select
-                            value={getSkinCreateForm(cat.id).modelType}
+                            value={getSkinCreateForm(cat.id).fabricWeight}
                             onChange={(e) =>
                               updateSkinCreateForm(
                                 cat.id,
-                                "modelType",
+                                "fabricWeight",
                                 e.target.value,
                               )
                             }
                             className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                           >
-                            {MESH_VARIANTS.map((v) => (
+                            {FABRIC_WEIGHTS.map((v) => (
                               <option key={v} value={v}>
                                 {v === "none" ? "None" : v}
                               </option>

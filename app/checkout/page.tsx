@@ -24,7 +24,7 @@ interface DesignComponent {
   id: string;
   name: string;
   typeName: string;
-  fabricSkinName: string | null;
+  fabricName: string | null;
 }
 
 interface DesignDetails {
@@ -153,8 +153,8 @@ function CheckoutForm({
             {design.components.map((c) => (
               <li key={c.id}>
                 {c.typeName}: {c.name}
-                {c.fabricSkinName && (
-                  <span className="text-gray-500"> in {c.fabricSkinName}</span>
+                {c.fabricName && (
+                  <span className="text-gray-500"> in {c.fabricName}</span>
                 )}
               </li>
             ))}

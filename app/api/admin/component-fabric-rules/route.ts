@@ -3,15 +3,15 @@ import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
 import {
   components,
-  fabricSkinCategories,
-  componentFabricCategories,
+  fabricCategories,
+  componentFabricRules,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
 const linkSchema = z.object({
   componentId: z.string().uuid(),
-  fabricSkinCategoryId: z.string().uuid(),
+  fabricCategoryId: z.string().uuid(),
 });
 
 export async function GET(request: Request) {
@@ -22,14 +22,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const componentId = searchParams.get("componentId");
 
-    // Bulk mode: return all rules as { componentId, fabricSkinCategoryId }[]
+    // Bulk mode: return all rules as { componentId, fabricCategoryId }[]
     if (!componentId) {
       const rows = await db
         .select({
-          componentId: componentFabricCategories.componentId,
-          fabricSkinCategoryId: componentFabricCategories.fabricSkinCategoryId,
+          componentId: componentFabricRules.componentId,
+          fabricCategoryId: componentFabricRules.fabricCategoryId,
         })
-        .from(componentFabricCategories);
+        .from(componentFabricRules);
       return NextResponse.json(rows);
     }
 
@@ -48,12 +48,14 @@ export async function GET(request: Request) {
 
     const rows = await db
       .select({
-        fabricSkinCategoryId: componentFabricCategories.fabricSkinCategoryId,
+        fabricCategoryId: componentFabricRules.fabricCategoryId,
       })
-      .from(componentFabricCategories)
-      .where(eq(componentFabricCategories.componentId, componentId));
+      .from(componentFabricRules)
+      .where(eq(componentFabricRules.componentId, componentId));
 
-    return NextResponse.json(rows.map((r) => r.fabricSkinCategoryId));
+    return NextResponse.json(
+      rows.map((r) => r.fabricCategoryId),
+    );
   } catch (err) {
     console.error("[admin/component-fabric-rules] GET error:", err);
     return NextResponse.json(
@@ -84,23 +86,23 @@ export async function POST(request: Request) {
     }
 
     const [cat] = await db
-      .select({ id: fabricSkinCategories.id })
-      .from(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, body.fabricSkinCategoryId))
+      .select({ id: fabricCategories.id })
+      .from(fabricCategories)
+      .where(eq(fabricCategories.id, body.fabricCategoryId))
       .limit(1);
 
     if (!cat) {
       return NextResponse.json(
-        { error: "Fabric skin category not found" },
+        { error: "Fabric category not found" },
         { status: 404 },
       );
     }
 
     await db
-      .insert(componentFabricCategories)
+      .insert(componentFabricRules)
       .values({
         componentId: body.componentId,
-        fabricSkinCategoryId: body.fabricSkinCategoryId,
+        fabricCategoryId: body.fabricCategoryId,
       })
       .onConflictDoNothing();
 
@@ -141,26 +143,26 @@ export async function DELETE(request: Request) {
     }
 
     const [cat] = await db
-      .select({ id: fabricSkinCategories.id })
-      .from(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, body.fabricSkinCategoryId))
+      .select({ id: fabricCategories.id })
+      .from(fabricCategories)
+      .where(eq(fabricCategories.id, body.fabricCategoryId))
       .limit(1);
 
     if (!cat) {
       return NextResponse.json(
-        { error: "Fabric skin category not found" },
+        { error: "Fabric category not found" },
         { status: 404 },
       );
     }
 
     await db
-      .delete(componentFabricCategories)
+      .delete(componentFabricRules)
       .where(
         and(
-          eq(componentFabricCategories.componentId, body.componentId),
+          eq(componentFabricRules.componentId, body.componentId),
           eq(
-            componentFabricCategories.fabricSkinCategoryId,
-            body.fabricSkinCategoryId,
+            componentFabricRules.fabricCategoryId,
+            body.fabricCategoryId,
           ),
         ),
       );

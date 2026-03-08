@@ -11,20 +11,20 @@ interface ComponentType {
   id: string;
   name: string;
   slug: string;
-  stage: "silhouette" | "embellishment" | "finishing";
-  isFirstLeaf: boolean;
+  designStage: "silhouette" | "embellishment" | "finishing";
+  isAnchor: boolean;
 }
 
 interface ComponentData {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
   typeName: string;
   typeSlug: string;
-  stage: "silhouette" | "embellishment" | "finishing";
-  isFirstLeaf: boolean;
+  designStage: "silhouette" | "embellishment" | "finishing";
+  isAnchor: boolean;
 }
 
 interface CompatibleResponse {
@@ -75,7 +75,7 @@ export default function ComponentBrowser() {
         // Sort by stage order, then alphabetically
         types.sort(
           (a, b) =>
-            (STAGE_ORDER[a.stage] ?? 99) - (STAGE_ORDER[b.stage] ?? 99) ||
+            (STAGE_ORDER[a.designStage] ?? 99) - (STAGE_ORDER[b.designStage] ?? 99) ||
             a.name.localeCompare(b.name),
         );
         setComponentTypes(types);
@@ -147,11 +147,11 @@ export default function ComponentBrowser() {
         return;
       }
 
-      if (component.isFirstLeaf) {
-        // First-leaf selection: clear all, keep only this
+      if (component.isAnchor) {
+        // Anchor selection: clear all, keep only this
         setSelectedComponents([component.id]);
       } else {
-        // Non-first-leaf: deselect same-type, add new
+        // Non-anchor: deselect same-type, add new
         // Find all currently selected components of the same type
         const sameTypeIds = new Set(
           selectedComponentsData
@@ -287,7 +287,7 @@ export default function ComponentBrowser() {
                 >
                   <div className="text-sm font-medium">{comp.name}</div>
                   <div className="mt-0.5 text-xs text-gray-500">
-                    {comp.code}
+                    {comp.assetCode}
                   </div>
                   {isSelected && (
                     <div className="mt-1.5 text-xs font-medium text-green-400">

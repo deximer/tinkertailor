@@ -46,14 +46,14 @@ export async function POST(request: Request) {
     // Validate header row
     const header = rows[0].map((h) => h.toLowerCase());
     const nameIdx = header.indexOf("name");
-    const codeIdx = header.indexOf("code");
+    const codeIdx = header.indexOf("asset_code");
     const typeSlugIdx = header.indexOf("type_slug");
 
     if (nameIdx === -1 || codeIdx === -1 || typeSlugIdx === -1) {
       return NextResponse.json(
         {
           error:
-            "CSV must have columns: name, code, type_slug (header row required)",
+            "CSV must have columns: name, asset_code, type_slug (header row required)",
         },
         { status: 400 },
       );
@@ -71,10 +71,10 @@ export async function POST(request: Request) {
 
     // Load existing component codes for duplicate detection
     const existingComponents = await db
-      .select({ code: components.code })
+      .select({ assetCode: components.assetCode })
       .from(components);
 
-    const existingCodes = new Set(existingComponents.map((c) => c.code));
+    const existingCodes = new Set(existingComponents.map((c) => c.assetCode));
 
     const dataRows = rows.slice(1);
     let created = 0;
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     const errors: RowError[] = [];
     const seenCodesInBatch = new Set<string>();
 
-    const toInsert: { name: string; code: string; componentTypeId: string }[] =
+    const toInsert: { name: string; assetCode: string; componentTypeId: string }[] =
       [];
 
     for (let i = 0; i < dataRows.length; i++) {
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
       }
 
       if (!code) {
-        errors.push({ row: rowNum, message: "code is required" });
+        errors.push({ row: rowNum, message: "asset_code is required" });
         continue;
       }
 
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       }
 
       seenCodesInBatch.add(code);
-      toInsert.push({ name, code, componentTypeId: typeId });
+      toInsert.push({ name, assetCode: code, componentTypeId: typeId });
     }
 
     // Batch insert valid rows

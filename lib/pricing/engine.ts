@@ -2,7 +2,7 @@
  * Pricing engine — calculates order totals for Tinker Tailor garments.
  *
  * Formula:
- *   subtotal = silhouette base_price + SUM(fabric_skins.price_markup per product_component)
+ *   subtotal = silhouette base_price + SUM(fabrics.price_markup per product_component)
  *   shippingCost = FLAT_SHIPPING_RATE
  *   total = subtotal + shippingCost
  *
@@ -15,7 +15,7 @@ import {
   products,
   productComponents,
   silhouetteTemplates,
-  fabricSkins,
+  fabrics,
 } from "@/lib/db/schema";
 import { db } from "@/lib/db";
 
@@ -45,7 +45,7 @@ export interface PricingBreakdown {
  *
  * 1. Look up the product to get its silhouetteTemplateId
  * 2. Get the base price from silhouette_templates
- * 3. Get all product_components; join to fabric_skins for price_markup
+ * 3. Get all product_components; join to fabrics for price_markup
  * 4. Sum fabric markups (components with no fabric have 0 markup)
  * 5. Add flat shipping
  *
@@ -97,11 +97,11 @@ export async function calculateOrderTotal(params: {
   // 3. Get all product components with their fabric markups in a single query
   const componentRows = await db
     .select({
-      fabricSkinId: productComponents.fabricSkinId,
-      priceMarkup: fabricSkins.priceMarkup,
+      fabricId: productComponents.fabricId,
+      priceMarkup: fabrics.priceMarkup,
     })
     .from(productComponents)
-    .leftJoin(fabricSkins, eq(fabricSkins.id, productComponents.fabricSkinId))
+    .leftJoin(fabrics, eq(fabrics.id, productComponents.fabricId))
     .where(eq(productComponents.productId, productId));
 
   // 4. Sum fabric markups

@@ -272,12 +272,20 @@ export async function GET(request: Request) {
     // Fetch components for each type
     const [rowComponents, colComponents] = await Promise.all([
       db
-        .select({ id: components.id, name: components.name, code: components.code })
+        .select({
+          id: components.id,
+          name: components.name,
+          assetCode: components.assetCode,
+        })
         .from(components)
         .where(eq(components.componentTypeId, typeA.id))
         .orderBy(components.name),
       db
-        .select({ id: components.id, name: components.name, code: components.code })
+        .select({
+          id: components.id,
+          name: components.name,
+          assetCode: components.assetCode,
+        })
         .from(components)
         .where(eq(components.componentTypeId, typeB.id))
         .orderBy(components.name),

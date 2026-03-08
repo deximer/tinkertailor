@@ -9,7 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { categories } from "./categories";
 import { components } from "./components";
-import { fabricSkins } from "./fabrics";
+import { fabrics } from "./fabrics";
 
 export const silhouetteTemplates = pgTable("silhouette_templates", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -39,8 +39,8 @@ export const silhouetteComponents = pgTable(
     componentId: uuid("component_id")
       .notNull()
       .references(() => components.id),
-    defaultFabricSkinId: uuid("default_fabric_skin_id").references(
-      () => fabricSkins.id,
+    defaultFabricId: uuid("default_fabric_id").references(
+      () => fabrics.id,
     ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

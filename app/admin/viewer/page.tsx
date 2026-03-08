@@ -19,22 +19,31 @@ interface Component {
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
-  stage: string;
+  designStage: string;
 }
 
-interface FabricSkin {
+interface Mesh {
+  id: string;
+  componentId: string;
+  fabricWeight: string;
+  storagePath: string;
+  publicUrl: string;
+}
+
+interface Fabric {
   id: string;
   name: string;
   fabricCode: string;
   categoryId: string;
-  meshVariant: string | null;
+  fabricWeight: string | null;
   priceMarkup: string;
   hidden: boolean;
   viewerSettings: ViewerSettings | null;
   createdAt: string;
 }
 
-const TABS = ["Bodice", "Skirt Section", "Sleeve"] as const;
+const TABS = ["Bodice", "Skirt", "Sleeve"] as const;
+const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 
 const TEXTURE_OPTIONS: TextureType[] = [
   "solid",
@@ -64,12 +73,13 @@ export default function ViewerPage() {
   const [components, setComponents] = useState<Component[]>([]);
   const [activeTab, setActiveTab] = useState<string>("Bodice");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<"heavy" | "light" | "standard">("heavy");
+  const [meshes, setMeshes] = useState<Mesh[]>([]);
+  const [selectedWeight, setSelectedWeight] = useState<string>("heavy");
 
   const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
-  const [availableMeshes, setAvailableMeshes] = useState<{ variant: string; storagePath: string }[]>([]);
 
-  const [fabrics, setFabrics] = useState<FabricSkin[]>([]);
+  // Fabric state
+  const [fabrics, setFabrics] = useState<Fabric[]>([]);
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ViewerSettings>(DEFAULT_SETTINGS);
   const [savedSettings, setSavedSettings] = useState<ViewerSettings | null>(null);
@@ -87,9 +97,9 @@ export default function ViewerPage() {
       .then((data: Component[]) => setComponents(data))
       .catch(console.error);
 
-    fetch("/api/admin/fabric-skins")
+    fetch("/api/admin/fabrics")
       .then((r) => r.json())
-      .then((data: FabricSkin[]) => setFabrics(data))
+      .then((data: Fabric[]) => setFabrics(data))
       .catch(console.error);
 
     fetch("/api/admin/component-meshes")
@@ -98,33 +108,34 @@ export default function ViewerPage() {
       .catch(console.error);
   }, []);
 
-  // Load meshes for selected component; auto-select first available variant
+  // Load meshes for selected component; auto-select first available weight
   useEffect(() => {
     if (!selectedComponentId) {
-      setAvailableMeshes([]);
+      setMeshes([]);
+      setModelUrl(null);
       return;
     }
     fetch(`/api/admin/component-meshes?componentId=${selectedComponentId}`)
       .then((r) => r.json())
-      .then((meshes: { variant: string; storagePath: string }[]) => {
-        setAvailableMeshes(meshes);
-        // Auto-select first available variant if current isn't available
-        if (meshes.length > 0 && !meshes.find((m) => m.variant === selectedVariant)) {
-          setSelectedVariant(meshes[0].variant as typeof selectedVariant);
+      .then((data: Mesh[]) => {
+        setMeshes(data);
+        // Default to heavy weight, fall back to first available
+        const hasHeavy = data.some((m) => m.fabricWeight === "heavy");
+        if (!hasHeavy && data.length > 0) {
+          setSelectedWeight(data[0].fabricWeight);
+        } else {
+          setSelectedWeight("heavy");
         }
       })
-      .catch(() => setAvailableMeshes([]));
+      .catch(() => setMeshes([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponentId]);
 
-  // Derive storage path from available meshes + selected variant
-  const storagePath =
-    availableMeshes.find((m) => m.variant === selectedVariant)?.storagePath ??
-    availableMeshes[0]?.storagePath ??
-    null;
-
-  // Resolve signed URL whenever storage path changes
+  // Resolve signed URL whenever selected weight or meshes change
   useEffect(() => {
+    const mesh = meshes.find((m) => m.fabricWeight === selectedWeight) ?? meshes[0];
+    const storagePath = mesh?.storagePath ?? null;
+
     if (!storagePath) {
       setModelUrl(null);
       return;
@@ -133,7 +144,7 @@ export default function ViewerPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setModelUrl(data?.url ?? null))
       .catch(() => setModelUrl(null));
-  }, [storagePath]);
+  }, [meshes, selectedWeight]);
 
   const isDirty =
     selectedFabricId !== null &&
@@ -145,26 +156,31 @@ export default function ViewerPage() {
 
   // ── Handlers ──
 
-  const handleSelectFabric = useCallback((fabric: FabricSkin) => {
-    setSelectedFabricId(fabric.id);
-    const s = fabric.viewerSettings ?? DEFAULT_SETTINGS;
-    setSettings(s);
-    setSavedSettings({ ...s });
-  }, []);
+  const handleSelectFabric = useCallback(
+    (fabric: Fabric) => {
+      setSelectedFabricId(fabric.id);
+      const s = fabric.viewerSettings ?? DEFAULT_SETTINGS;
+      setSettings(s);
+      setSavedSettings({ ...s });
+    },
+    [],
+  );
 
   const handleSave = useCallback(async () => {
     if (!selectedFabricId || saving) return;
     setSaving(true);
     setSaveError(false);
     try {
-      const res = await fetch("/api/admin/fabric-skins", {
+      const res = await fetch("/api/admin/fabrics", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: selectedFabricId, viewerSettings: settings }),
       });
       if (res.ok) {
-        const updated: FabricSkin = await res.json();
-        setFabrics((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+        const updated: Fabric = await res.json();
+        setFabrics((prev) =>
+          prev.map((f) => (f.id === updated.id ? updated : f)),
+        );
         setSavedSettings({ ...settings });
         setSaveFlash(true);
         setTimeout(() => setSaveFlash(false), 1500);
@@ -210,7 +226,7 @@ export default function ViewerPage() {
                   : "text-gray-500 hover:text-gray-300"
               }`}
             >
-              {tab === "Skirt Section" ? "Skirt" : tab}
+              {tab}
             </button>
           ))}
         </div>
@@ -235,24 +251,30 @@ export default function ViewerPage() {
           ))}
         </div>
 
-        {/* Variant toggle — only shown when multiple variants are available */}
-        {availableMeshes.length > 1 && (
+        {/* Variant toggle — only shown when multiple weights are available */}
+        {meshes.length > 1 && (
           <div className="border-t border-gray-700 px-3 py-2">
-            <p className="mb-1 text-xs text-gray-500">Mesh Variant</p>
+            <p className="mb-1 text-xs text-gray-500">Fabric Weight</p>
             <div className="flex gap-1">
-              {availableMeshes.map(({ variant: v }) => (
-                <button
-                  key={v}
-                  onClick={() => setSelectedVariant(v as typeof selectedVariant)}
-                  className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
-                    selectedVariant === v
-                      ? "bg-white text-black"
-                      : "bg-[#333] text-gray-300 hover:bg-[#444]"
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
+              {FABRIC_WEIGHTS.map((v) => {
+                const available = meshes.some((m) => m.fabricWeight === v);
+                return (
+                  <button
+                    key={v}
+                    disabled={!available}
+                    onClick={() => setSelectedWeight(v)}
+                    className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
+                      selectedWeight === v
+                        ? "bg-white text-black"
+                        : available
+                          ? "bg-[#333] text-gray-300 hover:bg-[#444]"
+                          : "bg-[#222] text-gray-600 cursor-not-allowed"
+                    }`}
+                  >
+                    {v}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -294,6 +316,11 @@ export default function ViewerPage() {
                   )}
                   {f.name}
                 </span>
+                {f.fabricWeight && (
+                  <span className="shrink-0 rounded bg-[#333] px-1.5 py-0.5 text-[10px] text-gray-400">
+                    {f.fabricWeight}
+                  </span>
+                )}
               </button>
             );
           })}

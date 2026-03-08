@@ -13,8 +13,8 @@ type ComponentType = {
   name: string;
   slug: string;
   categoryId: string;
-  stage: "silhouette" | "embellishment" | "finishing";
-  isFirstLeaf: boolean;
+  designStage: "silhouette" | "embellishment" | "finishing";
+  isAnchor: boolean;
   garmentPart: "bodice" | "skirt" | "sleeve" | "embellishment" | "finishing" | null;
   componentCount: number;
 };
@@ -54,15 +54,15 @@ export default function ComponentTypesPage() {
   const [savingCategory, setSavingCategory] = useState(false);
 
   const [newTypeForms, setNewTypeForms] = useState<
-    Record<string, { name: string; stage: string; isFirstLeaf: boolean; garmentPart: string | null }>
+    Record<string, { name: string; designStage: string; isAnchor: boolean; garmentPart: string | null }>
   >({});
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [editingTypeFields, setEditingTypeFields] = useState<{
     name: string;
-    stage: string;
-    isFirstLeaf: boolean;
+    designStage: string;
+    isAnchor: boolean;
     garmentPart: string | null;
-  }>({ name: "", stage: "silhouette", isFirstLeaf: false, garmentPart: null });
+  }>({ name: "", designStage: "silhouette", isAnchor: false, garmentPart: null });
   const [savingType, setSavingType] = useState(false);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -190,8 +190,8 @@ export default function ComponentTypesPage() {
         body: JSON.stringify({
           name: form.name.trim(),
           categoryId,
-          stage: form.stage || "silhouette",
-          isFirstLeaf: form.isFirstLeaf,
+          designStage: form.designStage || "silhouette",
+          isAnchor: form.isAnchor,
           garmentPart: form.garmentPart || null,
         }),
       });
@@ -223,8 +223,8 @@ export default function ComponentTypesPage() {
         body: JSON.stringify({
           id: editingTypeId,
           name: editingTypeFields.name.trim(),
-          stage: editingTypeFields.stage,
-          isFirstLeaf: editingTypeFields.isFirstLeaf,
+          designStage: editingTypeFields.designStage,
+          isAnchor: editingTypeFields.isAnchor,
           garmentPart: editingTypeFields.garmentPart,
         }),
       });
@@ -263,18 +263,18 @@ export default function ComponentTypesPage() {
     setEditingTypeId(t.id);
     setEditingTypeFields({
       name: t.name,
-      stage: t.stage,
-      isFirstLeaf: t.isFirstLeaf,
+      designStage: t.designStage,
+      isAnchor: t.isAnchor,
       garmentPart: t.garmentPart,
     });
   };
 
   const getNewTypeForm = (categoryId: string) =>
-    newTypeForms[categoryId] ?? { name: "", stage: "silhouette", isFirstLeaf: false, garmentPart: null };
+    newTypeForms[categoryId] ?? { name: "", designStage: "silhouette", isAnchor: false, garmentPart: null };
 
   const setNewTypeForm = (
     categoryId: string,
-    patch: Partial<{ name: string; stage: string; isFirstLeaf: boolean; garmentPart: string | null }>,
+    patch: Partial<{ name: string; designStage: string; isAnchor: boolean; garmentPart: string | null }>,
   ) => {
     setNewTypeForms((prev) => ({
       ...prev,
@@ -433,7 +433,7 @@ export default function ComponentTypesPage() {
                         <th className="pb-2">Slug</th>
                         <th className="pb-2">Stage</th>
                         <th className="pb-2">Garment Part</th>
-                        <th className="pb-2">First Leaf</th>
+                        <th className="pb-2">Anchor</th>
                         <th className="pb-2 text-right">Components</th>
                         <th className="pb-2" />
                       </tr>
@@ -463,11 +463,11 @@ export default function ComponentTypesPage() {
                               <td className="py-2 text-gray-500">-</td>
                               <td className="py-2">
                                 <select
-                                  value={editingTypeFields.stage}
+                                  value={editingTypeFields.designStage}
                                   onChange={(e) =>
                                     setEditingTypeFields((f) => ({
                                       ...f,
-                                      stage: e.target.value,
+                                      designStage: e.target.value,
                                     }))
                                   }
                                   className="rounded border border-gray-600 bg-[#2a2a2a] px-2 py-1 text-sm text-white outline-none"
@@ -503,16 +503,16 @@ export default function ComponentTypesPage() {
                                   onClick={() =>
                                     setEditingTypeFields((f) => ({
                                       ...f,
-                                      isFirstLeaf: !f.isFirstLeaf,
+                                      isAnchor: !f.isAnchor,
                                     }))
                                   }
                                   className={`h-5 w-5 rounded border ${
-                                    editingTypeFields.isFirstLeaf
+                                    editingTypeFields.isAnchor
                                       ? "border-green-500 bg-green-900/50"
                                       : "border-gray-600 bg-[#2a2a2a]"
                                   }`}
                                 >
-                                  {editingTypeFields.isFirstLeaf && (
+                                  {editingTypeFields.isAnchor && (
                                     <span className="text-xs text-green-400">
                                       Y
                                     </span>
@@ -550,9 +550,9 @@ export default function ComponentTypesPage() {
                             <td className="py-2 text-gray-500">{t.slug}</td>
                             <td className="py-2">
                               <span
-                                className={`inline-block rounded-full px-2 py-0.5 text-xs ${stageBadgeColors[t.stage]}`}
+                                className={`inline-block rounded-full px-2 py-0.5 text-xs ${stageBadgeColors[t.designStage]}`}
                               >
-                                {t.stage}
+                                {t.designStage}
                               </span>
                             </td>
                             <td className="py-2">
@@ -565,7 +565,7 @@ export default function ComponentTypesPage() {
                               )}
                             </td>
                             <td className="py-2">
-                              {t.isFirstLeaf && (
+                              {t.isAnchor && (
                                 <span className="text-xs text-green-400">
                                   Yes
                                 </span>
@@ -642,9 +642,9 @@ export default function ComponentTypesPage() {
                     className="rounded border border-gray-700 bg-[#2a2a2a] px-2 py-1 text-sm text-white placeholder-gray-500 outline-none focus:border-gray-500"
                   />
                   <select
-                    value={form.stage}
+                    value={form.designStage}
                     onChange={(e) =>
-                      setNewTypeForm(cat.id, { stage: e.target.value })
+                      setNewTypeForm(cat.id, { designStage: e.target.value })
                     }
                     className="rounded border border-gray-700 bg-[#2a2a2a] px-2 py-1 text-sm text-white outline-none"
                   >
@@ -657,15 +657,15 @@ export default function ComponentTypesPage() {
                   <label className="flex items-center gap-1 text-xs text-gray-400">
                     <input
                       type="checkbox"
-                      checked={form.isFirstLeaf}
+                      checked={form.isAnchor}
                       onChange={(e) =>
                         setNewTypeForm(cat.id, {
-                          isFirstLeaf: e.target.checked,
+                          isAnchor: e.target.checked,
                         })
                       }
                       className="accent-green-500"
                     />
-                    First Leaf
+                    Anchor
                   </label>
                   <select
                     value={form.garmentPart ?? ""}

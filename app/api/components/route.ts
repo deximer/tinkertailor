@@ -47,12 +47,12 @@ export async function GET(request: Request) {
       .select({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))

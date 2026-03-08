@@ -22,19 +22,19 @@ interface Category {
 interface AssignedComponent {
   componentId: string;
   componentName: string;
-  componentCode: string;
-  defaultFabricSkinId: string | null;
+  componentAssetCode: string;
+  defaultFabricId: string | null;
 }
 
 interface ComponentOption {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
 }
 
-interface FabricSkin {
+interface Fabric {
   id: string;
   name: string;
   fabricCode: string;
@@ -70,7 +70,7 @@ export default function AdminSilhouettesPage() {
   const [silhouettes, setSilhouettes] = useState<Silhouette[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [allComponents, setAllComponents] = useState<ComponentOption[]>([]);
-  const [allSkins, setAllSkins] = useState<FabricSkin[]>([]);
+  const [allSkins, setAllSkins] = useState<Fabric[]>([]);
   const [dimensions, setDimensions] = useState<TagDimension[]>([]);
   const [tagValues, setTagValues] = useState<TagValue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +119,7 @@ export default function AdminSilhouettesPage() {
         fetch("/api/admin/silhouettes"),
         fetch("/api/categories"),
         fetch("/api/admin/components"),
-        fetch("/api/admin/fabric-skins"),
+        fetch("/api/admin/fabrics"),
         fetch("/api/admin/tags"),
       ]);
 
@@ -310,9 +310,9 @@ export default function AdminSilhouettesPage() {
     }
   };
 
-  const handleChangeFabricSkin = async (
+  const handleChangeFabric = async (
     componentId: string,
-    fabricSkinId: string | null,
+    fabricId: string | null,
   ) => {
     if (!selectedId) return;
 
@@ -323,7 +323,7 @@ export default function AdminSilhouettesPage() {
       body: JSON.stringify({
         silhouetteId: selectedId,
         componentId,
-        defaultFabricSkinId: fabricSkinId,
+        defaultFabricId: fabricId,
       }),
     });
 
@@ -331,13 +331,13 @@ export default function AdminSilhouettesPage() {
       setAssignedComponents((prev) =>
         prev.map((c) =>
           c.componentId === componentId
-            ? { ...c, defaultFabricSkinId: fabricSkinId }
+            ? { ...c, defaultFabricId: fabricId }
             : c,
         ),
       );
     } else {
       const data = await res.json();
-      setErrorMsg(data.error ?? "Failed to update default fabric skin");
+      setErrorMsg(data.error ?? "Failed to update default fabric");
     }
   };
 
@@ -769,7 +769,7 @@ export default function AdminSilhouettesPage() {
                         <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                           <th className="pb-2">Component</th>
                           <th className="pb-2">Code</th>
-                          <th className="pb-2">Default Fabric Skin</th>
+                          <th className="pb-2">Default Fabric</th>
                           <th className="pb-2" />
                         </tr>
                       </thead>
@@ -783,13 +783,13 @@ export default function AdminSilhouettesPage() {
                               {ac.componentName}
                             </td>
                             <td className="py-2 text-gray-400">
-                              {ac.componentCode}
+                              {ac.componentAssetCode}
                             </td>
                             <td className="py-2">
                               <select
-                                value={ac.defaultFabricSkinId ?? ""}
+                                value={ac.defaultFabricId ?? ""}
                                 onChange={(e) =>
-                                  handleChangeFabricSkin(
+                                  handleChangeFabric(
                                     ac.componentId,
                                     e.target.value || null,
                                   )
@@ -837,7 +837,7 @@ export default function AdminSilhouettesPage() {
                         <option value="">Select component...</option>
                         {unassignedComponents.map((comp) => (
                           <option key={comp.id} value={comp.id}>
-                            {comp.name} ({comp.code})
+                            {comp.name} ({comp.assetCode})
                           </option>
                         ))}
                       </select>

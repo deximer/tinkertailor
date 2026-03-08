@@ -6,7 +6,7 @@ import {
   productComponents,
   components,
   componentTypes,
-  fabricSkins,
+  fabrics,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -42,16 +42,17 @@ export async function GET(
       .select({
         id: productComponents.id,
         componentId: productComponents.componentId,
-        fabricSkinId: productComponents.fabricSkinId,
+        fabricId: productComponents.fabricId,
         displayOrder: productComponents.displayOrder,
         componentName: components.name,
-        componentCode: components.code,
+        componentAssetCode: components.assetCode,
+        componentModelPath: components.modelPath,
         componentTypeName: componentTypes.name,
         componentTypeSlug: componentTypes.slug,
-        componentStage: componentTypes.stage,
-        fabricSkinName: fabricSkins.name,
-        fabricCode: fabricSkins.fabricCode,
-        fabricPriceMarkup: fabricSkins.priceMarkup,
+        componentDesignStage: componentTypes.designStage,
+        fabricName: fabrics.name,
+        fabricCode: fabrics.fabricCode,
+        fabricPriceMarkup: fabrics.priceMarkup,
       })
       .from(productComponents)
       .innerJoin(components, eq(productComponents.componentId, components.id))
@@ -59,7 +60,7 @@ export async function GET(
         componentTypes,
         eq(components.componentTypeId, componentTypes.id),
       )
-      .leftJoin(fabricSkins, eq(productComponents.fabricSkinId, fabricSkins.id))
+      .leftJoin(fabrics, eq(productComponents.fabricId, fabrics.id))
       .where(eq(productComponents.productId, id))
       .orderBy(productComponents.displayOrder);
 
@@ -73,12 +74,13 @@ export async function GET(
       components: comps.map((c) => ({
         id: c.componentId,
         name: c.componentName,
-        code: c.componentCode,
+        assetCode: c.componentAssetCode,
+        modelPath: c.componentModelPath,
         typeName: c.componentTypeName,
         typeSlug: c.componentTypeSlug,
-        stage: c.componentStage,
-        fabricSkinId: c.fabricSkinId,
-        fabricSkinName: c.fabricSkinName,
+        designStage: c.componentDesignStage,
+        fabricId: c.fabricId,
+        fabricName: c.fabricName,
         fabricCode: c.fabricCode,
         fabricPriceMarkup: c.fabricPriceMarkup,
       })),

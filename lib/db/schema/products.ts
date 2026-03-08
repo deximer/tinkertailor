@@ -9,7 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { silhouetteTemplates } from "./silhouettes";
 import { components } from "./components";
-import { fabricSkins } from "./fabrics";
+import { fabrics } from "./fabrics";
 
 export const productStatusEnum = ["draft", "published", "archived"] as const;
 export type ProductStatus = (typeof productStatusEnum)[number];
@@ -45,7 +45,7 @@ export const productComponents = pgTable("product_components", {
   componentId: uuid("component_id")
     .notNull()
     .references(() => components.id),
-  fabricSkinId: uuid("fabric_skin_id").references(() => fabricSkins.id),
+  fabricId: uuid("fabric_id").references(() => fabrics.id),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

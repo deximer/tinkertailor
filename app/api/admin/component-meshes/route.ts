@@ -6,7 +6,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@supabase/supabase-js";
 
-const variantEnum = z.enum(["heavy", "light", "standard"]);
+const fabricWeightEnum = z.enum(["heavy", "light", "standard"]);
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,13 +44,13 @@ export async function GET(request: Request) {
       .select({
         id: componentMeshes.id,
         componentId: componentMeshes.componentId,
-        variant: componentMeshes.variant,
+        fabricWeight: componentMeshes.fabricWeight,
         storagePath: componentMeshes.storagePath,
         createdAt: componentMeshes.createdAt,
       })
       .from(componentMeshes)
       .where(eq(componentMeshes.componentId, componentId))
-      .orderBy(componentMeshes.variant);
+      .orderBy(componentMeshes.fabricWeight);
 
     const result = rows.map((row) => ({
       ...row,
@@ -74,21 +74,21 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const componentId = formData.get("componentId") as string | null;
-    const variant = formData.get("variant") as string | null;
+    const fabricWeight = formData.get("fabricWeight") as string | null;
     const file = formData.get("file") as File | null;
 
-    if (!componentId || !variant || !file) {
+    if (!componentId || !fabricWeight || !file) {
       return NextResponse.json(
-        { error: "componentId, variant, and file are required" },
+        { error: "componentId, fabricWeight, and file are required" },
         { status: 400 },
       );
     }
 
-    // Validate variant
-    const parsedVariant = variantEnum.safeParse(variant);
-    if (!parsedVariant.success) {
+    // Validate fabricWeight
+    const parsedWeight = fabricWeightEnum.safeParse(fabricWeight);
+    if (!parsedWeight.success) {
       return NextResponse.json(
-        { error: "Invalid variant. Must be: heavy, light, or standard" },
+        { error: "Invalid fabricWeight. Must be: heavy, light, or standard" },
         { status: 400 },
       );
     }
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
 
     // Look up the component to get its code for the storage path
     const [component] = await db
-      .select({ id: components.id, code: components.code })
+      .select({ id: components.id, assetCode: components.assetCode })
       .from(components)
       .where(eq(components.id, componentId))
       .limit(1);
@@ -117,9 +117,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const legacyCode = component.code;
+    const assetCode = component.assetCode;
     const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '.obj';
-    const storagePath = `${legacyCode}/${parsedVariant.data}${ext}`;
+    const storagePath = `${assetCode}/${parsedWeight.data}${ext}`;
 
     // Upload to Supabase Storage
     const supabase = getServiceClient();
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
       .where(
         and(
           eq(componentMeshes.componentId, componentId),
-          eq(componentMeshes.variant, parsedVariant.data),
+          eq(componentMeshes.fabricWeight, parsedWeight.data),
         ),
       )
       .limit(1);
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
         .returning({
           id: componentMeshes.id,
           componentId: componentMeshes.componentId,
-          variant: componentMeshes.variant,
+          fabricWeight: componentMeshes.fabricWeight,
           storagePath: componentMeshes.storagePath,
           createdAt: componentMeshes.createdAt,
         });
@@ -170,13 +170,13 @@ export async function POST(request: Request) {
         .insert(componentMeshes)
         .values({
           componentId,
-          variant: parsedVariant.data,
+          fabricWeight: parsedWeight.data,
           storagePath,
         })
         .returning({
           id: componentMeshes.id,
           componentId: componentMeshes.componentId,
-          variant: componentMeshes.variant,
+          fabricWeight: componentMeshes.fabricWeight,
           storagePath: componentMeshes.storagePath,
           createdAt: componentMeshes.createdAt,
         });

@@ -65,7 +65,7 @@ export async function GET(request: Request) {
         silhouetteId: silhouetteComponents.silhouetteId,
         componentId: silhouetteComponents.componentId,
         componentName: components.name,
-        componentCode: components.code,
+        componentAssetCode: components.assetCode,
       })
       .from(silhouetteComponents)
       .innerJoin(components, eq(silhouetteComponents.componentId, components.id))
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
           .map((c) => ({
             id: c.componentId,
             name: c.componentName,
-            code: c.componentCode,
+            assetCode: c.componentAssetCode,
           })),
         tags: tagAssignments
           .filter((t) => t.silhouetteId === s.id)

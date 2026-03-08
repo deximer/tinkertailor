@@ -6,14 +6,14 @@ interface ComponentType {
   id: string;
   name: string;
   slug: string;
-  stage: string;
+  designStage: string;
   garmentPart: string | null;
 }
 
 interface Component {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
 }
 
@@ -28,7 +28,7 @@ interface FabricCategory {
 
 interface Rule {
   componentId: string;
-  fabricSkinCategoryId: string;
+  fabricCategoryId: string;
 }
 
 interface ColDef {
@@ -74,7 +74,7 @@ export default function ComponentFabricRulesPage() {
         if (rulesRes.ok) {
           const rules: Rule[] = await rulesRes.json();
           setEdgeSet(
-            new Set(rules.map((r) => `${r.componentId}:${r.fabricSkinCategoryId}`)),
+            new Set(rules.map((r) => `${r.componentId}:${r.fabricCategoryId}`)),
           );
         }
       } catch {
@@ -100,7 +100,7 @@ export default function ComponentFabricRulesPage() {
       const res = await fetch("/api/admin/component-fabric-rules", {
         method: isLinked ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ componentId, fabricSkinCategoryId: categoryId }),
+        body: JSON.stringify({ componentId, fabricCategoryId: categoryId }),
       });
       if (!res.ok) {
         setEdgeSet((prev) => {
@@ -270,7 +270,7 @@ export default function ComponentFabricRulesPage() {
                   >
                     <td
                       className="sticky left-0 bg-[#222] border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap"
-                      title={comp.code}
+                      title={comp.assetCode}
                     >
                       {comp.name}
                     </td>

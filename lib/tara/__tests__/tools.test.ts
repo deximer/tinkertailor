@@ -29,8 +29,8 @@ const TAG_ASSIGNMENTS = [
 ];
 
 const COMP_ASSIGNMENTS = [
-  { silhouetteId: "sil-1", componentId: "comp-1", componentName: "A-Line Bodice", componentCode: "BOD-001" },
-  { silhouetteId: "sil-2", componentId: "comp-2", componentName: "Sheath Bodice", componentCode: "BOD-002" },
+  { silhouetteId: "sil-1", componentId: "comp-1", componentName: "A-Line Bodice", componentAssetCode: "BOD-001" },
+  { silhouetteId: "sil-2", componentId: "comp-2", componentName: "Sheath Bodice", componentAssetCode: "BOD-002" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ let searchSilhouettes: typeof import("../tools").searchSilhouettes;
 // The Vercel AI SDK types execute as returning T | AsyncIterable<T> to support
 // streaming, but in non-streaming tests it always returns T directly.
 type SearchInput = Parameters<NonNullable<typeof searchSilhouettes["execute"]>>[0];
-type SearchResult = { silhouettes: { id: string; name: string; patternId: string; matchScore: number; totalRequested: number; tags: { dimension: string; value: string; label: string }[]; components: { id: string; name: string; code: string }[] }[] };
+type SearchResult = { silhouettes: { id: string; name: string; patternId: string; matchScore: number; totalRequested: number; tags: { dimension: string; value: string; label: string }[]; components: { id: string; name: string; assetCode: string }[] }[] };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const exec = (input: SearchInput, ctx = toolCtx) => searchSilhouettes.execute!(input, ctx) as any as Promise<SearchResult>;
 
@@ -166,7 +166,7 @@ describe("searchSilhouettes", () => {
     expect(sil1!.components.length).toBeGreaterThan(0);
     expect(sil1!.components[0]).toHaveProperty("id");
     expect(sil1!.components[0]).toHaveProperty("name");
-    expect(sil1!.components[0]).toHaveProperty("code");
+    expect(sil1!.components[0]).toHaveProperty("assetCode");
   });
 
   it("sorts results by match score descending", async () => {

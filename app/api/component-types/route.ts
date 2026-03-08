@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { componentTypes, categories } from "@/lib/db/schema";
 import { eq, and, asc, type SQL } from "drizzle-orm";
-import type { ComponentStage } from "@/lib/db/schema/component-types";
+import type { ComponentDesignStage } from "@/lib/db/schema/component-types";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     }
 
     if (stage) {
-      conditions.push(eq(componentTypes.stage, stage as ComponentStage));
+      conditions.push(eq(componentTypes.designStage, stage as ComponentDesignStage));
     }
 
     const rows = await db
@@ -43,8 +43,8 @@ export async function GET(request: Request) {
         name: componentTypes.name,
         slug: componentTypes.slug,
         categoryId: componentTypes.categoryId,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
         garmentPart: componentTypes.garmentPart,
       })
       .from(componentTypes)

@@ -7,8 +7,8 @@ interface ComponentType {
   name: string;
   slug: string;
   categoryId: string;
-  stage: string;
-  isFirstLeaf: boolean;
+  designStage: string;
+  isAnchor: boolean;
 }
 
 interface Category {
@@ -20,16 +20,17 @@ interface Category {
 interface Component {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   modelPath: string | null;
+  garmentPart: string | null;
   createdAt: string;
 }
 
 interface Mesh {
   id: string;
   componentId: string;
-  variant: string;
+  fabricWeight: string;
   storagePath: string;
   publicUrl: string;
 }
@@ -39,7 +40,7 @@ interface GroupedTypes {
   types: ComponentType[];
 }
 
-const MESH_VARIANTS = ["heavy", "light", "standard"] as const;
+const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 
 export default function AdminComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
@@ -49,22 +50,22 @@ export default function AdminComponentsPage() {
 
   // Inline create form state per component type
   const [createForms, setCreateForms] = useState<
-    Record<string, { name: string; code: string; modelPath: string }>
+    Record<string, { name: string; assetCode: string; modelPath: string }>
   >({});
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
     name: string;
-    code: string;
+    assetCode: string;
     modelPath: string;
-  }>({ name: "", code: "", modelPath: "" });
+  }>({ name: "", assetCode: "", modelPath: "" });
 
   // Mesh management
   const [expandedMeshId, setExpandedMeshId] = useState<string | null>(null);
   const [meshes, setMeshes] = useState<Record<string, Mesh[]>>({});
   const [meshLoading, setMeshLoading] = useState<string | null>(null);
-  const [uploadingVariant, setUploadingVariant] = useState<string | null>(null);
+  const [uploadingWeight, setUploadingWeight] = useState<string | null>(null);
 
   // Operation feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export default function AdminComponentsPage() {
     components.filter((c) => c.componentTypeId === typeId);
 
   const getCreateForm = (typeId: string) =>
-    createForms[typeId] ?? { name: "", code: "", modelPath: "" };
+    createForms[typeId] ?? { name: "", assetCode: "", modelPath: "" };
 
   const updateCreateForm = (
     typeId: string,
@@ -119,7 +120,7 @@ export default function AdminComponentsPage() {
 
   const handleCreate = async (typeId: string) => {
     const form = getCreateForm(typeId);
-    if (!form.name || !form.code) return;
+    if (!form.name || !form.assetCode) return;
 
     setErrorMsg(null);
     const res = await fetch("/api/admin/components", {
@@ -127,7 +128,7 @@ export default function AdminComponentsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,
-        code: form.code,
+        assetCode: form.assetCode,
         componentTypeId: typeId,
         modelPath: form.modelPath || null,
       }),
@@ -138,7 +139,7 @@ export default function AdminComponentsPage() {
       setComponents((prev) => [...prev, created]);
       setCreateForms((prev) => ({
         ...prev,
-        [typeId]: { name: "", code: "", modelPath: "" },
+        [typeId]: { name: "", assetCode: "", modelPath: "" },
       }));
     } else {
       const data = await res.json();
@@ -150,7 +151,7 @@ export default function AdminComponentsPage() {
     setEditingId(comp.id);
     setEditForm({
       name: comp.name,
-      code: comp.code,
+      assetCode: comp.assetCode,
       modelPath: comp.modelPath ?? "",
     });
     setErrorMsg(null);
@@ -171,7 +172,7 @@ export default function AdminComponentsPage() {
       body: JSON.stringify({
         id: editingId,
         name: editForm.name,
-        code: editForm.code,
+        assetCode: editForm.assetCode,
         modelPath: editForm.modelPath || null,
       }),
     });
@@ -236,15 +237,15 @@ export default function AdminComponentsPage() {
 
   const handleMeshUpload = async (
     componentId: string,
-    variant: string,
+    weight: string,
     file: File,
   ) => {
-    setUploadingVariant(`${componentId}:${variant}`);
+    setUploadingWeight(`${componentId}:${weight}`);
     setErrorMsg(null);
 
     const formData = new FormData();
     formData.append("componentId", componentId);
-    formData.append("variant", variant);
+    formData.append("fabricWeight", weight);
     formData.append("file", file);
 
     try {
@@ -262,7 +263,7 @@ export default function AdminComponentsPage() {
     } catch {
       setErrorMsg("Failed to upload mesh");
     }
-    setUploadingVariant(null);
+    setUploadingWeight(null);
   };
 
   const handleMeshDelete = async (meshId: string, componentId: string) => {
@@ -288,8 +289,8 @@ export default function AdminComponentsPage() {
     }
   };
 
-  const getMeshForVariant = (componentId: string, variant: string) =>
-    (meshes[componentId] ?? []).find((m) => m.variant === variant);
+  const getMeshForWeight = (componentId: string, weight: string) =>
+    (meshes[componentId] ?? []).find((m) => m.fabricWeight === weight);
 
   if (loading) {
     return (
@@ -341,7 +342,7 @@ export default function AdminComponentsPage() {
                   <h3 className="mb-3 text-sm font-semibold text-white">
                     {ct.name}{" "}
                     <span className="font-normal text-gray-500">
-                      ({ct.slug} / {ct.stage})
+                      ({ct.slug} / {ct.designStage})
                     </span>
                   </h3>
 
@@ -350,8 +351,8 @@ export default function AdminComponentsPage() {
                       <thead>
                         <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                           <th className="pb-2">Name</th>
-                          <th className="pb-2">Code</th>
-                          <th className="pb-2">Legacy Code</th>
+                          <th className="pb-2">Asset Code</th>
+                          <th className="pb-2">Model Path</th>
                           <th className="pb-2">Meshes</th>
                           <th className="pb-2" />
                         </tr>
@@ -381,11 +382,11 @@ export default function AdminComponentsPage() {
                                   <td className="py-2 pr-2">
                                     <input
                                       type="text"
-                                      value={editForm.code}
+                                      value={editForm.assetCode}
                                       onChange={(e) =>
                                         setEditForm((f) => ({
                                           ...f,
-                                          code: e.target.value,
+                                          assetCode: e.target.value,
                                         }))
                                       }
                                       className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
@@ -427,7 +428,7 @@ export default function AdminComponentsPage() {
                                     {comp.name}
                                   </td>
                                   <td className="py-2 text-gray-400">
-                                    {comp.code}
+                                    {comp.assetCode}
                                   </td>
                                   <td className="py-2 text-gray-400">
                                     {comp.modelPath ?? (
@@ -482,24 +483,24 @@ export default function AdminComponentsPage() {
                                   ) : (
                                     <div className="space-y-2">
                                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                        Mesh Variants
+                                        Fabric Weights
                                       </p>
-                                      {MESH_VARIANTS.map((variant) => {
-                                        const mesh = getMeshForVariant(
+                                      {FABRIC_WEIGHTS.map((weight) => {
+                                        const mesh = getMeshForWeight(
                                           comp.id,
-                                          variant,
+                                          weight,
                                         );
                                         const isUploading =
-                                          uploadingVariant ===
-                                          `${comp.id}:${variant}`;
+                                          uploadingWeight ===
+                                          `${comp.id}:${weight}`;
 
                                         return (
                                           <div
-                                            key={variant}
+                                            key={weight}
                                             className="flex items-center gap-3 rounded border border-gray-700 bg-[#222] px-3 py-2"
                                           >
                                             <span className="w-20 text-xs font-medium text-gray-300 capitalize">
-                                              {variant}
+                                              {weight}
                                             </span>
                                             {mesh ? (
                                               <>
@@ -538,7 +539,7 @@ export default function AdminComponentsPage() {
                                                       if (file) {
                                                         handleMeshUpload(
                                                           comp.id,
-                                                          variant,
+                                                          weight,
                                                           file,
                                                         );
                                                       }
@@ -584,21 +585,21 @@ export default function AdminComponentsPage() {
                     </div>
                     <div className="flex-1">
                       <label className="mb-1 block text-xs text-gray-500">
-                        Code
+                        Asset Code
                       </label>
                       <input
                         type="text"
-                        value={form.code}
+                        value={form.assetCode}
                         onChange={(e) =>
-                          updateCreateForm(ct.id, "code", e.target.value)
+                          updateCreateForm(ct.id, "assetCode", e.target.value)
                         }
-                        placeholder="unique-code"
+                        placeholder="e.g. BOD-27"
                         className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white placeholder-gray-600"
                       />
                     </div>
                     <div className="flex-1">
                       <label className="mb-1 block text-xs text-gray-500">
-                        Legacy Code
+                        Model Path
                       </label>
                       <input
                         type="text"
@@ -612,7 +613,7 @@ export default function AdminComponentsPage() {
                     </div>
                     <button
                       onClick={() => handleCreate(ct.id)}
-                      disabled={!form.name || !form.code}
+                      disabled={!form.name || !form.assetCode}
                       className="rounded bg-white px-3 py-1 text-sm font-medium text-black hover:bg-gray-200 disabled:opacity-50 transition-colors"
                     >
                       Add

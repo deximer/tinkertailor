@@ -10,14 +10,13 @@ import {
   primaryKey,
   jsonb,
 } from "drizzle-orm/pg-core";
-import { type MeshVariant } from "./component-meshes";
 import { components } from "./components";
 
-export const fabricSkinCategories = pgTable("fabric_skin_categories", {
+export const fabricCategories = pgTable("fabric_categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
-  parentId: uuid("parent_id").references((): AnyPgColumn => fabricSkinCategories.id),
+  parentId: uuid("parent_id").references((): AnyPgColumn => fabricCategories.id),
   merchandisingOrder: integer("merchandising_order").notNull().default(0),
   hidden: boolean("hidden").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -25,16 +24,14 @@ export const fabricSkinCategories = pgTable("fabric_skin_categories", {
     .notNull(),
 });
 
-export const fabricSkins = pgTable("fabric_skins", {
+export const fabrics = pgTable("fabrics", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   fabricCode: varchar("fabric_code", { length: 50 }).notNull().unique(),
   categoryId: uuid("category_id")
     .notNull()
-    .references(() => fabricSkinCategories.id),
-  // Which component mesh variant to load when this fabric is applied.
-  // Matches component_meshes.variant. Null = fabric works with any mesh variant.
-  meshVariant: varchar("mesh_variant", { length: 20 }).$type<MeshVariant>(),
+    .references(() => fabricCategories.id),
+  fabricWeight: varchar("fabric_weight", { length: 50 }),
   priceMarkup: numeric("price_markup", { precision: 10, scale: 2 })
     .notNull()
     .default("0"),
@@ -45,22 +42,22 @@ export const fabricSkins = pgTable("fabric_skins", {
     .notNull(),
 });
 
-export const componentFabricCategories = pgTable(
-  "component_fabric_categories",
+export const componentFabricRules = pgTable(
+  "component_fabric_rules",
   {
     componentId: uuid("component_id")
       .notNull()
       .references(() => components.id),
-    fabricSkinCategoryId: uuid("fabric_skin_category_id")
+    fabricCategoryId: uuid("fabric_category_id")
       .notNull()
-      .references(() => fabricSkinCategories.id),
+      .references(() => fabricCategories.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
     primaryKey({
-      columns: [table.componentId, table.fabricSkinCategoryId],
+      columns: [table.componentId, table.fabricCategoryId],
     }),
   ],
 );

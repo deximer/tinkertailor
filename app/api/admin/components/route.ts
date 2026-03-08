@@ -3,26 +3,27 @@ import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
 import {
   components,
+  componentTypes,
   silhouetteComponents,
   productComponents,
 } from "@/lib/db/schema";
-import { componentFabricCategories } from "@/lib/db/schema/fabrics";
+import { componentFabricRules } from "@/lib/db/schema/fabrics";
 import { eq, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
-  code: z.string().min(1).max(50),
+  assetCode: z.string().min(1).max(50),
   componentTypeId: z.string().uuid(),
-  legacyCode: z.string().max(20).nullable().optional(),
+  modelPath: z.string().max(500).nullable().optional(),
 });
 
 const updateSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(200).optional(),
-  code: z.string().min(1).max(50).optional(),
+  assetCode: z.string().min(1).max(50).optional(),
   componentTypeId: z.string().uuid().optional(),
-  legacyCode: z.string().max(20).nullable().optional(),
+  modelPath: z.string().max(500).nullable().optional(),
 });
 
 export async function GET() {
@@ -34,9 +35,10 @@ export async function GET() {
       .select({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
-        legacyCode: components.legacyCode,
+        modelPath: components.modelPath,
+        garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       })
       .from(components)
@@ -62,30 +64,39 @@ export async function POST(request: Request) {
     const [existing] = await db
       .select({ id: components.id })
       .from(components)
-      .where(eq(components.code, body.code))
+      .where(eq(components.assetCode, body.assetCode))
       .limit(1);
 
     if (existing) {
       return NextResponse.json(
-        { error: "Component code already exists", code: body.code },
+        { error: "Component asset code already exists", assetCode: body.assetCode },
         { status: 409 },
       );
     }
+
+    // Look up garmentPart from the component type to denormalize
+    const [ct] = await db
+      .select({ garmentPart: componentTypes.garmentPart })
+      .from(componentTypes)
+      .where(eq(componentTypes.id, body.componentTypeId))
+      .limit(1);
 
     const [row] = await db
       .insert(components)
       .values({
         name: body.name,
-        code: body.code,
+        assetCode: body.assetCode,
         componentTypeId: body.componentTypeId,
-        legacyCode: body.legacyCode ?? null,
+        modelPath: body.modelPath ?? null,
+        garmentPart: ct?.garmentPart ?? null,
       })
       .returning({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
-        legacyCode: components.legacyCode,
+        modelPath: components.modelPath,
+        garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       });
 
@@ -112,16 +123,16 @@ export async function PUT(request: Request) {
   try {
     const body = updateSchema.parse(await request.json());
 
-    if (body.code !== undefined) {
+    if (body.assetCode !== undefined) {
       const [existing] = await db
         .select({ id: components.id })
         .from(components)
-        .where(eq(components.code, body.code))
+        .where(eq(components.assetCode, body.assetCode))
         .limit(1);
 
       if (existing && existing.id !== body.id) {
         return NextResponse.json(
-          { error: "Component code already exists", code: body.code },
+          { error: "Component asset code already exists", assetCode: body.assetCode },
           { status: 409 },
         );
       }
@@ -129,10 +140,18 @@ export async function PUT(request: Request) {
 
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = body.name;
-    if (body.code !== undefined) updates.code = body.code;
-    if (body.componentTypeId !== undefined)
+    if (body.assetCode !== undefined) updates.assetCode = body.assetCode;
+    if (body.componentTypeId !== undefined) {
       updates.componentTypeId = body.componentTypeId;
-    if (body.legacyCode !== undefined) updates.legacyCode = body.legacyCode;
+      // Re-sync garmentPart from new component type
+      const [ct] = await db
+        .select({ garmentPart: componentTypes.garmentPart })
+        .from(componentTypes)
+        .where(eq(componentTypes.id, body.componentTypeId))
+        .limit(1);
+      updates.garmentPart = ct?.garmentPart ?? null;
+    }
+    if (body.modelPath !== undefined) updates.modelPath = body.modelPath;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -148,9 +167,10 @@ export async function PUT(request: Request) {
       .returning({
         id: components.id,
         name: components.name,
-        code: components.code,
+        assetCode: components.assetCode,
         componentTypeId: components.componentTypeId,
-        legacyCode: components.legacyCode,
+        modelPath: components.modelPath,
+        garmentPart: components.garmentPart,
         createdAt: components.createdAt,
       });
 
@@ -215,8 +235,8 @@ export async function DELETE(request: Request) {
 
     // Cascade-delete fabric category associations
     await db
-      .delete(componentFabricCategories)
-      .where(eq(componentFabricCategories.componentId, id));
+      .delete(componentFabricRules)
+      .where(eq(componentFabricRules.componentId, id));
 
     // Delete the component itself
     const [row] = await db

@@ -25,9 +25,9 @@ import {
   components,
   bodiceSkirtCompatibility,
   bodiceSleeveCompatibility,
-  fabricSkinCategories,
-  fabricSkins,
-  componentFabricCategories,
+  fabricCategories,
+  fabrics,
+  componentFabricRules,
 } from "../lib/db/schema";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -79,12 +79,12 @@ async function upsertBySlug(
 
 async function upsertByCode(
   code: string,
-  row: { name: string; code: string; componentTypeId: string; legacyCode?: string },
+  row: { name: string; assetCode: string; componentTypeId: string; modelPath?: string },
 ) {
   const existing = await db
     .select()
     .from(components)
-    .where(eq(components.code, code))
+    .where(eq(components.assetCode, code))
     .limit(1);
   if (existing.length > 0) return existing[0];
 
@@ -129,25 +129,22 @@ async function seedComponentTypes(categoryIds: Record<string, string>) {
       name: "Bodice",
       slug: "bodice",
       categoryId: categoryIds.dress,
-      stage: "silhouette" as const,
-      isFirstLeaf: true,
-      garmentPart: "bodice" as const,
+      designStage: "silhouette" as const,
+      isAnchor: true,
     },
     {
       name: "Skirt Section",
       slug: "skirt-section",
       categoryId: categoryIds.dress,
-      stage: "silhouette" as const,
-      isFirstLeaf: false,
-      garmentPart: "skirt" as const,
+      designStage: "silhouette" as const,
+      isAnchor: false,
     },
     {
       name: "Sleeve",
       slug: "sleeve",
       categoryId: categoryIds.dress,
-      stage: "silhouette" as const,
-      isFirstLeaf: false,
-      garmentPart: "sleeve" as const,
+      designStage: "silhouette" as const,
+      isAnchor: false,
     },
   ];
 
@@ -195,9 +192,8 @@ async function seedComponentsFromSpreadsheet(
     const num = code.replace("BOD-", "");
     const row = await upsertByCode(code, {
       name: nameMap[code] || `Bodice ${num}`,
-      code,
+      assetCode: code,
       componentTypeId: typeIds.bodice,
-      legacyCode: code,
     });
     componentMap[code] = row.id;
   }
@@ -217,9 +213,8 @@ async function seedComponentsFromSpreadsheet(
     const num = code.replace("SK-", "");
     const row = await upsertByCode(code, {
       name: nameMap[code] || `Skirt ${num}`,
-      code,
+      assetCode: code,
       componentTypeId: typeIds["skirt-section"],
-      legacyCode: code,
     });
     componentMap[code] = row.id;
   }
@@ -248,9 +243,8 @@ async function seedComponentsFromSpreadsheet(
           : "";
         const row = await upsertByCode(code, {
           name: nameMap[code] || `Sleeve ${num}${typeName ? ` (${typeName})` : ""}`,
-          code,
+          assetCode: code,
           componentTypeId: typeIds.sleeve,
-          legacyCode: code,
         });
         componentMap[code] = row.id;
       }
@@ -404,8 +398,8 @@ async function seedFabrics() {
 
   // Create top-level "All Fabrics" parent category
   const parentCat = await upsertBySlug(
-    fabricSkinCategories,
-    fabricSkinCategories.slug,
+    fabricCategories,
+    fabricCategories.slug,
     "all-fabrics",
     {
       name: "All Fabrics",
@@ -429,8 +423,8 @@ async function seedFabrics() {
   const familyCats: Record<string, string> = {};
   for (const [key, fam] of Object.entries(fabricFamilies)) {
     const cat = await upsertBySlug(
-      fabricSkinCategories,
-      fabricSkinCategories.slug,
+      fabricCategories,
+      fabricCategories.slug,
       fam.slug,
       {
         name: fam.name,
@@ -488,11 +482,10 @@ async function seedFabrics() {
     const family = codeToFamily[code] || "specialty";
     const catId = familyCats[family];
 
-    const slug = code.toLowerCase();
     const existing = await db
       .select()
-      .from(fabricSkins)
-      .where(eq(fabricSkins.fabricCode, code))
+      .from(fabrics)
+      .where(eq(fabrics.fabricCode, code))
       .limit(1);
 
     let fabricId: string;
@@ -500,12 +493,12 @@ async function seedFabrics() {
       fabricId = existing[0].id;
     } else {
       const inserted = await db
-        .insert(fabricSkins)
+        .insert(fabrics)
         .values({
           name,
           fabricCode: code,
           categoryId: catId,
-          meshVariant: null,
+          fabricWeight: null,
           priceMarkup: "0",
         })
         .returning();
@@ -514,7 +507,7 @@ async function seedFabrics() {
     }
     fabricCodeToId[code] = fabricId;
   }
-  console.log(`  ${fabricCount} fabric skins seeded.`);
+  console.log(`  ${fabricCount} fabrics seeded.`);
 
   return { fabricCodeToId, wb };
 }
@@ -547,8 +540,8 @@ async function seedFabricAffinity(
   for (const code of fabricCodesUsed) {
     const skin = await db
       .select()
-      .from(fabricSkins)
-      .where(eq(fabricSkins.fabricCode, code))
+      .from(fabrics)
+      .where(eq(fabrics.fabricCode, code))
       .limit(1);
     if (skin.length > 0) {
       fabricCatMap[code] = skin[0].categoryId;
@@ -603,18 +596,18 @@ async function seedFabricAffinity(
     for (const catId of catIds) {
       const existing = await db
         .select()
-        .from(componentFabricCategories)
+        .from(componentFabricRules)
         .where(
           and(
-            eq(componentFabricCategories.componentId, compId),
-            eq(componentFabricCategories.fabricSkinCategoryId, catId),
+            eq(componentFabricRules.componentId, compId),
+            eq(componentFabricRules.fabricCategoryId, catId),
           ),
         )
         .limit(1);
       if (existing.length === 0) {
-        await db.insert(componentFabricCategories).values({
+        await db.insert(componentFabricRules).values({
           componentId: compId,
-          fabricSkinCategoryId: catId,
+          fabricCategoryId: catId,
         });
         affinityCount++;
       }
@@ -622,10 +615,6 @@ async function seedFabricAffinity(
   }
   console.log(`  ${affinityCount} component-fabric affinity rules seeded.`);
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Step 3b: Seed extra components from seed JSON (those not in spreadsheet)
@@ -648,9 +637,8 @@ async function seedExtraComponentsFromJson(
       if (componentMap[comp.code]) continue; // already seeded from spreadsheet
       const row = await upsertByCode(comp.code, {
         name: comp.name || comp.code,
-        code: comp.code,
+        assetCode: comp.code,
         componentTypeId: typeIds[typeSlug],
-        legacyCode: comp.code,
       });
       componentMap[comp.code] = row.id;
       added++;
@@ -658,6 +646,10 @@ async function seedExtraComponentsFromJson(
   }
   console.log(`  ${added} extra components added.`);
 }
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 async function main() {
   console.log("=== Seed Components & Compatibility ===\n");
