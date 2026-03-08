@@ -25,7 +25,7 @@ import {
   componentCompatibility,
   fabricSkinCategories,
   fabricSkins,
-  componentFabricCategories,
+  componentFabricRules,
 } from "../lib/db/schema";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -112,22 +112,22 @@ async function seedComponentTypes(categoryIds: Record<string, string>) {
       name: "Bodice",
       slug: "bodice",
       categoryId: categoryIds.dress,
-      stage: "silhouette" as const,
-      isFirstLeaf: true,
+      designStage: "silhouette" as const,
+      isAnchor: true,
     },
     {
       name: "Skirt Section",
       slug: "skirt-section",
       categoryId: categoryIds.dress,
-      stage: "silhouette" as const,
-      isFirstLeaf: false,
+      designStage: "silhouette" as const,
+      isAnchor: false,
     },
     {
       name: "Sleeve",
       slug: "sleeve",
       categoryId: categoryIds.dress,
-      stage: "silhouette" as const,
-      isFirstLeaf: false,
+      designStage: "silhouette" as const,
+      isAnchor: false,
     },
   ];
 
@@ -553,18 +553,18 @@ async function seedFabricAffinity(
     for (const catId of catIds) {
       const existing = await db
         .select()
-        .from(componentFabricCategories)
+        .from(componentFabricRules)
         .where(
           and(
-            eq(componentFabricCategories.componentId, compId),
-            eq(componentFabricCategories.fabricSkinCategoryId, catId),
+            eq(componentFabricRules.componentId, compId),
+            eq(componentFabricRules.fabricCategoryId, catId),
           ),
         )
         .limit(1);
       if (existing.length === 0) {
-        await db.insert(componentFabricCategories).values({
+        await db.insert(componentFabricRules).values({
           componentId: compId,
-          fabricSkinCategoryId: catId,
+          fabricCategoryId: catId,
         });
         affinityCount++;
       }

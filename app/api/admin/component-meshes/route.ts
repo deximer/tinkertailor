@@ -116,9 +116,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const legacyCode = component.code;
+    const assetCode = component.code;
     const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '.obj';
-    const storagePath = `${legacyCode}/${parsedVariant.data}${ext}`;
+    const storagePath = `${assetCode}/${parsedVariant.data}${ext}`;
 
     // Upload to Supabase Storage
     const supabase = getServiceClient();

@@ -7,8 +7,8 @@ interface ComponentType {
   name: string;
   slug: string;
   categoryId: string;
-  stage: string;
-  isFirstLeaf: boolean;
+  designStage: string;
+  isAnchor: boolean;
 }
 
 interface Category {
@@ -341,7 +341,7 @@ export default function AdminComponentsPage() {
                   <h3 className="mb-3 text-sm font-semibold text-white">
                     {ct.name}{" "}
                     <span className="font-normal text-gray-500">
-                      ({ct.slug} / {ct.stage})
+                      ({ct.slug} / {ct.designStage})
                     </span>
                   </h3>
 
@@ -351,7 +351,7 @@ export default function AdminComponentsPage() {
                         <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                           <th className="pb-2">Name</th>
                           <th className="pb-2">Code</th>
-                          <th className="pb-2">Legacy Code</th>
+                          <th className="pb-2">Asset Code</th>
                           <th className="pb-2">Meshes</th>
                           <th className="pb-2" />
                         </tr>
@@ -598,7 +598,7 @@ export default function AdminComponentsPage() {
                     </div>
                     <div className="flex-1">
                       <label className="mb-1 block text-xs text-gray-500">
-                        Legacy Code
+                        Asset Code
                       </label>
                       <input
                         type="text"

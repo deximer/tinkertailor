@@ -115,7 +115,7 @@ describe("Design Phase Determination", () => {
     expect(result.selectedComponents).toEqual([]);
   });
 
-  it("silhouette phase when only non-first-leaf selected", async () => {
+  it("silhouette phase when only non-anchor selected", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
     const skirt = makeMockComponent("sk1", "Skirt 1", "SK-1", "skirt-section", "silhouette", false);
@@ -138,7 +138,7 @@ describe("Design Phase Determination", () => {
     expect(result.designPhase).toBe("silhouette");
   });
 
-  it("embellishment phase when first-leaf component is selected", async () => {
+  it("embellishment phase when anchor component is selected", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
     const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "silhouette", true);
@@ -163,13 +163,13 @@ describe("Design Phase Determination", () => {
 // ---------------------------------------------------------------------------
 
 describe("Selection Rules", () => {
-  it("first-leaf selection clears all other components", async () => {
+  it("anchor selection clears all other components", async () => {
     const { applySelectionRules } = await import("../engine");
 
     const mockDb = createMockDb({
       selectResults: {
         // New component lookup
-        "select-0": [{ id: "bod2", typeId: "bodice-type", isFirstLeaf: true }],
+        "select-0": [{ id: "bod2", typeId: "bodice-type", isAnchor: true }],
       },
     });
 
@@ -178,13 +178,13 @@ describe("Selection Rules", () => {
     expect(result).toEqual(["bod2"]);
   });
 
-  it("non-first-leaf deselects only same-type components", async () => {
+  it("non-anchor deselects only same-type components", async () => {
     const { applySelectionRules } = await import("../engine");
 
     const mockDb = createMockDb({
       selectResults: {
         // New component lookup
-        "select-0": [{ id: "sk2", typeId: "skirt-type", isFirstLeaf: false }],
+        "select-0": [{ id: "sk2", typeId: "skirt-type", isAnchor: false }],
         // Current components lookup
         "select-1": [
           { id: "bod1", typeId: "bodice-type" },
@@ -208,7 +208,7 @@ describe("Selection Rules", () => {
 
     const mockDb = createMockDb({
       selectResults: {
-        "select-0": [{ id: "bod1", typeId: "bodice-type", isFirstLeaf: true }],
+        "select-0": [{ id: "bod1", typeId: "bodice-type", isAnchor: true }],
       },
     });
 
@@ -251,7 +251,7 @@ describe("Compatible Components — Multi-Select", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await getCompatibleComponents(mockDb as any, ["bod1", "sk1"]);
 
-    // Phase should be embellishment (first-leaf bodice selected, silhouette stage present)
+    // Phase should be embellishment (anchor bodice selected, silhouette stage present)
     expect(result.designPhase).toBe("embellishment");
     // Selected components returned separately
     expect(result.selectedComponents).toHaveLength(2);
@@ -314,7 +314,7 @@ describe("Stage Gating", () => {
     const result = await getCompatibleComponents(mockDb as any, []);
     expect(result.designPhase).toBe("silhouette");
     // The DB mock returns what we tell it, but the important thing is the phase
-    expect(result.components.every((c) => c.stage === "silhouette")).toBe(true);
+    expect(result.components.every((c) => c.designStage === "silhouette")).toBe(true);
   });
 });
 
@@ -327,8 +327,8 @@ function makeMockComponent(
   name: string,
   code: string,
   typeSlug: string,
-  stage: ComponentWithType["stage"],
-  isFirstLeaf: boolean,
+  designStage: ComponentWithType["designStage"],
+  isAnchor: boolean,
 ): ComponentWithType {
   return {
     id,
@@ -338,7 +338,7 @@ function makeMockComponent(
     modelPath: null,
     typeName: typeSlug.charAt(0).toUpperCase() + typeSlug.slice(1),
     typeSlug,
-    stage,
-    isFirstLeaf,
+    designStage,
+    isAnchor,
   };
 }

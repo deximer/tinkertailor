@@ -52,8 +52,8 @@ export async function GET(request: Request) {
         modelPath: components.modelPath,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))

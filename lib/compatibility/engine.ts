@@ -5,14 +5,14 @@
  * Used by both Atelier (real-time filtering) and TARA (validation).
  *
  * Key rules (from legacy app):
- * 1. If a component's type has is_first_leaf=true, selecting it clears all
+ * 1. If a component's type has is_anchor=true, selecting it clears all
  *    other selected components.
  * 2. Otherwise, selecting a component deselects only other components of the
  *    same type.
  * 3. Stage sequencing: silhouette must complete before embellishment,
  *    embellishment before finishing.
  * 4. Fabric filtering: intersect compatible_skin_categories across selected
- *    components; show only fabrics from the first_leaf component's categories.
+ *    components; show only fabrics from the anchor component's categories.
  */
 
 import { eq, and, inArray } from "drizzle-orm";
@@ -23,9 +23,9 @@ import {
   componentCompatibility,
   fabricSkinCategories,
   fabricSkins,
-  componentFabricCategories,
+  componentFabricRules,
 } from "../db/schema";
-import type { ComponentStage } from "../db/schema/component-types";
+import type { ComponentDesignStage } from "../db/schema/component-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,8 +41,8 @@ export interface ComponentWithType {
   modelPath: string | null;
   typeName: string;
   typeSlug: string;
-  stage: ComponentStage;
-  isFirstLeaf: boolean;
+  designStage: ComponentDesignStage;
+  isAnchor: boolean;
 }
 
 export interface CompatibleComponentsResult {
@@ -83,7 +83,7 @@ export async function applySelectionRules(
     .select({
       id: components.id,
       typeId: componentTypes.id,
-      isFirstLeaf: componentTypes.isFirstLeaf,
+      isAnchor: componentTypes.isAnchor,
     })
     .from(components)
     .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
@@ -92,14 +92,14 @@ export async function applySelectionRules(
 
   if (newComp.length === 0) return currentSelectionIds;
 
-  const { isFirstLeaf, typeId } = newComp[0];
+  const { isAnchor, typeId } = newComp[0];
 
-  if (isFirstLeaf) {
-    // First-leaf selection: clear ALL other components
+  if (isAnchor) {
+    // Anchor selection: clear ALL other components
     return [newComponentId];
   }
 
-  // Non-first-leaf: deselect only components of the same type
+  // Non-anchor: deselect only components of the same type
   if (currentSelectionIds.length === 0) return [newComponentId];
 
   const currentComps = await db
@@ -141,8 +141,8 @@ export async function getCompatibleComponents(
         modelPath: components.modelPath,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
@@ -166,12 +166,12 @@ export async function getCompatibleComponents(
         modelPath: components.modelPath,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
-      .where(inArray(componentTypes.stage, allowedStages));
+      .where(inArray(componentTypes.designStage, allowedStages));
 
     return {
       designPhase,
@@ -236,15 +236,15 @@ export async function getCompatibleComponents(
       modelPath: components.modelPath,
       typeName: componentTypes.name,
       typeSlug: componentTypes.slug,
-      stage: componentTypes.stage,
-      isFirstLeaf: componentTypes.isFirstLeaf,
+      designStage: componentTypes.designStage,
+      isAnchor: componentTypes.isAnchor,
     })
     .from(components)
     .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
     .where(
       and(
         inArray(components.id, [...resultIds]),
-        inArray(componentTypes.stage, allowedStages),
+        inArray(componentTypes.designStage, allowedStages),
       ),
     );
 
@@ -266,7 +266,7 @@ export async function getCompatibleComponents(
 /**
  * Given selected component IDs, return fabric options valid for the selection.
  *
- * Logic: find the is_first_leaf component; return its compatible fabric
+ * Logic: find the is_anchor component; return its compatible fabric
  * categories and their non-hidden leaf skins.
  */
 export async function getCompatibleFabrics(
@@ -275,26 +275,26 @@ export async function getCompatibleFabrics(
 ): Promise<FabricCategoryWithSkins[]> {
   if (selectedComponentIds.length === 0) return [];
 
-  // Find the first-leaf component in the selection
+  // Find the anchor component in the selection
   const selectedWithTypes = await db
     .select({
       compId: components.id,
-      isFirstLeaf: componentTypes.isFirstLeaf,
+      isAnchor: componentTypes.isAnchor,
     })
     .from(components)
     .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
     .where(inArray(components.id, selectedComponentIds));
 
-  const firstLeaf = selectedWithTypes.find((c) => c.isFirstLeaf);
-  if (!firstLeaf) return [];
+  const anchor = selectedWithTypes.find((c) => c.isAnchor);
+  if (!anchor) return [];
 
-  // Get fabric categories linked to the first-leaf component
+  // Get fabric categories linked to the anchor component
   const linkedCats = await db
     .select({
-      categoryId: componentFabricCategories.fabricSkinCategoryId,
+      categoryId: componentFabricRules.fabricCategoryId,
     })
-    .from(componentFabricCategories)
-    .where(eq(componentFabricCategories.componentId, firstLeaf.compId));
+    .from(componentFabricRules)
+    .where(eq(componentFabricRules.componentId, anchor.compId));
 
   if (linkedCats.length === 0) return [];
 
@@ -348,11 +348,11 @@ export async function getCompatibleFabrics(
 function determineDesignPhase(selectedComps: ComponentWithType[]): DesignPhase {
   if (selectedComps.length === 0) return "silhouette";
 
-  const stages = new Set(selectedComps.map((c) => c.stage));
-  const hasFirstLeaf = selectedComps.some((c) => c.isFirstLeaf);
+  const stages = new Set(selectedComps.map((c) => c.designStage));
+  const hasAnchor = selectedComps.some((c) => c.isAnchor);
 
-  // If no first-leaf component selected yet, still in silhouette phase
-  if (!hasFirstLeaf) return "silhouette";
+  // If no anchor component selected yet, still in silhouette phase
+  if (!hasAnchor) return "silhouette";
 
   // Check if silhouette is complete (has bodice at minimum)
   if (!stages.has("silhouette")) return "silhouette";
@@ -365,7 +365,7 @@ function determineDesignPhase(selectedComps: ComponentWithType[]): DesignPhase {
   return "embellishment";
 }
 
-function getAllowedStages(phase: DesignPhase): ComponentStage[] {
+function getAllowedStages(phase: DesignPhase): ComponentDesignStage[] {
   switch (phase) {
     case "silhouette":
       return ["silhouette"];

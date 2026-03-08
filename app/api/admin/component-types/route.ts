@@ -12,8 +12,8 @@ const garmentPartZodEnum = z.enum(["bodice", "skirt", "sleeve", "embellishment",
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   categoryId: z.string().uuid(),
-  stage: stageEnum,
-  isFirstLeaf: z.boolean(),
+  designStage: stageEnum,
+  isAnchor: z.boolean(),
   garmentPart: garmentPartZodEnum.nullable().optional(),
 });
 
@@ -21,8 +21,8 @@ const updateSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100).optional(),
   categoryId: z.string().uuid().optional(),
-  stage: stageEnum.optional(),
-  isFirstLeaf: z.boolean().optional(),
+  designStage: stageEnum.optional(),
+  isAnchor: z.boolean().optional(),
   garmentPart: garmentPartZodEnum.nullable().optional(),
 });
 
@@ -44,8 +44,8 @@ export async function POST(request: Request) {
         name: body.name,
         slug,
         categoryId: body.categoryId,
-        stage: body.stage,
-        isFirstLeaf: body.isFirstLeaf,
+        designStage: body.designStage,
+        isAnchor: body.isAnchor,
         garmentPart: body.garmentPart ?? null,
       })
       .returning({
@@ -53,8 +53,8 @@ export async function POST(request: Request) {
         name: componentTypes.name,
         slug: componentTypes.slug,
         categoryId: componentTypes.categoryId,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
         garmentPart: componentTypes.garmentPart,
       });
 
@@ -87,8 +87,8 @@ export async function PUT(request: Request) {
       updates.slug = slugify(body.name);
     }
     if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
-    if (body.stage !== undefined) updates.stage = body.stage;
-    if (body.isFirstLeaf !== undefined) updates.isFirstLeaf = body.isFirstLeaf;
+    if (body.designStage !== undefined) updates.designStage = body.designStage;
+    if (body.isAnchor !== undefined) updates.isAnchor = body.isAnchor;
     if (body.garmentPart !== undefined) updates.garmentPart = body.garmentPart;
 
     if (Object.keys(updates).length === 0) {
@@ -107,8 +107,8 @@ export async function PUT(request: Request) {
         name: componentTypes.name,
         slug: componentTypes.slug,
         categoryId: componentTypes.categoryId,
-        stage: componentTypes.stage,
-        isFirstLeaf: componentTypes.isFirstLeaf,
+        designStage: componentTypes.designStage,
+        isAnchor: componentTypes.isAnchor,
         garmentPart: componentTypes.garmentPart,
       });
 

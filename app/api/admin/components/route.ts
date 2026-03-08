@@ -7,7 +7,7 @@ import {
   silhouetteComponents,
   productComponents,
 } from "@/lib/db/schema";
-import { componentFabricCategories } from "@/lib/db/schema/fabrics";
+import { componentFabricRules } from "@/lib/db/schema/fabrics";
 import { eq, or, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
@@ -226,8 +226,8 @@ export async function DELETE(request: Request) {
 
     // Cascade-delete fabric category associations
     await db
-      .delete(componentFabricCategories)
-      .where(eq(componentFabricCategories.componentId, id));
+      .delete(componentFabricRules)
+      .where(eq(componentFabricRules.componentId, id));
 
     // Delete the component itself
     const [row] = await db

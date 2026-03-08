@@ -4,14 +4,14 @@ import { db } from "@/lib/db";
 import {
   components,
   fabricSkinCategories,
-  componentFabricCategories,
+  componentFabricRules,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
 const linkSchema = z.object({
   componentId: z.string().uuid(),
-  fabricSkinCategoryId: z.string().uuid(),
+  fabricCategoryId: z.string().uuid(),
 });
 
 export async function GET(request: Request) {
@@ -44,13 +44,13 @@ export async function GET(request: Request) {
 
     const rows = await db
       .select({
-        fabricSkinCategoryId: componentFabricCategories.fabricSkinCategoryId,
+        fabricCategoryId: componentFabricRules.fabricCategoryId,
       })
-      .from(componentFabricCategories)
-      .where(eq(componentFabricCategories.componentId, componentId));
+      .from(componentFabricRules)
+      .where(eq(componentFabricRules.componentId, componentId));
 
     return NextResponse.json(
-      rows.map((r) => r.fabricSkinCategoryId),
+      rows.map((r) => r.fabricCategoryId),
     );
   } catch (err) {
     console.error("[admin/component-fabric-rules] GET error:", err);
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     const [cat] = await db
       .select({ id: fabricSkinCategories.id })
       .from(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, body.fabricSkinCategoryId))
+      .where(eq(fabricSkinCategories.id, body.fabricCategoryId))
       .limit(1);
 
     if (!cat) {
@@ -95,10 +95,10 @@ export async function POST(request: Request) {
     }
 
     await db
-      .insert(componentFabricCategories)
+      .insert(componentFabricRules)
       .values({
         componentId: body.componentId,
-        fabricSkinCategoryId: body.fabricSkinCategoryId,
+        fabricCategoryId: body.fabricCategoryId,
       })
       .onConflictDoNothing();
 
@@ -141,7 +141,7 @@ export async function DELETE(request: Request) {
     const [cat] = await db
       .select({ id: fabricSkinCategories.id })
       .from(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, body.fabricSkinCategoryId))
+      .where(eq(fabricSkinCategories.id, body.fabricCategoryId))
       .limit(1);
 
     if (!cat) {
@@ -152,13 +152,13 @@ export async function DELETE(request: Request) {
     }
 
     await db
-      .delete(componentFabricCategories)
+      .delete(componentFabricRules)
       .where(
         and(
-          eq(componentFabricCategories.componentId, body.componentId),
+          eq(componentFabricRules.componentId, body.componentId),
           eq(
-            componentFabricCategories.fabricSkinCategoryId,
-            body.fabricSkinCategoryId,
+            componentFabricRules.fabricCategoryId,
+            body.fabricCategoryId,
           ),
         ),
       );

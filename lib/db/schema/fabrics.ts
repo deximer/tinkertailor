@@ -42,13 +42,13 @@ export const fabricSkins = pgTable("fabric_skins", {
     .notNull(),
 });
 
-export const componentFabricCategories = pgTable(
-  "component_fabric_categories",
+export const componentFabricRules = pgTable(
+  "component_fabric_rules",
   {
     componentId: uuid("component_id")
       .notNull()
       .references(() => components.id),
-    fabricSkinCategoryId: uuid("fabric_skin_category_id")
+    fabricCategoryId: uuid("fabric_category_id")
       .notNull()
       .references(() => fabricSkinCategories.id),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -57,7 +57,7 @@ export const componentFabricCategories = pgTable(
   },
   (table) => [
     primaryKey({
-      columns: [table.componentId, table.fabricSkinCategoryId],
+      columns: [table.componentId, table.fabricCategoryId],
     }),
   ],
 );

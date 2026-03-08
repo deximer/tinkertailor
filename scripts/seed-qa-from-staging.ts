@@ -94,7 +94,7 @@ const TABLE_ORDER = [
   "fabric_skins",
   "silhouette_components",
   "silhouette_tags",
-  "component_fabric_categories",
+  "component_fabric_rules",
   "component_compatibility",
   "profiles",              // will fail — FK to auth.users (not copied)
   "invite_codes",          // will fail — FK to profiles

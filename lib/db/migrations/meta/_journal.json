@@ -71,6 +71,41 @@
       "when": 1772870800000,
       "tag": "0009_products_shared_column",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772900000000,
+      "tag": "0010_add_garment_part",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772900100000,
+      "tag": "0011_add_is_composable",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772900200000,
+      "tag": "0012_add_component_meshes",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1772900300000,
+      "tag": "0013_add_viewer_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1772900400000,
+      "tag": "0014_rename_fields_delivery1",
+      "breakpoints": true
     }
   ]
 }

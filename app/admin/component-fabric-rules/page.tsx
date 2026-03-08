@@ -99,7 +99,7 @@ export default function ComponentFabricRulesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           componentId: selectedComponentId,
-          fabricSkinCategoryId: categoryId,
+          fabricCategoryId: categoryId,
         }),
       });
 

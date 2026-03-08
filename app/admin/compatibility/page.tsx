@@ -7,8 +7,8 @@ interface ComponentType {
   name: string;
   slug: string;
   categoryId: string;
-  stage: string;
-  isFirstLeaf: boolean;
+  designStage: string;
+  isAnchor: boolean;
 }
 
 interface MatrixComponent {

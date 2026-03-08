@@ -164,14 +164,14 @@ export const getCompatibleComponentsTool = tool({
         name: c.name,
         code: c.code,
         type: c.typeName,
-        stage: c.stage,
+        designStage: c.designStage,
       })),
       selectedComponents: result.selectedComponents.map((c) => ({
         id: c.id,
         name: c.name,
         code: c.code,
         type: c.typeName,
-        stage: c.stage,
+        designStage: c.designStage,
       })),
     };
   },
@@ -185,7 +185,7 @@ export const getCompatibleFabricsTool = tool({
   description:
     "Given currently selected component IDs, return fabric categories and " +
     "individual fabrics that are compatible with the selection. Requires at " +
-    "least one first-leaf (bodice) component in the selection.",
+    "least one anchor (bodice) component in the selection.",
   inputSchema: z.object({
     selectedComponentIds: z.array(z.string()).describe(
       "UUIDs of currently selected components",
