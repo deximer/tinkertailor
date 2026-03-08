@@ -15,7 +15,7 @@ const AdminFabricViewer = dynamic(
 interface Component {
   id: string;
   name: string;
-  code: string;
+  assetCode: string;
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
@@ -43,6 +43,11 @@ interface Fabric {
 }
 
 const TABS = ["Bodice", "Skirt", "Sleeve"] as const;
+const TAB_SLUG: Record<string, string> = {
+  Bodice: "bodice",
+  Skirt: "skirt-section",
+  Sleeve: "sleeve",
+};
 const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 
 const TEXTURE_OPTIONS: TextureType[] = [
@@ -89,6 +94,10 @@ export default function ViewerPage() {
 
   const [modelUrl, setModelUrl] = useState<string | null>(null);
 
+  // Fabric filter state
+  const [filterToComponent, setFilterToComponent] = useState(false);
+  const [componentFabricCategoryIds, setComponentFabricCategoryIds] = useState<Set<string> | null>(null);
+
   // ── Data fetching ──
 
   useEffect(() => {
@@ -130,6 +139,18 @@ export default function ViewerPage() {
       .catch(() => setMeshes([]));
   }, [selectedComponentId]);
 
+  // Fetch allowed fabric category IDs for the selected component when filter is on
+  useEffect(() => {
+    if (!filterToComponent || !selectedComponentId) {
+      setComponentFabricCategoryIds(null);
+      return;
+    }
+    fetch(`/api/admin/component-fabric-rules?componentId=${selectedComponentId}`)
+      .then((r) => r.json())
+      .then((ids: string[]) => setComponentFabricCategoryIds(new Set(ids)))
+      .catch(() => setComponentFabricCategoryIds(null));
+  }, [filterToComponent, selectedComponentId]);
+
   // Resolve signed URL whenever selected weight or meshes change
   useEffect(() => {
     const mesh = meshes.find((m) => m.fabricWeight === selectedWeight) ?? meshes[0];
@@ -149,8 +170,13 @@ export default function ViewerPage() {
     selectedFabricId !== null &&
     JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
+  const displayedFabrics =
+    filterToComponent && componentFabricCategoryIds !== null
+      ? fabrics.filter((f) => componentFabricCategoryIds.has(f.categoryId))
+      : fabrics;
+
   const filteredComponents = components.filter(
-    (c) => c.typeName === activeTab && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
+    (c) => c.typeSlug === TAB_SLUG[activeTab] && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
   );
 
   // ── Handlers ──
@@ -295,11 +321,26 @@ export default function ViewerPage() {
 
       {/* Right panel: fabrics & settings */}
       <div className="flex w-[280px] shrink-0 flex-col border-l border-gray-700">
-        <div className="border-b border-gray-700 px-3 py-2">
+        <div className="flex items-center justify-between border-b border-gray-700 px-3 py-2">
           <span className="text-xs font-medium text-gray-400">Fabrics</span>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-400">
+            <input
+              type="checkbox"
+              checked={filterToComponent}
+              disabled={!selectedComponentId}
+              onChange={(e) => setFilterToComponent(e.target.checked)}
+              className="accent-white"
+            />
+            Filter to component
+          </label>
         </div>
         <div className="max-h-[280px] overflow-y-auto border-b border-gray-700">
-          {fabrics.map((f) => {
+          {displayedFabrics.length === 0 && (
+            <p className="px-3 py-3 text-xs text-gray-500">
+              {filterToComponent ? "No fabrics linked to this component" : "No fabrics found"}
+            </p>
+          )}
+          {displayedFabrics.map((f) => {
             const isSelected = selectedFabricId === f.id;
             return (
               <button
