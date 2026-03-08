@@ -119,6 +119,14 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Cascade: sync denormalized garmentPart on child components
+    if (body.garmentPart !== undefined) {
+      await db
+        .update(components)
+        .set({ garmentPart: body.garmentPart ?? null })
+        .where(eq(components.componentTypeId, body.id));
+    }
+
     return NextResponse.json(row);
   } catch (err) {
     if (err instanceof ZodError) {
