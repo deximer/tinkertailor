@@ -155,7 +155,7 @@ async function main() {
       await db.insert(silhouetteComponents).values({
         silhouetteId,
         componentId: bodice.id,
-        defaultFabricSkinId: null,
+        defaultFabricId: null,
       });
     }
   }

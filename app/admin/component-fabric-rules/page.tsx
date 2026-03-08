@@ -92,7 +92,7 @@ export default function ComponentFabricRulesPage() {
     setToggling((prev) => new Set(prev).add(key));
     setEdgeSet((prev) => {
       const next = new Set(prev);
-      isLinked ? next.delete(key) : next.add(key);
+      if (isLinked) next.delete(key); else next.add(key);
       return next;
     });
 
@@ -105,7 +105,7 @@ export default function ComponentFabricRulesPage() {
       if (!res.ok) {
         setEdgeSet((prev) => {
           const next = new Set(prev);
-          isLinked ? next.add(key) : next.delete(key);
+          if (isLinked) next.add(key); else next.delete(key);
           return next;
         });
         const data = await res.json();
@@ -114,7 +114,7 @@ export default function ComponentFabricRulesPage() {
     } catch {
       setEdgeSet((prev) => {
         const next = new Set(prev);
-        isLinked ? next.add(key) : next.delete(key);
+        if (isLinked) next.add(key); else next.delete(key);
         return next;
       });
       setErrorMsg("Failed to update rule");

@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       id: userId,
       role: invite.role,
     });
-  } catch (profileError) {
+  } catch {
     // Clean up: delete the auth user if profile insert fails
     await supabase.auth.admin.deleteUser(userId);
     return NextResponse.json(

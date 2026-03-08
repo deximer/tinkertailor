@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { componentMeshes, components } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@supabase/supabase-js";
 

@@ -230,7 +230,7 @@ export default function AdminFabricViewer({
     } else {
       new OBJLoader().load(modelUrl, onLoad);
     }
-  }, [modelUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [modelUrl]);
 
   // Update material when settings change
   useEffect(() => {
