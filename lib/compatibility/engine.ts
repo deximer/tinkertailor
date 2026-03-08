@@ -21,8 +21,8 @@ import {
   components,
   componentTypes,
   componentCompatibility,
-  fabricSkinCategories,
-  fabricSkins,
+  fabricCategories,
+  fabrics,
   componentFabricRules,
 } from "../db/schema";
 import type { ComponentDesignStage } from "../db/schema/component-types";
@@ -303,8 +303,8 @@ export async function getCompatibleFabrics(
   // Get the categories with their parent info
   const cats = await db
     .select()
-    .from(fabricSkinCategories)
-    .where(inArray(fabricSkinCategories.id, catIds));
+    .from(fabricCategories)
+    .where(inArray(fabricCategories.id, catIds));
 
   // For each category, get non-hidden leaf skins
   const result: FabricCategoryWithSkins[] = [];
@@ -314,16 +314,16 @@ export async function getCompatibleFabrics(
 
     const skins = await db
       .select({
-        id: fabricSkins.id,
-        name: fabricSkins.name,
-        fabricCode: fabricSkins.fabricCode,
-        priceMarkup: fabricSkins.priceMarkup,
+        id: fabrics.id,
+        name: fabrics.name,
+        fabricCode: fabrics.fabricCode,
+        priceMarkup: fabrics.priceMarkup,
       })
-      .from(fabricSkins)
+      .from(fabrics)
       .where(
         and(
-          eq(fabricSkins.categoryId, cat.id),
-          eq(fabricSkins.hidden, false),
+          eq(fabrics.categoryId, cat.id),
+          eq(fabrics.hidden, false),
         ),
       );
 

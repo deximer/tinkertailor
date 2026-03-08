@@ -30,7 +30,7 @@ interface Component {
 interface Mesh {
   id: string;
   componentId: string;
-  variant: string;
+  fabricWeight: string;
   storagePath: string;
   publicUrl: string;
 }
@@ -40,7 +40,7 @@ interface GroupedTypes {
   types: ComponentType[];
 }
 
-const MESH_VARIANTS = ["heavy", "light", "standard"] as const;
+const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 
 export default function AdminComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
@@ -65,7 +65,7 @@ export default function AdminComponentsPage() {
   const [expandedMeshId, setExpandedMeshId] = useState<string | null>(null);
   const [meshes, setMeshes] = useState<Record<string, Mesh[]>>({});
   const [meshLoading, setMeshLoading] = useState<string | null>(null);
-  const [uploadingVariant, setUploadingVariant] = useState<string | null>(null);
+  const [uploadingWeight, setUploadingWeight] = useState<string | null>(null);
 
   // Operation feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -237,15 +237,15 @@ export default function AdminComponentsPage() {
 
   const handleMeshUpload = async (
     componentId: string,
-    variant: string,
+    weight: string,
     file: File,
   ) => {
-    setUploadingVariant(`${componentId}:${variant}`);
+    setUploadingWeight(`${componentId}:${weight}`);
     setErrorMsg(null);
 
     const formData = new FormData();
     formData.append("componentId", componentId);
-    formData.append("variant", variant);
+    formData.append("fabricWeight", weight);
     formData.append("file", file);
 
     try {
@@ -263,7 +263,7 @@ export default function AdminComponentsPage() {
     } catch {
       setErrorMsg("Failed to upload mesh");
     }
-    setUploadingVariant(null);
+    setUploadingWeight(null);
   };
 
   const handleMeshDelete = async (meshId: string, componentId: string) => {
@@ -289,8 +289,8 @@ export default function AdminComponentsPage() {
     }
   };
 
-  const getMeshForVariant = (componentId: string, variant: string) =>
-    (meshes[componentId] ?? []).find((m) => m.variant === variant);
+  const getMeshForWeight = (componentId: string, weight: string) =>
+    (meshes[componentId] ?? []).find((m) => m.fabricWeight === weight);
 
   if (loading) {
     return (
@@ -483,24 +483,24 @@ export default function AdminComponentsPage() {
                                   ) : (
                                     <div className="space-y-2">
                                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                        Mesh Variants
+                                        Fabric Weights
                                       </p>
-                                      {MESH_VARIANTS.map((variant) => {
-                                        const mesh = getMeshForVariant(
+                                      {FABRIC_WEIGHTS.map((weight) => {
+                                        const mesh = getMeshForWeight(
                                           comp.id,
-                                          variant,
+                                          weight,
                                         );
                                         const isUploading =
-                                          uploadingVariant ===
-                                          `${comp.id}:${variant}`;
+                                          uploadingWeight ===
+                                          `${comp.id}:${weight}`;
 
                                         return (
                                           <div
-                                            key={variant}
+                                            key={weight}
                                             className="flex items-center gap-3 rounded border border-gray-700 bg-[#222] px-3 py-2"
                                           >
                                             <span className="w-20 text-xs font-medium text-gray-300 capitalize">
-                                              {variant}
+                                              {weight}
                                             </span>
                                             {mesh ? (
                                               <>
@@ -539,7 +539,7 @@ export default function AdminComponentsPage() {
                                                       if (file) {
                                                         handleMeshUpload(
                                                           comp.id,
-                                                          variant,
+                                                          weight,
                                                           file,
                                                         );
                                                       }

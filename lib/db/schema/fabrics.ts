@@ -12,11 +12,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { components } from "./components";
 
-export const fabricSkinCategories = pgTable("fabric_skin_categories", {
+export const fabricCategories = pgTable("fabric_categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
-  parentId: uuid("parent_id").references((): AnyPgColumn => fabricSkinCategories.id),
+  parentId: uuid("parent_id").references((): AnyPgColumn => fabricCategories.id),
   merchandisingOrder: integer("merchandising_order").notNull().default(0),
   hidden: boolean("hidden").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -24,13 +24,13 @@ export const fabricSkinCategories = pgTable("fabric_skin_categories", {
     .notNull(),
 });
 
-export const fabricSkins = pgTable("fabric_skins", {
+export const fabrics = pgTable("fabrics", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   fabricCode: varchar("fabric_code", { length: 50 }).notNull().unique(),
   categoryId: uuid("category_id")
     .notNull()
-    .references(() => fabricSkinCategories.id),
+    .references(() => fabricCategories.id),
   modelType: varchar("model_type", { length: 50 }),
   priceMarkup: numeric("price_markup", { precision: 10, scale: 2 })
     .notNull()
@@ -50,7 +50,7 @@ export const componentFabricRules = pgTable(
       .references(() => components.id),
     fabricCategoryId: uuid("fabric_category_id")
       .notNull()
-      .references(() => fabricSkinCategories.id),
+      .references(() => fabricCategories.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

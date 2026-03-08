@@ -23,8 +23,8 @@ import {
   componentTypes,
   components,
   componentCompatibility,
-  fabricSkinCategories,
-  fabricSkins,
+  fabricCategories,
+  fabrics,
   componentFabricRules,
 } from "../lib/db/schema";
 
@@ -354,8 +354,8 @@ async function seedFabrics() {
 
   // Create top-level "All Fabrics" parent category
   const parentCat = await upsertBySlug(
-    fabricSkinCategories,
-    fabricSkinCategories.slug,
+    fabricCategories,
+    fabricCategories.slug,
     "all-fabrics",
     {
       name: "All Fabrics",
@@ -379,8 +379,8 @@ async function seedFabrics() {
   const familyCats: Record<string, string> = {};
   for (const [key, fam] of Object.entries(fabricFamilies)) {
     const cat = await upsertBySlug(
-      fabricSkinCategories,
-      fabricSkinCategories.slug,
+      fabricCategories,
+      fabricCategories.slug,
       fam.slug,
       {
         name: fam.name,
@@ -441,8 +441,8 @@ async function seedFabrics() {
     const slug = code.toLowerCase();
     const existing = await db
       .select()
-      .from(fabricSkins)
-      .where(eq(fabricSkins.fabricCode, code))
+      .from(fabrics)
+      .where(eq(fabrics.fabricCode, code))
       .limit(1);
 
     let fabricId: string;
@@ -450,7 +450,7 @@ async function seedFabrics() {
       fabricId = existing[0].id;
     } else {
       const inserted = await db
-        .insert(fabricSkins)
+        .insert(fabrics)
         .values({
           name,
           fabricCode: code,
@@ -464,7 +464,7 @@ async function seedFabrics() {
     }
     fabricCodeToId[code] = fabricId;
   }
-  console.log(`  ${fabricCount} fabric skins seeded.`);
+  console.log(`  ${fabricCount} fabrics seeded.`);
 
   return { fabricCodeToId, wb };
 }
@@ -497,8 +497,8 @@ async function seedFabricAffinity(
   for (const code of fabricCodesUsed) {
     const skin = await db
       .select()
-      .from(fabricSkins)
-      .where(eq(fabricSkins.fabricCode, code))
+      .from(fabrics)
+      .where(eq(fabrics.fabricCode, code))
       .limit(1);
     if (skin.length > 0) {
       fabricCatMap[code] = skin[0].categoryId;

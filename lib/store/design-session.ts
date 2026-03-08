@@ -7,7 +7,7 @@ interface DesignSessionState {
   studioMode: StudioMode;
   silhouetteId: string | null;
   selectedComponentIds: string[];
-  selectedFabricSkinId: string | null;
+  selectedFabricId: string | null;
   selectedFabricCode: string | null;
   designPhase: DesignPhase;
   designName: string;
@@ -32,7 +32,7 @@ const initialState: DesignSessionState = {
   studioMode: "imagine",
   silhouetteId: null,
   selectedComponentIds: [],
-  selectedFabricSkinId: null,
+  selectedFabricId: null,
   selectedFabricCode: null,
   designPhase: "silhouette",
   designName: "My Design",
@@ -51,7 +51,7 @@ export const useDesignSession = create<
       studioMode: "atelier",
       silhouetteId: id,
       selectedComponentIds: componentIds,
-      selectedFabricSkinId: null,
+      selectedFabricId: null,
       selectedFabricCode: null,
       designPhase: "embellishment",
     }),
@@ -72,7 +72,7 @@ export const useDesignSession = create<
     set({ selectedComponentIds: ids }),
 
   selectFabric: (id, fabricCode) =>
-    set({ selectedFabricSkinId: id, selectedFabricCode: fabricCode }),
+    set({ selectedFabricId: id, selectedFabricCode: fabricCode }),
 
   setDesignPhase: (phase) =>
     set({ designPhase: phase }),
@@ -92,7 +92,7 @@ export const useDesignSession = create<
           name: state.designName,
           silhouetteTemplateId: state.silhouetteId,
           selectedComponentIds: state.selectedComponentIds,
-          selectedFabricSkinId: state.selectedFabricSkinId,
+          selectedFabricId: state.selectedFabricId,
         }),
       });
 
@@ -119,20 +119,20 @@ export const useDesignSession = create<
         silhouetteTemplateId: string | null;
         components: {
           id: string;
-          fabricSkinId: string | null;
+          fabricId: string | null;
           fabricCode: string | null;
         }[];
       };
 
       const componentIds = data.components.map((c) => c.id);
-      const fabric = data.components.find((c) => c.fabricSkinId);
+      const fabric = data.components.find((c) => c.fabricId);
 
       set({
         savedDesignId: data.id,
         designName: data.name,
         silhouetteId: data.silhouetteTemplateId,
         selectedComponentIds: componentIds,
-        selectedFabricSkinId: fabric?.fabricSkinId ?? null,
+        selectedFabricId: fabric?.fabricId ?? null,
         selectedFabricCode: fabric?.fabricCode ?? null,
       });
       return null;

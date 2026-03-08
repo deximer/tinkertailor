@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { fabricSkinCategories, fabricSkins } from "@/lib/db/schema";
+import { fabricCategories, fabrics } from "@/lib/db/schema";
 import { eq, and, isNull, inArray, asc } from "drizzle-orm";
 import { getCompatibleFabrics } from "@/lib/compatibility";
 
@@ -42,14 +42,14 @@ export async function GET(request: Request) {
 
       const parents = await db
         .select({
-          id: fabricSkinCategories.id,
-          name: fabricSkinCategories.name,
-          slug: fabricSkinCategories.slug,
-          merchandisingOrder: fabricSkinCategories.merchandisingOrder,
+          id: fabricCategories.id,
+          name: fabricCategories.name,
+          slug: fabricCategories.slug,
+          merchandisingOrder: fabricCategories.merchandisingOrder,
         })
-        .from(fabricSkinCategories)
-        .where(inArray(fabricSkinCategories.id, parentIds))
-        .orderBy(asc(fabricSkinCategories.merchandisingOrder));
+        .from(fabricCategories)
+        .where(inArray(fabricCategories.id, parentIds))
+        .orderBy(asc(fabricCategories.merchandisingOrder));
 
       const childByParent = new Map<
         string,
@@ -75,69 +75,69 @@ export async function GET(request: Request) {
       return NextResponse.json(tree);
     }
 
-    // Full 2-level tree: parent categories → child categories → leaf skins
+    // Full 2-level tree: parent categories → child categories → leaf fabrics
     const parents = await db
       .select({
-        id: fabricSkinCategories.id,
-        name: fabricSkinCategories.name,
-        slug: fabricSkinCategories.slug,
-        merchandisingOrder: fabricSkinCategories.merchandisingOrder,
+        id: fabricCategories.id,
+        name: fabricCategories.name,
+        slug: fabricCategories.slug,
+        merchandisingOrder: fabricCategories.merchandisingOrder,
       })
-      .from(fabricSkinCategories)
+      .from(fabricCategories)
       .where(
         and(
-          isNull(fabricSkinCategories.parentId),
-          eq(fabricSkinCategories.hidden, false),
+          isNull(fabricCategories.parentId),
+          eq(fabricCategories.hidden, false),
         ),
       )
-      .orderBy(asc(fabricSkinCategories.merchandisingOrder));
+      .orderBy(asc(fabricCategories.merchandisingOrder));
 
     const tree = [];
 
     for (const parent of parents) {
       const children = await db
         .select({
-          id: fabricSkinCategories.id,
-          name: fabricSkinCategories.name,
-          slug: fabricSkinCategories.slug,
-          merchandisingOrder: fabricSkinCategories.merchandisingOrder,
+          id: fabricCategories.id,
+          name: fabricCategories.name,
+          slug: fabricCategories.slug,
+          merchandisingOrder: fabricCategories.merchandisingOrder,
         })
-        .from(fabricSkinCategories)
+        .from(fabricCategories)
         .where(
           and(
-            eq(fabricSkinCategories.parentId, parent.id),
-            eq(fabricSkinCategories.hidden, false),
+            eq(fabricCategories.parentId, parent.id),
+            eq(fabricCategories.hidden, false),
           ),
         )
-        .orderBy(asc(fabricSkinCategories.merchandisingOrder));
+        .orderBy(asc(fabricCategories.merchandisingOrder));
 
-      const childrenWithSkins = [];
+      const childrenWithFabrics = [];
       for (const child of children) {
-        const skins = await db
+        const childFabrics = await db
           .select({
-            id: fabricSkins.id,
-            name: fabricSkins.name,
-            fabricCode: fabricSkins.fabricCode,
-            modelType: fabricSkins.modelType,
-            priceMarkup: fabricSkins.priceMarkup,
+            id: fabrics.id,
+            name: fabrics.name,
+            fabricCode: fabrics.fabricCode,
+            modelType: fabrics.modelType,
+            priceMarkup: fabrics.priceMarkup,
           })
-          .from(fabricSkins)
+          .from(fabrics)
           .where(
             and(
-              eq(fabricSkins.categoryId, child.id),
-              eq(fabricSkins.hidden, false),
+              eq(fabrics.categoryId, child.id),
+              eq(fabrics.hidden, false),
             ),
           );
 
-        childrenWithSkins.push({ ...child, skins });
+        childrenWithFabrics.push({ ...child, skins: childFabrics });
       }
 
-      tree.push({ ...parent, children: childrenWithSkins });
+      tree.push({ ...parent, children: childrenWithFabrics });
     }
 
     return NextResponse.json(tree);
   } catch (err) {
-    console.error("[fabric-skin-categories] DB error:", err);
+    console.error("[fabric-categories] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

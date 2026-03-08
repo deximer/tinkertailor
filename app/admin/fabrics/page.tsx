@@ -12,7 +12,7 @@ interface FabricCategory {
   createdAt: string;
 }
 
-interface FabricSkin {
+interface Fabric {
   id: string;
   name: string;
   fabricCode: string;
@@ -29,11 +29,11 @@ interface CategoryNode {
   skinCount: number;
 }
 
-const MESH_VARIANTS = ["heavy", "light", "standard", "none"] as const;
+const FABRIC_WEIGHTS = ["heavy", "light", "standard", "none"] as const;
 
 export default function AdminFabricsPage() {
   const [categories, setCategories] = useState<FabricCategory[]>([]);
-  const [skins, setSkins] = useState<FabricSkin[]>([]);
+  const [skins, setSkins] = useState<Fabric[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -83,7 +83,7 @@ export default function AdminFabricsPage() {
     try {
       const [catRes, skinRes] = await Promise.all([
         fetch("/api/admin/fabric-categories"),
-        fetch("/api/admin/fabric-skins"),
+        fetch("/api/admin/fabrics"),
       ]);
 
       if (catRes.ok) setCategories(await catRes.json());
@@ -262,7 +262,7 @@ export default function AdminFabricsPage() {
     if (!form.name || !form.fabricCode) return;
     setErrorMsg(null);
 
-    const res = await fetch("/api/admin/fabric-skins", {
+    const res = await fetch("/api/admin/fabrics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -275,7 +275,7 @@ export default function AdminFabricsPage() {
     });
 
     if (res.ok) {
-      const created: FabricSkin = await res.json();
+      const created: Fabric = await res.json();
       setSkins((prev) => [...prev, created]);
       setSkinCreateForms((prev) => ({
         ...prev,
@@ -292,7 +292,7 @@ export default function AdminFabricsPage() {
     }
   };
 
-  const startEditSkin = (skin: FabricSkin) => {
+  const startEditSkin = (skin: Fabric) => {
     setEditingSkinId(skin.id);
     setEditSkinForm({
       name: skin.name,
@@ -307,7 +307,7 @@ export default function AdminFabricsPage() {
     if (!editingSkinId) return;
     setErrorMsg(null);
 
-    const res = await fetch("/api/admin/fabric-skins", {
+    const res = await fetch("/api/admin/fabrics", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -320,7 +320,7 @@ export default function AdminFabricsPage() {
     });
 
     if (res.ok) {
-      const updated: FabricSkin = await res.json();
+      const updated: Fabric = await res.json();
       setSkins((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
       setEditingSkinId(null);
     } else {
@@ -329,16 +329,16 @@ export default function AdminFabricsPage() {
     }
   };
 
-  const handleToggleSkinHidden = async (skin: FabricSkin) => {
+  const handleToggleSkinHidden = async (skin: Fabric) => {
     setErrorMsg(null);
-    const res = await fetch("/api/admin/fabric-skins", {
+    const res = await fetch("/api/admin/fabrics", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: skin.id, hidden: !skin.hidden }),
     });
 
     if (res.ok) {
-      const updated: FabricSkin = await res.json();
+      const updated: Fabric = await res.json();
       setSkins((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     } else {
       const data = await res.json();
@@ -350,7 +350,7 @@ export default function AdminFabricsPage() {
     setErrorMsg(null);
     setConfirmDeleteSkinId(null);
 
-    const res = await fetch(`/api/admin/fabric-skins?id=${id}`, {
+    const res = await fetch(`/api/admin/fabrics?id=${id}`, {
       method: "DELETE",
     });
 
@@ -843,7 +843,7 @@ export default function AdminFabricsPage() {
                                         }
                                         className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                                       >
-                                        {MESH_VARIANTS.map((v) => (
+                                        {FABRIC_WEIGHTS.map((v) => (
                                           <option key={v} value={v}>
                                             {v === "none" ? "None" : v}
                                           </option>
@@ -1020,7 +1020,7 @@ export default function AdminFabricsPage() {
                             }
                             className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                           >
-                            {MESH_VARIANTS.map((v) => (
+                            {FABRIC_WEIGHTS.map((v) => (
                               <option key={v} value={v}>
                                 {v === "none" ? "None" : v}
                               </option>

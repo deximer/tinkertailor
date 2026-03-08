@@ -7,7 +7,7 @@ import { useDesignSession } from "@/lib/store/design-session";
 // Types
 // ---------------------------------------------------------------------------
 
-interface FabricSkin {
+interface Fabric {
   id: string;
   name: string;
   fabricCode: string;
@@ -18,7 +18,7 @@ interface FabricChildCategory {
   id: string;
   name: string;
   slug: string;
-  skins: FabricSkin[];
+  skins: Fabric[];
 }
 
 interface FabricParentCategory {
@@ -30,7 +30,7 @@ interface FabricParentCategory {
 }
 
 // Deterministic color swatch from fabric code — gives each fabric a stable
-// representative color until a proper hex column is added to fabric_skins.
+// representative color until a proper hex column is added to fabrics.
 function fabricSwatch(code: string): string {
   let h = 0;
   for (let i = 0; i < code.length; i++) {
@@ -46,7 +46,7 @@ function fabricSwatch(code: string): string {
 
 export default function FabricPicker() {
   const selectedComponentIds = useDesignSession((s) => s.selectedComponentIds);
-  const selectedFabricSkinId = useDesignSession((s) => s.selectedFabricSkinId);
+  const selectedFabricId = useDesignSession((s) => s.selectedFabricId);
   const selectFabric = useDesignSession((s) => s.selectFabric);
   const designPhase = useDesignSession((s) => s.designPhase);
 
@@ -76,7 +76,7 @@ export default function FabricPicker() {
 
     try {
       const res = await fetch(
-        `/api/fabric-skin-categories?${params.toString()}`,
+        `/api/fabric-categories?${params.toString()}`,
       );
       if (!res.ok) {
         setFetchError("Failed to load fabrics");
@@ -180,7 +180,7 @@ export default function FabricPicker() {
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {child.skins.map((skin) => {
-                      const isSelected = selectedFabricSkinId === skin.id;
+                      const isSelected = selectedFabricId === skin.id;
                       const markup = parseFloat(skin.priceMarkup);
                       return (
                         <button

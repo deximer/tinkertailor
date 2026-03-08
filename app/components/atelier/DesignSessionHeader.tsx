@@ -14,12 +14,12 @@ export default function DesignSessionHeader() {
   const selectedComponentIds = useDesignSession((s) => s.selectedComponentIds);
   const savedDesignId = useDesignSession((s) => s.savedDesignId);
   const silhouetteId = useDesignSession((s) => s.silhouetteId);
-  const selectedFabricSkinId = useDesignSession((s) => s.selectedFabricSkinId);
+  const selectedFabricId = useDesignSession((s) => s.selectedFabricId);
   const reset = useDesignSession((s) => s.reset);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
 
-  const canCheckout = !!savedDesignId && !!silhouetteId && !!selectedFabricSkinId;
+  const canCheckout = !!savedDesignId && !!silhouetteId && !!selectedFabricId;
 
   const handleShare = async () => {
     if (!savedDesignId || sharing) return;

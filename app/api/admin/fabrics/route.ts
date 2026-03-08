@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
-import { fabricSkins, silhouetteComponents } from "@/lib/db/schema";
+import { fabrics, silhouetteComponents } from "@/lib/db/schema";
 import { eq, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
@@ -31,15 +31,15 @@ const viewerSettingsSchema = z
   .optional();
 
 const returningFields = {
-  id: fabricSkins.id,
-  name: fabricSkins.name,
-  fabricCode: fabricSkins.fabricCode,
-  categoryId: fabricSkins.categoryId,
-  modelType: fabricSkins.modelType,
-  priceMarkup: fabricSkins.priceMarkup,
-  hidden: fabricSkins.hidden,
-  viewerSettings: fabricSkins.viewerSettings,
-  createdAt: fabricSkins.createdAt,
+  id: fabrics.id,
+  name: fabrics.name,
+  fabricCode: fabrics.fabricCode,
+  categoryId: fabrics.categoryId,
+  modelType: fabrics.modelType,
+  priceMarkup: fabrics.priceMarkup,
+  hidden: fabrics.hidden,
+  viewerSettings: fabrics.viewerSettings,
+  createdAt: fabrics.createdAt,
 };
 
 export async function GET() {
@@ -49,12 +49,12 @@ export async function GET() {
   try {
     const rows = await db
       .select(returningFields)
-      .from(fabricSkins)
-      .orderBy(fabricSkins.name);
+      .from(fabrics)
+      .orderBy(fabrics.name);
 
     return NextResponse.json(rows);
   } catch (err) {
-    console.error("[admin/fabric-skins] GET error:", err);
+    console.error("[admin/fabrics] GET error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -91,9 +91,9 @@ export async function POST(request: Request) {
     const body = createSchema.parse(await request.json());
 
     const [existing] = await db
-      .select({ id: fabricSkins.id })
-      .from(fabricSkins)
-      .where(eq(fabricSkins.fabricCode, body.fabricCode))
+      .select({ id: fabrics.id })
+      .from(fabrics)
+      .where(eq(fabrics.fabricCode, body.fabricCode))
       .limit(1);
 
     if (existing) {
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     }
 
     const [row] = await db
-      .insert(fabricSkins)
+      .insert(fabrics)
       .values({
         name: body.name,
         fabricCode: body.fabricCode,
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/fabric-skins] POST error:", err);
+    console.error("[admin/fabrics] POST error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -141,9 +141,9 @@ export async function PUT(request: Request) {
 
     if (body.fabricCode !== undefined) {
       const [existing] = await db
-        .select({ id: fabricSkins.id })
-        .from(fabricSkins)
-        .where(eq(fabricSkins.fabricCode, body.fabricCode))
+        .select({ id: fabrics.id })
+        .from(fabrics)
+        .where(eq(fabrics.fabricCode, body.fabricCode))
         .limit(1);
 
       if (existing && existing.id !== body.id) {
@@ -172,14 +172,14 @@ export async function PUT(request: Request) {
     }
 
     const [row] = await db
-      .update(fabricSkins)
+      .update(fabrics)
       .set(updates)
-      .where(eq(fabricSkins.id, body.id))
+      .where(eq(fabrics.id, body.id))
       .returning(returningFields);
 
     if (!row) {
       return NextResponse.json(
-        { error: "Fabric skin not found" },
+        { error: "Fabric not found" },
         { status: 404 },
       );
     }
@@ -192,7 +192,7 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/fabric-skins] PUT error:", err);
+    console.error("[admin/fabrics] PUT error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -218,13 +218,13 @@ export async function DELETE(request: Request) {
     const [linked] = await db
       .select({ value: count() })
       .from(silhouetteComponents)
-      .where(eq(silhouetteComponents.defaultFabricSkinId, id));
+      .where(eq(silhouetteComponents.defaultFabricId, id));
 
     if (linked.value > 0) {
       return NextResponse.json(
         {
           error:
-            "Cannot delete fabric skin referenced as default in silhouette components",
+            "Cannot delete fabric referenced as default in silhouette components",
           linkedCount: linked.value,
         },
         { status: 409 },
@@ -232,20 +232,20 @@ export async function DELETE(request: Request) {
     }
 
     const [row] = await db
-      .delete(fabricSkins)
-      .where(eq(fabricSkins.id, id))
-      .returning({ id: fabricSkins.id });
+      .delete(fabrics)
+      .where(eq(fabrics.id, id))
+      .returning({ id: fabrics.id });
 
     if (!row) {
       return NextResponse.json(
-        { error: "Fabric skin not found" },
+        { error: "Fabric not found" },
         { status: 404 },
       );
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[admin/fabric-skins] DELETE error:", err);
+    console.error("[admin/fabrics] DELETE error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

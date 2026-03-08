@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
-import { fabricSkinCategories, fabricSkins } from "@/lib/db/schema";
+import { fabricCategories, fabrics } from "@/lib/db/schema";
 import { eq, count, asc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 import { slugify } from "@/lib/utils/slugify";
@@ -13,16 +13,16 @@ export async function GET() {
   try {
     const rows = await db
       .select({
-        id: fabricSkinCategories.id,
-        name: fabricSkinCategories.name,
-        slug: fabricSkinCategories.slug,
-        parentId: fabricSkinCategories.parentId,
-        merchandisingOrder: fabricSkinCategories.merchandisingOrder,
-        hidden: fabricSkinCategories.hidden,
-        createdAt: fabricSkinCategories.createdAt,
+        id: fabricCategories.id,
+        name: fabricCategories.name,
+        slug: fabricCategories.slug,
+        parentId: fabricCategories.parentId,
+        merchandisingOrder: fabricCategories.merchandisingOrder,
+        hidden: fabricCategories.hidden,
+        createdAt: fabricCategories.createdAt,
       })
-      .from(fabricSkinCategories)
-      .orderBy(asc(fabricSkinCategories.merchandisingOrder));
+      .from(fabricCategories)
+      .orderBy(asc(fabricCategories.merchandisingOrder));
 
     return NextResponse.json(rows);
   } catch (err) {
@@ -59,9 +59,9 @@ export async function POST(request: Request) {
 
     if (body.parentId) {
       const [parent] = await db
-        .select({ id: fabricSkinCategories.id })
-        .from(fabricSkinCategories)
-        .where(eq(fabricSkinCategories.id, body.parentId))
+        .select({ id: fabricCategories.id })
+        .from(fabricCategories)
+        .where(eq(fabricCategories.id, body.parentId))
         .limit(1);
 
       if (!parent) {
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     }
 
     const [row] = await db
-      .insert(fabricSkinCategories)
+      .insert(fabricCategories)
       .values({
         name: body.name,
         slug,
@@ -82,13 +82,13 @@ export async function POST(request: Request) {
         hidden: body.hidden,
       })
       .returning({
-        id: fabricSkinCategories.id,
-        name: fabricSkinCategories.name,
-        slug: fabricSkinCategories.slug,
-        parentId: fabricSkinCategories.parentId,
-        merchandisingOrder: fabricSkinCategories.merchandisingOrder,
-        hidden: fabricSkinCategories.hidden,
-        createdAt: fabricSkinCategories.createdAt,
+        id: fabricCategories.id,
+        name: fabricCategories.name,
+        slug: fabricCategories.slug,
+        parentId: fabricCategories.parentId,
+        merchandisingOrder: fabricCategories.merchandisingOrder,
+        hidden: fabricCategories.hidden,
+        createdAt: fabricCategories.createdAt,
       });
 
     return NextResponse.json(row, { status: 201 });
@@ -132,17 +132,17 @@ export async function PUT(request: Request) {
     }
 
     const [row] = await db
-      .update(fabricSkinCategories)
+      .update(fabricCategories)
       .set(updates)
-      .where(eq(fabricSkinCategories.id, body.id))
+      .where(eq(fabricCategories.id, body.id))
       .returning({
-        id: fabricSkinCategories.id,
-        name: fabricSkinCategories.name,
-        slug: fabricSkinCategories.slug,
-        parentId: fabricSkinCategories.parentId,
-        merchandisingOrder: fabricSkinCategories.merchandisingOrder,
-        hidden: fabricSkinCategories.hidden,
-        createdAt: fabricSkinCategories.createdAt,
+        id: fabricCategories.id,
+        name: fabricCategories.name,
+        slug: fabricCategories.slug,
+        parentId: fabricCategories.parentId,
+        merchandisingOrder: fabricCategories.merchandisingOrder,
+        hidden: fabricCategories.hidden,
+        createdAt: fabricCategories.createdAt,
       });
 
     if (!row) {
@@ -185,13 +185,13 @@ export async function DELETE(request: Request) {
 
     const [linked] = await db
       .select({ value: count() })
-      .from(fabricSkins)
-      .where(eq(fabricSkins.categoryId, id));
+      .from(fabrics)
+      .where(eq(fabrics.categoryId, id));
 
     if (linked.value > 0) {
       return NextResponse.json(
         {
-          error: "Cannot delete category with linked fabric skins",
+          error: "Cannot delete category with linked fabrics",
           linkedCount: linked.value,
         },
         { status: 409 },
@@ -199,9 +199,9 @@ export async function DELETE(request: Request) {
     }
 
     const [row] = await db
-      .delete(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, id))
-      .returning({ id: fabricSkinCategories.id });
+      .delete(fabricCategories)
+      .where(eq(fabricCategories.id, id))
+      .returning({ id: fabricCategories.id });
 
     if (!row) {
       return NextResponse.json(

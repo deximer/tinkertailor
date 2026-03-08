@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       name?: string;
       silhouetteTemplateId?: string;
       selectedComponentIds: string[];
-      selectedFabricSkinId?: string;
+      selectedFabricId?: string;
     };
 
     if (!body.selectedComponentIds || body.selectedComponentIds.length === 0) {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const componentRows = body.selectedComponentIds.map((compId, idx) => ({
       productId: product.id,
       componentId: compId,
-      fabricSkinId: body.selectedFabricSkinId ?? null,
+      fabricId: body.selectedFabricId ?? null,
       displayOrder: idx,
     }));
 

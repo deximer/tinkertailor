@@ -3,7 +3,7 @@ import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
 import {
   components,
-  fabricSkinCategories,
+  fabricCategories,
   componentFabricRules,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -82,14 +82,14 @@ export async function POST(request: Request) {
     }
 
     const [cat] = await db
-      .select({ id: fabricSkinCategories.id })
-      .from(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, body.fabricCategoryId))
+      .select({ id: fabricCategories.id })
+      .from(fabricCategories)
+      .where(eq(fabricCategories.id, body.fabricCategoryId))
       .limit(1);
 
     if (!cat) {
       return NextResponse.json(
-        { error: "Fabric skin category not found" },
+        { error: "Fabric category not found" },
         { status: 404 },
       );
     }
@@ -139,14 +139,14 @@ export async function DELETE(request: Request) {
     }
 
     const [cat] = await db
-      .select({ id: fabricSkinCategories.id })
-      .from(fabricSkinCategories)
-      .where(eq(fabricSkinCategories.id, body.fabricCategoryId))
+      .select({ id: fabricCategories.id })
+      .from(fabricCategories)
+      .where(eq(fabricCategories.id, body.fabricCategoryId))
       .limit(1);
 
     if (!cat) {
       return NextResponse.json(
-        { error: "Fabric skin category not found" },
+        { error: "Fabric category not found" },
         { status: 404 },
       );
     }

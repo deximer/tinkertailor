@@ -88,10 +88,10 @@ const TABLE_ORDER = [
   "tag_dimensions",
   "component_types",
   "tag_values",
-  "fabric_skin_categories", // self-referencing via parent_id — handled below
+  "fabric_categories", // self-referencing via parent_id — handled below
   "silhouette_templates",
   "components",
-  "fabric_skins",
+  "fabrics",
   "silhouette_components",
   "silhouette_tags",
   "component_fabric_rules",
@@ -115,15 +115,15 @@ async function copyTable(table: string): Promise<void> {
     return;
   }
 
-  // fabric_skin_categories is self-referencing: insert root nodes first
-  if (table === "fabric_skin_categories") {
+  // fabric_categories is self-referencing: insert root nodes first
+  if (table === "fabric_categories") {
     const roots = rows.filter((r) => (r as any).parent_id === null);
     const children = rows.filter((r) => (r as any).parent_id !== null);
     if (roots.length > 0) {
-      await qaDb`INSERT INTO fabric_skin_categories ${qaDb(roots as any[])} ON CONFLICT DO NOTHING`;
+      await qaDb`INSERT INTO fabric_categories ${qaDb(roots as any[])} ON CONFLICT DO NOTHING`;
     }
     if (children.length > 0) {
-      await qaDb`INSERT INTO fabric_skin_categories ${qaDb(children as any[])} ON CONFLICT DO NOTHING`;
+      await qaDb`INSERT INTO fabric_categories ${qaDb(children as any[])} ON CONFLICT DO NOTHING`;
     }
     console.log(`  ${table}: ${rows.length} rows`);
     return;

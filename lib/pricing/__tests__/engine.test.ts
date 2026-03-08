@@ -77,8 +77,8 @@ describe("calculateOrderTotal", () => {
       ],
       // select-1: silhouette base price
       "select-1": [{ basePrice: "49.99" }],
-      // select-2: product components LEFT JOIN fabric_skins
-      "select-2": [{ fabricSkinId: "fab-1", priceMarkup: "12.50" }],
+      // select-2: product components LEFT JOIN fabrics
+      "select-2": [{ fabricId: "fab-1", priceMarkup: "12.50" }],
     });
 
     // Re-import with fresh module to pick up our mock
@@ -100,11 +100,11 @@ describe("calculateOrderTotal", () => {
       ],
       // select-1: silhouette base price
       "select-1": [{ basePrice: "100.00" }],
-      // select-2: product components LEFT JOIN fabric_skins (all markups in one query)
+      // select-2: product components LEFT JOIN fabrics (all markups in one query)
       "select-2": [
-        { fabricSkinId: "fab-1", priceMarkup: "5.00" },
-        { fabricSkinId: "fab-2", priceMarkup: "10.00" },
-        { fabricSkinId: "fab-3", priceMarkup: "7.50" },
+        { fabricId: "fab-1", priceMarkup: "5.00" },
+        { fabricId: "fab-2", priceMarkup: "10.00" },
+        { fabricId: "fab-3", priceMarkup: "7.50" },
       ],
     });
 
@@ -128,10 +128,10 @@ describe("calculateOrderTotal", () => {
       ],
       // select-1: silhouette base price
       "select-1": [{ basePrice: "75.00" }],
-      // select-2: product components LEFT JOIN fabric_skins — null priceMarkup for no fabric
+      // select-2: product components LEFT JOIN fabrics — null priceMarkup for no fabric
       "select-2": [
-        { fabricSkinId: "fab-1", priceMarkup: "15.00" },
-        { fabricSkinId: null, priceMarkup: null },
+        { fabricId: "fab-1", priceMarkup: "15.00" },
+        { fabricId: null, priceMarkup: null },
       ],
     });
 

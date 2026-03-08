@@ -5,7 +5,7 @@ import {
   silhouetteTemplates,
   silhouetteComponents,
   components,
-  fabricSkins,
+  fabrics,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -13,7 +13,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 const addSchema = z.object({
   silhouetteId: z.string().uuid(),
   componentId: z.string().uuid(),
-  defaultFabricSkinId: z.string().uuid().nullable().optional(),
+  defaultFabricId: z.string().uuid().nullable().optional(),
 });
 
 const removeSchema = z.object({
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         componentId: silhouetteComponents.componentId,
         componentName: components.name,
         componentCode: components.code,
-        defaultFabricSkinId: silhouetteComponents.defaultFabricSkinId,
+        defaultFabricId: silhouetteComponents.defaultFabricId,
       })
       .from(silhouetteComponents)
       .innerJoin(
@@ -97,16 +97,16 @@ export async function POST(request: Request) {
     }
 
     // Validate fabric skin exists if provided
-    if (body.defaultFabricSkinId) {
+    if (body.defaultFabricId) {
       const [skin] = await db
-        .select({ id: fabricSkins.id })
-        .from(fabricSkins)
-        .where(eq(fabricSkins.id, body.defaultFabricSkinId))
+        .select({ id: fabrics.id })
+        .from(fabrics)
+        .where(eq(fabrics.id, body.defaultFabricId))
         .limit(1);
 
       if (!skin) {
         return NextResponse.json(
-          { error: "Fabric skin not found" },
+          { error: "Fabric not found" },
           { status: 404 },
         );
       }
@@ -125,11 +125,11 @@ export async function POST(request: Request) {
       .limit(1);
 
     if (existing) {
-      // Already assigned — update defaultFabricSkinId if provided
-      if (body.defaultFabricSkinId !== undefined) {
+      // Already assigned — update defaultFabricId if provided
+      if (body.defaultFabricId !== undefined) {
         await db
           .update(silhouetteComponents)
-          .set({ defaultFabricSkinId: body.defaultFabricSkinId ?? null })
+          .set({ defaultFabricId: body.defaultFabricId ?? null })
           .where(
             and(
               eq(silhouetteComponents.silhouetteId, body.silhouetteId),
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     await db.insert(silhouetteComponents).values({
       silhouetteId: body.silhouetteId,
       componentId: body.componentId,
-      defaultFabricSkinId: body.defaultFabricSkinId ?? null,
+      defaultFabricId: body.defaultFabricId ?? null,
     });
 
     return NextResponse.json({ ok: true }, { status: 201 });

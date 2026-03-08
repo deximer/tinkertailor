@@ -32,12 +32,12 @@ interface Component {
 interface Mesh {
   id: string;
   componentId: string;
-  variant: string;
+  fabricWeight: string;
   storagePath: string;
   publicUrl: string;
 }
 
-interface FabricSkin {
+interface Fabric {
   id: string;
   name: string;
   fabricCode: string;
@@ -50,7 +50,7 @@ interface FabricSkin {
 }
 
 const TABS = ["Bodice", "Skirt", "Sleeve"] as const;
-const VARIANTS = ["heavy", "light", "standard"] as const;
+const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 
 const TEXTURE_OPTIONS: TextureType[] = [
   "solid",
@@ -83,11 +83,11 @@ export default function ViewerPage() {
   const [activeTab, setActiveTab] = useState<string>("Bodice");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [meshes, setMeshes] = useState<Mesh[]>([]);
-  const [selectedVariant, setSelectedVariant] = useState<string>("heavy");
+  const [selectedWeight, setSelectedWeight] = useState<string>("heavy");
   const [meshLoading, setMeshLoading] = useState(false);
 
   // Fabric state
-  const [fabrics, setFabrics] = useState<FabricSkin[]>([]);
+  const [fabrics, setFabrics] = useState<Fabric[]>([]);
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ViewerSettings>(DEFAULT_SETTINGS);
   const [savedSettings, setSavedSettings] = useState<ViewerSettings | null>(null);
@@ -97,7 +97,7 @@ export default function ViewerPage() {
 
   // Derived
   const modelUrl =
-    meshes.find((m) => m.variant === selectedVariant)?.publicUrl ?? null;
+    meshes.find((m) => m.fabricWeight === selectedWeight)?.publicUrl ?? null;
   const isDirty =
     selectedFabricId !== null &&
     JSON.stringify(settings) !== JSON.stringify(savedSettings);
@@ -115,9 +115,9 @@ export default function ViewerPage() {
       .then((data: Component[]) => setComponents(data))
       .catch(console.error);
 
-    fetch("/api/admin/fabric-skins")
+    fetch("/api/admin/fabrics")
       .then((r) => r.json())
-      .then((data: FabricSkin[]) => setFabrics(data))
+      .then((data: Fabric[]) => setFabrics(data))
       .catch(console.error);
   }, []);
 
@@ -135,12 +135,12 @@ export default function ViewerPage() {
       .then((r) => r.json())
       .then((data: Mesh[]) => {
         setMeshes(data);
-        // Default to heavy variant, fall back to first available
-        const hasHeavy = data.some((m) => m.variant === "heavy");
+        // Default to heavy weight, fall back to first available
+        const hasHeavy = data.some((m) => m.fabricWeight === "heavy");
         if (!hasHeavy && data.length > 0) {
-          setSelectedVariant(data[0].variant);
+          setSelectedWeight(data[0].fabricWeight);
         } else {
-          setSelectedVariant("heavy");
+          setSelectedWeight("heavy");
         }
       })
       .catch(console.error)
@@ -173,7 +173,7 @@ export default function ViewerPage() {
   // ── Handlers ──
 
   const handleSelectFabric = useCallback(
-    (fabric: FabricSkin) => {
+    (fabric: Fabric) => {
       setSelectedFabricId(fabric.id);
       const s = fabric.viewerSettings ?? DEFAULT_SETTINGS;
       setSettings(s);
@@ -187,13 +187,13 @@ export default function ViewerPage() {
     setSaving(true);
     setSaveError(false);
     try {
-      const res = await fetch("/api/admin/fabric-skins", {
+      const res = await fetch("/api/admin/fabrics", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: selectedFabricId, viewerSettings: settings }),
       });
       if (res.ok) {
-        const updated: FabricSkin = await res.json();
+        const updated: Fabric = await res.json();
         setFabrics((prev) =>
           prev.map((f) => (f.id === updated.id ? updated : f)),
         );
@@ -288,17 +288,17 @@ export default function ViewerPage() {
         {/* Variant toggle */}
         {meshes.length > 0 && (
           <div className="border-t border-gray-700 px-3 py-2">
-            <p className="mb-1 text-xs text-gray-500">Mesh Variant</p>
+            <p className="mb-1 text-xs text-gray-500">Fabric Weight</p>
             <div className="flex gap-1">
-              {VARIANTS.map((v) => {
-                const available = meshes.some((m) => m.variant === v);
+              {FABRIC_WEIGHTS.map((v) => {
+                const available = meshes.some((m) => m.fabricWeight === v);
                 return (
                   <button
                     key={v}
                     disabled={!available}
-                    onClick={() => setSelectedVariant(v)}
+                    onClick={() => setSelectedWeight(v)}
                     className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
-                      selectedVariant === v
+                      selectedWeight === v
                         ? "bg-white text-black"
                         : available
                           ? "bg-[#333] text-gray-300 hover:bg-[#444]"
