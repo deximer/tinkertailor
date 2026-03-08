@@ -35,7 +35,6 @@ interface FabricSkin {
 }
 
 const TABS = ["Bodice", "Skirt Section", "Sleeve"] as const;
-const VARIANTS = ["heavy", "light", "standard"] as const;
 
 const TEXTURE_OPTIONS: TextureType[] = [
   "solid",
@@ -68,6 +67,7 @@ export default function ViewerPage() {
   const [selectedVariant, setSelectedVariant] = useState<"heavy" | "light" | "standard">("heavy");
 
   const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
+  const [availableMeshes, setAvailableMeshes] = useState<{ variant: string; storagePath: string }[]>([]);
 
   const [fabrics, setFabrics] = useState<FabricSkin[]>([]);
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
@@ -77,7 +77,6 @@ export default function ViewerPage() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  const [storagePath, setStoragePath] = useState<string | null>(null);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
 
   // ── Data fetching ──
@@ -99,25 +98,32 @@ export default function ViewerPage() {
       .catch(console.error);
   }, []);
 
-  // Load meshes for selected component (one call per selection)
+  // Load meshes for selected component; auto-select first available variant
   useEffect(() => {
     if (!selectedComponentId) {
-      setStoragePath(null);
+      setAvailableMeshes([]);
       return;
     }
     fetch(`/api/admin/component-meshes?componentId=${selectedComponentId}`)
       .then((r) => r.json())
       .then((meshes: { variant: string; storagePath: string }[]) => {
-        const mesh =
-          meshes.find((m) => m.variant === selectedVariant) ??
-          meshes[0] ??
-          null;
-        setStoragePath(mesh?.storagePath ?? null);
+        setAvailableMeshes(meshes);
+        // Auto-select first available variant if current isn't available
+        if (meshes.length > 0 && !meshes.find((m) => m.variant === selectedVariant)) {
+          setSelectedVariant(meshes[0].variant as typeof selectedVariant);
+        }
       })
-      .catch(() => setStoragePath(null));
-  }, [selectedComponentId, selectedVariant]);
+      .catch(() => setAvailableMeshes([]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedComponentId]);
 
-  // Resolve signed URL from storage path
+  // Derive storage path from available meshes + selected variant
+  const storagePath =
+    availableMeshes.find((m) => m.variant === selectedVariant)?.storagePath ??
+    availableMeshes[0]?.storagePath ??
+    null;
+
+  // Resolve signed URL whenever storage path changes
   useEffect(() => {
     if (!storagePath) {
       setModelUrl(null);
@@ -229,15 +235,15 @@ export default function ViewerPage() {
           ))}
         </div>
 
-        {/* Variant toggle — always shown when a component is selected */}
-        {selectedComponentId && (
+        {/* Variant toggle — only shown when multiple variants are available */}
+        {availableMeshes.length > 1 && (
           <div className="border-t border-gray-700 px-3 py-2">
             <p className="mb-1 text-xs text-gray-500">Mesh Variant</p>
             <div className="flex gap-1">
-              {VARIANTS.map((v) => (
+              {availableMeshes.map(({ variant: v }) => (
                 <button
                   key={v}
-                  onClick={() => setSelectedVariant(v)}
+                  onClick={() => setSelectedVariant(v as typeof selectedVariant)}
                   className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
                     selectedVariant === v
                       ? "bg-white text-black"
