@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { componentTypes, garmentParts } from "@/lib/db/schema";
+import { componentTypes, garmentParts, partRoles } from "@/lib/db/schema";
 import { eq, and, asc, type SQL } from "drizzle-orm";
 
 export async function GET(request: Request) {
@@ -39,9 +39,12 @@ export async function GET(request: Request) {
         garmentPartId: componentTypes.garmentPartId,
         garmentPartName: garmentParts.name,
         garmentPartSlug: garmentParts.slug,
+        partRoleSlug: partRoles.slug,
+        partRoleSortOrder: partRoles.sortOrder,
       })
       .from(componentTypes)
       .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
+      .leftJoin(partRoles, eq(garmentParts.partRoleId, partRoles.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(asc(componentTypes.name));
 
