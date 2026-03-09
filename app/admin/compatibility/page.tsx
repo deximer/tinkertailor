@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 
 interface ComponentType {
   id: string;
@@ -74,43 +74,47 @@ export default function AdminCompatibilityPage() {
   }, []);
 
   // Fetch matrix when type pair changes
-  const fetchMatrix = useCallback(async () => {
+  useEffect(() => {
     if (!typeASlug || !typeBSlug) {
       setMatrix(null);
       setEdgeSet(new Set());
       return;
     }
 
+    const controller = new AbortController();
     setMatrixLoading(true);
     setErrorMsg(null);
 
-    try {
-      const res = await fetch(
-        `/api/admin/compatibility?typeA=${encodeURIComponent(typeASlug)}&typeB=${encodeURIComponent(typeBSlug)}`,
-      );
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/compatibility?typeA=${encodeURIComponent(typeASlug)}&typeB=${encodeURIComponent(typeBSlug)}`,
+          { signal: controller.signal },
+        );
 
-      if (res.ok) {
-        const data: MatrixData = await res.json();
-        setMatrix(data);
-        setEdgeSet(new Set(data.edges));
-      } else {
-        const data = await res.json();
-        setErrorMsg(data.error ?? "Failed to load matrix");
-        setMatrix(null);
-        setEdgeSet(new Set());
+        if (res.ok) {
+          const data: MatrixData = await res.json();
+          setMatrix(data);
+          setEdgeSet(new Set(data.edges));
+        } else {
+          const data = await res.json();
+          setErrorMsg(data.error ?? "Failed to load matrix");
+          setMatrix(null);
+          setEdgeSet(new Set());
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setErrorMsg("Failed to load compatibility matrix");
+          setMatrix(null);
+          setEdgeSet(new Set());
+        }
       }
-    } catch {
-      setErrorMsg("Failed to load compatibility matrix");
-      setMatrix(null);
-      setEdgeSet(new Set());
-    }
 
-    setMatrixLoading(false);
+      setMatrixLoading(false);
+    })();
+
+    return () => controller.abort();
   }, [typeASlug, typeBSlug]);
-
-  useEffect(() => {
-    fetchMatrix();
-  }, [fetchMatrix]);
 
   const handleToggle = async (rowId: string, colId: string) => {
     const key = `${rowId}:${colId}`;
@@ -360,10 +364,10 @@ export default function AdminCompatibilityPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {matrix.rows.map((row, rowIdx) => (
-                    <tr key={row.id} className={`border-b border-gray-800 hover:bg-[#2a2a2a] ${rowIdx % 2 === 1 ? "bg-[#1e1e1e]" : ""}`}>
+                  {matrix.rows.map((row) => (
+                    <tr key={row.id} className="border-b border-gray-800 hover:bg-[#2a2a2a]">
                       <td
-                        className={`sticky left-0 border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap ${rowIdx % 2 === 1 ? "bg-[#1e1e1e]" : "bg-[#222]"}`}
+                        className="sticky left-0 bg-[#222] border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap"
                         title={`${row.name} (${row.assetCode})`}
                       >
                         {row.name}
