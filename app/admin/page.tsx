@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/admin/component-types", label: "Component Types" },
   { href: "/admin/components", label: "Components" },
   { href: "/admin/compatibility", label: "Compatibility Graph" },
+  { href: "/admin/compatibility/analyze", label: "Auto-Detect Compatibility" },
   { href: "/admin/fabrics", label: "Fabric Catalog" },
   { href: "/admin/component-fabric-rules", label: "Component Fabric Rules" },
   { href: "/admin/tags", label: "Tag Dimensions & Values" },

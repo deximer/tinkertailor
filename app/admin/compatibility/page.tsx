@@ -216,12 +216,20 @@ export default function AdminCompatibilityPage() {
           <h1 className="text-xl font-bold tracking-tight">
             Tinker Tailor — Compatibility
           </h1>
-          <a
-            href="/admin"
-            className="rounded border border-gray-600 px-3 py-1.5 text-sm text-gray-300 hover:bg-[#2a2a2a] transition-colors"
-          >
-            Back to Admin
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="/admin/compatibility/analyze"
+              className="rounded border border-gray-600 px-3 py-1.5 text-sm text-gray-300 hover:bg-[#2a2a2a] transition-colors"
+            >
+              Run Auto-Detection &rarr;
+            </a>
+            <a
+              href="/admin"
+              className="rounded border border-gray-600 px-3 py-1.5 text-sm text-gray-300 hover:bg-[#2a2a2a] transition-colors"
+            >
+              Back to Admin
+            </a>
+          </div>
         </div>
 
         {errorMsg && (
