@@ -141,6 +141,76 @@
       "when": 1772900900000,
       "tag": "0019_add_model_path_to_components",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772901000000,
+      "tag": "0020_drop_model_path",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1772901100000,
+      "tag": "0021_schema_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1773091200000,
+      "tag": "0022_create_part_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1773091300000,
+      "tag": "0023_create_garment_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1773091400000,
+      "tag": "0024_create_garment_parts",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1773091500000,
+      "tag": "0025_create_garment_type_parts",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1773091600000,
+      "tag": "0026_seed_taxonomy",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1773091700000,
+      "tag": "0027_add_taxonomy_fks",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1773091800000,
+      "tag": "0028_make_legacy_columns_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1773091900000,
+      "tag": "0029_drop_legacy_categories",
+      "breakpoints": true
     }
   ]
 }

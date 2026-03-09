@@ -13,7 +13,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   patternId: z.string().min(1).max(50),
-  categoryId: z.string().uuid(),
+  garmentTypeId: z.string().uuid(),
   basePrice: z.string().default("0"),
   description: z.string().max(2000).nullable().optional(),
   isComposable: z.boolean().optional(),
@@ -23,7 +23,7 @@ const updateSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(200).optional(),
   patternId: z.string().min(1).max(50).optional(),
-  categoryId: z.string().uuid().optional(),
+  garmentTypeId: z.string().uuid().optional(),
   basePrice: z.string().optional(),
   description: z.string().max(2000).nullable().optional(),
   isComposable: z.boolean().optional(),
@@ -39,7 +39,7 @@ export async function GET() {
         id: silhouetteTemplates.id,
         name: silhouetteTemplates.name,
         patternId: silhouetteTemplates.patternId,
-        categoryId: silhouetteTemplates.categoryId,
+        garmentTypeId: silhouetteTemplates.garmentTypeId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
         isComposable: silhouetteTemplates.isComposable,
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       .values({
         name: body.name,
         patternId: body.patternId,
-        categoryId: body.categoryId,
+        garmentTypeId: body.garmentTypeId,
         basePrice: body.basePrice,
         description: body.description ?? null,
         isComposable: body.isComposable ?? false,
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
         id: silhouetteTemplates.id,
         name: silhouetteTemplates.name,
         patternId: silhouetteTemplates.patternId,
-        categoryId: silhouetteTemplates.categoryId,
+        garmentTypeId: silhouetteTemplates.garmentTypeId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
         isComposable: silhouetteTemplates.isComposable,
@@ -142,7 +142,7 @@ export async function PUT(request: Request) {
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.patternId !== undefined) updates.patternId = body.patternId;
-    if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
+    if (body.garmentTypeId !== undefined) updates.garmentTypeId = body.garmentTypeId;
     if (body.basePrice !== undefined) updates.basePrice = body.basePrice;
     if (body.description !== undefined) updates.description = body.description;
     if (body.isComposable !== undefined) updates.isComposable = body.isComposable;
@@ -162,7 +162,7 @@ export async function PUT(request: Request) {
         id: silhouetteTemplates.id,
         name: silhouetteTemplates.name,
         patternId: silhouetteTemplates.patternId,
-        categoryId: silhouetteTemplates.categoryId,
+        garmentTypeId: silhouetteTemplates.garmentTypeId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
         isComposable: silhouetteTemplates.isComposable,

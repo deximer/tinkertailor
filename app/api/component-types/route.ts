@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { componentTypes, categories } from "@/lib/db/schema";
+import { componentTypes, garmentParts, partRoles } from "@/lib/db/schema";
 import { eq, and, asc, type SQL } from "drizzle-orm";
-import type { ComponentDesignStage } from "@/lib/db/schema/component-types";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -16,25 +15,20 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const categorySlug = searchParams.get("category");
-    const stage = searchParams.get("stage");
+    const garmentPartSlug = searchParams.get("garmentPart");
 
     const conditions: SQL[] = [];
 
-    if (categorySlug) {
-      const cat = await db
-        .select({ id: categories.id })
-        .from(categories)
-        .where(eq(categories.slug, categorySlug))
+    if (garmentPartSlug) {
+      const gp = await db
+        .select({ id: garmentParts.id })
+        .from(garmentParts)
+        .where(eq(garmentParts.slug, garmentPartSlug))
         .limit(1);
-      if (cat.length === 0) {
+      if (gp.length === 0) {
         return NextResponse.json([]);
       }
-      conditions.push(eq(componentTypes.categoryId, cat[0].id));
-    }
-
-    if (stage) {
-      conditions.push(eq(componentTypes.designStage, stage as ComponentDesignStage));
+      conditions.push(eq(componentTypes.garmentPartId, gp[0].id));
     }
 
     const rows = await db
@@ -42,12 +36,15 @@ export async function GET(request: Request) {
         id: componentTypes.id,
         name: componentTypes.name,
         slug: componentTypes.slug,
-        categoryId: componentTypes.categoryId,
-        designStage: componentTypes.designStage,
-        isAnchor: componentTypes.isAnchor,
-        garmentPart: componentTypes.garmentPart,
+        garmentPartId: componentTypes.garmentPartId,
+        garmentPartName: garmentParts.name,
+        garmentPartSlug: garmentParts.slug,
+        partRoleSlug: partRoles.slug,
+        partRoleSortOrder: partRoles.sortOrder,
       })
       .from(componentTypes)
+      .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
+      .leftJoin(partRoles, eq(garmentParts.partRoleId, partRoles.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(asc(componentTypes.name));
 

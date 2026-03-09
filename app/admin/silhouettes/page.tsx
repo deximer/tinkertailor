@@ -6,7 +6,7 @@ interface Silhouette {
   id: string;
   name: string;
   patternId: string;
-  categoryId: string;
+  garmentTypeId: string | null;
   basePrice: string;
   isComposable: boolean;
   description: string | null;
@@ -15,7 +15,7 @@ interface Silhouette {
   tagCount: number;
 }
 
-interface Category {
+interface GarmentType {
   id: string;
   name: string;
   slug: string;
@@ -61,7 +61,7 @@ interface TagValue {
 interface CreateForm {
   name: string;
   patternId: string;
-  categoryId: string;
+  garmentTypeId: string;
   basePrice: string;
   isComposable: boolean;
   description: string;
@@ -69,7 +69,7 @@ interface CreateForm {
 
 export default function AdminSilhouettesPage() {
   const [silhouettes, setSilhouettes] = useState<Silhouette[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [garmentTypes, setGarmentTypes] = useState<GarmentType[]>([]);
   const [allComponents, setAllComponents] = useState<ComponentOption[]>([]);
   const [allSkins, setAllSkins] = useState<Fabric[]>([]);
   const [dimensions, setDimensions] = useState<TagDimension[]>([]);
@@ -101,7 +101,7 @@ export default function AdminSilhouettesPage() {
   const [createForm, setCreateForm] = useState<CreateForm>({
     name: "",
     patternId: "",
-    categoryId: "",
+    garmentTypeId: "",
     basePrice: "0",
     isComposable: false,
     description: "",
@@ -116,16 +116,16 @@ export default function AdminSilhouettesPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [silRes, catRes, compRes, skinRes, tagRes] = await Promise.all([
+      const [silRes, gtRes, compRes, skinRes, tagRes] = await Promise.all([
         fetch("/api/admin/silhouettes"),
-        fetch("/api/categories"),
+        fetch("/api/admin/garment-types"),
         fetch("/api/admin/components"),
         fetch("/api/admin/fabrics"),
         fetch("/api/admin/tags"),
       ]);
 
       if (silRes.ok) setSilhouettes(await silRes.json());
-      if (catRes.ok) setCategories(await catRes.json());
+      if (gtRes.ok) setGarmentTypes(await gtRes.json());
       if (compRes.ok) setAllComponents(await compRes.json());
       if (skinRes.ok) setAllSkins(await skinRes.json());
       if (tagRes.ok) {
@@ -180,7 +180,7 @@ export default function AdminSilhouettesPage() {
   // -- CRUD handlers --
 
   const handleCreate = async () => {
-    if (!createForm.name || !createForm.patternId || !createForm.categoryId)
+    if (!createForm.name || !createForm.patternId || !createForm.garmentTypeId)
       return;
 
     setErrorMsg(null);
@@ -190,7 +190,7 @@ export default function AdminSilhouettesPage() {
       body: JSON.stringify({
         name: createForm.name,
         patternId: createForm.patternId,
-        categoryId: createForm.categoryId,
+        garmentTypeId: createForm.garmentTypeId,
         basePrice: createForm.basePrice || "0",
         isComposable: createForm.isComposable,
         description: createForm.description || null,
@@ -203,7 +203,7 @@ export default function AdminSilhouettesPage() {
       setCreateForm({
         name: "",
         patternId: "",
-        categoryId: "",
+        garmentTypeId: "",
         basePrice: "0",
         isComposable: false,
         description: "",
@@ -385,8 +385,8 @@ export default function AdminSilhouettesPage() {
 
   // -- Helpers --
 
-  const categoryName = (catId: string) =>
-    categories.find((c) => c.id === catId)?.name ?? catId;
+  const garmentTypeName = (gtId: string | null) =>
+    garmentTypes.find((g) => g.id === gtId)?.name ?? "Unassigned";
 
   const componentCount = (sil: Silhouette) => {
     if (sil.id === selectedId) return assignedComponents.length;
@@ -489,22 +489,22 @@ export default function AdminSilhouettesPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-500">
-                    Category
+                    Garment Type
                   </label>
                   <select
-                    value={createForm.categoryId}
+                    value={createForm.garmentTypeId}
                     onChange={(e) =>
                       setCreateForm((f) => ({
                         ...f,
-                        categoryId: e.target.value,
+                        garmentTypeId: e.target.value,
                       }))
                     }
                     className="w-full rounded border border-gray-600 bg-[#1a1a1a] px-2 py-1 text-sm text-white"
                   >
-                    <option value="">Select category...</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
+                    <option value="">Select garment type...</option>
+                    {garmentTypes.map((gt) => (
+                      <option key={gt.id} value={gt.id}>
+                        {gt.name}
                       </option>
                     ))}
                   </select>
@@ -563,7 +563,7 @@ export default function AdminSilhouettesPage() {
                 disabled={
                   !createForm.name ||
                   !createForm.patternId ||
-                  !createForm.categoryId
+                  !createForm.garmentTypeId
                 }
                 className="rounded bg-white px-4 py-1.5 text-sm font-medium text-black hover:bg-gray-200 disabled:opacity-50 transition-colors"
               >
@@ -585,7 +585,7 @@ export default function AdminSilhouettesPage() {
                   <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wider text-gray-500">
                     <th className="px-4 py-2">Name</th>
                     <th className="px-4 py-2">Pattern ID</th>
-                    <th className="px-4 py-2">Category</th>
+                    <th className="px-4 py-2">Garment Type</th>
                     <th className="px-4 py-2">Base Price</th>
                     <th className="px-4 py-2">Mode</th>
                     <th className="px-4 py-2">Components</th>
@@ -609,7 +609,7 @@ export default function AdminSilhouettesPage() {
                         {sil.patternId}
                       </td>
                       <td className="px-4 py-2 text-gray-400">
-                        {categoryName(sil.categoryId)}
+                        {garmentTypeName(sil.garmentTypeId)}
                       </td>
                       <td className="px-4 py-2 text-gray-400">
                         ${sil.basePrice}

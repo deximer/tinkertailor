@@ -4,9 +4,11 @@ import { db } from "@/lib/db";
 import {
   components,
   componentTypes,
+  garmentParts,
   silhouetteComponents,
   productComponents,
 } from "@/lib/db/schema";
+import type { GarmentPart } from "@/lib/db/schema/components";
 import { componentFabricRules } from "@/lib/db/schema/fabrics";
 import { eq, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -71,10 +73,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Look up garmentPart from the component type to denormalize
+    // Look up garmentPart slug from the component type → garment_parts join
     const [ct] = await db
-      .select({ garmentPart: componentTypes.garmentPart })
+      .select({ garmentPartSlug: garmentParts.slug })
       .from(componentTypes)
+      .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
       .where(eq(componentTypes.id, body.componentTypeId))
       .limit(1);
 
@@ -84,7 +87,7 @@ export async function POST(request: Request) {
         name: body.name,
         assetCode: body.assetCode,
         componentTypeId: body.componentTypeId,
-        garmentPart: ct?.garmentPart ?? null,
+        garmentPart: (ct?.garmentPartSlug as GarmentPart) ?? null,
       })
       .returning({
         id: components.id,
@@ -138,13 +141,14 @@ export async function PUT(request: Request) {
     if (body.assetCode !== undefined) updates.assetCode = body.assetCode;
     if (body.componentTypeId !== undefined) {
       updates.componentTypeId = body.componentTypeId;
-      // Re-sync garmentPart from new component type
+      // Re-sync garmentPart from new component type → garment_parts join
       const [ct] = await db
-        .select({ garmentPart: componentTypes.garmentPart })
+        .select({ garmentPartSlug: garmentParts.slug })
         .from(componentTypes)
+        .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
         .where(eq(componentTypes.id, body.componentTypeId))
         .limit(1);
-      updates.garmentPart = ct?.garmentPart ?? null;
+      updates.garmentPart = (ct?.garmentPartSlug as GarmentPart) ?? null;
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

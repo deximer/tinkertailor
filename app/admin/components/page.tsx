@@ -6,15 +6,19 @@ interface ComponentType {
   id: string;
   name: string;
   slug: string;
-  categoryId: string;
-  designStage: string;
-  isAnchor: boolean;
+  garmentPartId: string | null;
+  garmentPartName: string | null;
+  garmentPartSlug: string | null;
 }
 
-interface Category {
+interface GarmentPart {
   id: string;
   name: string;
   slug: string;
+  partRoleId: string;
+  partRoleName: string;
+  partRoleSlug: string;
+  isAnchor: boolean;
 }
 
 interface Component {
@@ -35,7 +39,7 @@ interface Mesh {
 }
 
 interface GroupedTypes {
-  category: Category;
+  garmentPart: GarmentPart;
   types: ComponentType[];
 }
 
@@ -44,7 +48,7 @@ const FABRIC_WEIGHTS = ["heavy", "light", "standard"] as const;
 export default function AdminComponentsPage() {
   const [components, setComponents] = useState<Component[]>([]);
   const [componentTypes, setComponentTypes] = useState<ComponentType[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [garmentParts, setGarmentParts] = useState<GarmentPart[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Inline create form state per component type
@@ -72,15 +76,15 @@ export default function AdminComponentsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [compRes, typesRes, catsRes] = await Promise.all([
+      const [compRes, typesRes, partsRes] = await Promise.all([
         fetch("/api/admin/components"),
-        fetch("/api/component-types"),
-        fetch("/api/categories"),
+        fetch("/api/admin/component-types"),
+        fetch("/api/admin/garment-parts"),
       ]);
 
       if (compRes.ok) setComponents(await compRes.json());
       if (typesRes.ok) setComponentTypes(await typesRes.json());
-      if (catsRes.ok) setCategories(await catsRes.json());
+      if (partsRes.ok) setGarmentParts(await partsRes.json());
     } catch {
       setErrorMsg("Failed to load data");
     }
@@ -91,11 +95,11 @@ export default function AdminComponentsPage() {
     fetchData();
   }, [fetchData]);
 
-  // Group component types by category
-  const groupedByCategory: GroupedTypes[] = categories
-    .map((cat) => ({
-      category: cat,
-      types: componentTypes.filter((ct) => ct.categoryId === cat.id),
+  // Group component types by garment part
+  const groupedByPart: GroupedTypes[] = garmentParts
+    .map((gp) => ({
+      garmentPart: gp,
+      types: componentTypes.filter((ct) => ct.garmentPartId === gp.id),
     }))
     .filter((g) => g.types.length > 0);
 
@@ -318,11 +322,11 @@ export default function AdminComponentsPage() {
           </div>
         )}
 
-        {/* Components grouped by category, then by type */}
-        {groupedByCategory.map((group) => (
-          <section key={group.category.id} className="mb-10">
+        {/* Components grouped by garment part, then by type */}
+        {groupedByPart.map((group) => (
+          <section key={group.garmentPart.id} className="mb-10">
             <h2 className="mb-4 text-sm font-medium uppercase tracking-wider text-gray-400">
-              {group.category.name}
+              {group.garmentPart.name}
             </h2>
 
             {group.types.map((ct) => {
@@ -337,7 +341,7 @@ export default function AdminComponentsPage() {
                   <h3 className="mb-3 text-sm font-semibold text-white">
                     {ct.name}{" "}
                     <span className="font-normal text-gray-500">
-                      ({ct.slug} / {ct.designStage})
+                      ({ct.slug})
                     </span>
                   </h3>
 
@@ -586,9 +590,9 @@ export default function AdminComponentsPage() {
           </section>
         ))}
 
-        {groupedByCategory.length === 0 && (
+        {groupedByPart.length === 0 && (
           <p className="text-gray-500 text-sm">
-            No component types found. Create categories and component types
+            No component types found. Create garment parts and component types
             first.
           </p>
         )}

@@ -27,6 +27,7 @@ function createMockDb(overrides: {
 
   const mockFrom = vi.fn();
   const mockInnerJoin = vi.fn();
+  const mockLeftJoin = vi.fn();
   const mockWhere = vi.fn();
   const mockLimit = vi.fn();
 
@@ -37,6 +38,10 @@ function createMockDb(overrides: {
     },
     innerJoin: (...args: unknown[]) => {
       mockInnerJoin(...args);
+      return chainResult;
+    },
+    leftJoin: (...args: unknown[]) => {
+      mockLeftJoin(...args);
       return chainResult;
     },
     where: (...args: unknown[]) => {
@@ -81,7 +86,7 @@ function createMockDb(overrides: {
         })),
       })),
     })),
-    _mocks: { mockFrom, mockInnerJoin, mockWhere, mockLimit },
+    _mocks: { mockFrom, mockInnerJoin, mockLeftJoin, mockWhere, mockLimit },
   };
 }
 
@@ -101,10 +106,10 @@ describe("Design Phase Determination", () => {
     const mockDb = createMockDb({
       selectResults: {
         // First call: selected components (empty)
-        // Second call: all components in allowed stages
+        // Second call: all components in allowed roles
         "select-0": [
-          makeMockComponent("c1", "Bodice 1", "BOD-1", "bodice", "silhouette", true),
-          makeMockComponent("c2", "Skirt 1", "SK-1", "skirt-section", "silhouette", false),
+          makeMockComponent("c1", "Bodice 1", "BOD-1", "bodice", "bodice", "structural", true),
+          makeMockComponent("c2", "Skirt 1", "SK-1", "skirt-section", "skirt", "structural", false),
         ],
       },
     });
@@ -118,7 +123,7 @@ describe("Design Phase Determination", () => {
   it("silhouette phase when only non-anchor selected", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
-    const skirt = makeMockComponent("sk1", "Skirt 1", "SK-1", "skirt-section", "silhouette", false);
+    const skirt = makeMockComponent("sk1", "Skirt 1", "SK-1", "skirt-section", "skirt", "structural", false);
 
     const mockDb = createMockDb({
       selectResults: {
@@ -141,7 +146,7 @@ describe("Design Phase Determination", () => {
   it("embellishment phase when anchor component is selected", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
-    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "silhouette", true);
+    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "bodice", "structural", true);
 
     const mockDb = createMockDb({
       selectResults: {
@@ -226,32 +231,31 @@ describe("Compatible Components — Multi-Select", () => {
   it("bodice+skirt selected returns only mutually compatible components", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
-    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "silhouette", true);
-    const skirt = makeMockComponent("sk1", "Skirt 1", "SK-1", "skirt-section", "silhouette", false);
-    const sleeve = makeMockComponent("slv1", "Sleeve 1", "SLV-1", "sleeve", "silhouette", false);
+    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "bodice", "structural", true);
+    const skirt = makeMockComponent("sk1", "Skirt 1", "SK-1", "skirt-section", "skirt", "structural", false);
+    const sleeve = makeMockComponent("slv1", "Sleeve 1", "SLV-1", "sleeve", "sleeve", "structural", false);
 
     const mockDb = createMockDb({
       selectResults: {
         // select-0: fetch selected components with type info
         "select-0": [bodice, skirt],
-        // select-1: forward edges for bod1 (bod1 → sk1, bod1 → slv1)
-        "select-1": [{ compatId: "sk1" }, { compatId: "slv1" }],
-        // select-2: reverse edges for bod1
-        "select-2": [],
-        // select-3: forward edges for sk1
-        "select-3": [],
-        // select-4: reverse edges for sk1 (bod1 → sk1 stored, sk1 ← slv1)
-        "select-4": [{ compatId: "bod1" }, { compatId: "slv1" }],
-        // select-5: fetch full data for intersection result IDs
-        // Intersection of {sk1,slv1} ∩ {bod1,slv1} = {slv1}, plus selected = {bod1,sk1,slv1}
-        "select-5": [bodice, skirt, sleeve],
+        // select-1: bod1 bodice-skirt edges (skirt IDs compatible with bod1)
+        "select-1": [{ compatId: "sk1" }],
+        // select-2: bod1 bodice-sleeve edges (sleeve IDs compatible with bod1)
+        "select-2": [{ compatId: "slv1" }],
+        // select-3: sk1 bodice-skirt reverse (bodice IDs compatible with sk1)
+        "select-3": [{ compatId: "bod1" }],
+        // select-4: fetch full data for result IDs
+        // Per-part: validSkirts={sk1}, validSleeves={slv1}, validBodices={bod1}
+        // Plus selected = {bod1,sk1} → result = {bod1,sk1,slv1}
+        "select-4": [bodice, skirt, sleeve],
       },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await getCompatibleComponents(mockDb as any, ["bod1", "sk1"]);
 
-    // Phase should be embellishment (anchor bodice selected, silhouette stage present)
+    // Phase should be embellishment (anchor bodice selected, structural role present)
     expect(result.designPhase).toBe("embellishment");
     // Selected components returned separately
     expect(result.selectedComponents).toHaveLength(2);
@@ -263,23 +267,24 @@ describe("Compatible Components — Multi-Select", () => {
   it("incompatible pair rejected — empty compatible set when no shared edges", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
-    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "silhouette", true);
-    const skirt2 = makeMockComponent("sk2", "Skirt 2", "SK-2", "skirt-section", "silhouette", false);
+    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "bodice", "structural", true);
+    const skirt2 = makeMockComponent("sk2", "Skirt 2", "SK-2", "skirt-section", "skirt", "structural", false);
 
     const mockDb = createMockDb({
       selectResults: {
         // select-0: fetch selected components
         "select-0": [bodice, skirt2],
-        // select-1: forward edges for bod1 (compatible with sk1, slv1 — NOT sk2)
-        "select-1": [{ compatId: "sk1" }, { compatId: "slv1" }],
-        // select-2: reverse edges for bod1
-        "select-2": [],
-        // select-3: forward edges for sk2 (compatible with slv2, slv3 — no overlap with bod1)
-        "select-3": [{ compatId: "slv2" }, { compatId: "slv3" }],
-        // select-4: reverse edges for sk2
-        "select-4": [],
-        // select-5: DB fetches only the selected IDs (intersection was empty)
-        "select-5": [bodice, skirt2],
+        // select-1: bod1 bodice-skirt edges (sk1, NOT sk2)
+        "select-1": [{ compatId: "sk1" }],
+        // select-2: bod1 bodice-sleeve edges
+        "select-2": [{ compatId: "slv1" }],
+        // select-3: sk2 bodice-skirt reverse (bod2, NOT bod1)
+        "select-3": [{ compatId: "bod2" }],
+        // select-4: DB fetches only the selected IDs
+        // Per-part: validSkirts={sk1}, validSleeves={slv1}, validBodices={bod2}
+        // None of these are selected, so after filtering selected: {slv1, sk1, bod2}
+        // But these are fetched from DB filtered by allowed roles
+        "select-4": [bodice, skirt2],
       },
     });
 
@@ -288,7 +293,8 @@ describe("Compatible Components — Multi-Select", () => {
 
     // Both are selected so they show up in selectedComponents
     expect(result.selectedComponents).toHaveLength(2);
-    // No available components — the compatible sets don't overlap
+    // The DB mock returns only bodice+skirt2 for the final fetch,
+    // but both are already selected, so no available components
     expect(result.components).toHaveLength(0);
   });
 });
@@ -298,14 +304,14 @@ describe("Compatible Components — Multi-Select", () => {
 // ---------------------------------------------------------------------------
 
 describe("Stage Gating", () => {
-  it("only silhouette-stage components returned when no selection", async () => {
+  it("only structural-role components returned when no selection", async () => {
     const { getCompatibleComponents } = await import("../engine");
 
-    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "silhouette", true);
+    const bodice = makeMockComponent("bod1", "Bodice 1", "BOD-1", "bodice", "bodice", "structural", true);
 
     const mockDb = createMockDb({
       selectResults: {
-        // All components query - only silhouette stage should be queried
+        // All components query - only structural role should be queried
         "select-0": [bodice],
       },
     });
@@ -314,7 +320,7 @@ describe("Stage Gating", () => {
     const result = await getCompatibleComponents(mockDb as any, []);
     expect(result.designPhase).toBe("silhouette");
     // The DB mock returns what we tell it, but the important thing is the phase
-    expect(result.components.every((c) => c.designStage === "silhouette")).toBe(true);
+    expect(result.components.every((c) => c.partRoleSlug === "structural")).toBe(true);
   });
 });
 
@@ -327,7 +333,8 @@ function makeMockComponent(
   name: string,
   assetCode: string,
   typeSlug: string,
-  designStage: ComponentWithType["designStage"],
+  garmentPartSlug: string,
+  partRoleSlug: ComponentWithType["partRoleSlug"],
   isAnchor: boolean,
 ): ComponentWithType {
   return {
@@ -337,7 +344,8 @@ function makeMockComponent(
     componentTypeId: `${typeSlug}-type`,
     typeName: typeSlug.charAt(0).toUpperCase() + typeSlug.slice(1),
     typeSlug,
-    designStage,
+    partRoleSlug,
     isAnchor,
+    garmentPartSlug,
   };
 }

@@ -84,7 +84,10 @@ const qaSupabase = createClient(QA_SUPABASE_URL, QA_SERVICE_ROLE_KEY, {
 // profiles/invite_codes/creator_applications reference auth.users (not copied)
 // and will be skipped with a warning.
 const TABLE_ORDER = [
-  "categories",
+  "part_roles",
+  "garment_types",
+  "garment_parts",
+  "garment_type_parts",
   "tag_dimensions",
   "component_types",
   "tag_values",

@@ -6,8 +6,6 @@ interface ComponentType {
   id: string;
   name: string;
   slug: string;
-  designStage: string;
-  garmentPart: string | null;
 }
 
 interface Component {

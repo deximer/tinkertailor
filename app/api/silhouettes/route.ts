@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import {
   silhouetteTemplates,
   silhouetteComponents,
-  categories,
+  garmentTypes,
   components,
   silhouetteTags,
   tagValues,
@@ -23,21 +23,21 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const categorySlug = searchParams.get("category");
+    const garmentTypeSlug = searchParams.get("garmentType");
     const tagSlugs = searchParams.get("tags");
 
     const conditions: SQL[] = [];
 
-    if (categorySlug) {
-      const cat = await db
-        .select({ id: categories.id })
-        .from(categories)
-        .where(eq(categories.slug, categorySlug))
+    if (garmentTypeSlug) {
+      const gt = await db
+        .select({ id: garmentTypes.id })
+        .from(garmentTypes)
+        .where(eq(garmentTypes.slug, garmentTypeSlug))
         .limit(1);
-      if (cat.length === 0) {
+      if (gt.length === 0) {
         return NextResponse.json([]);
       }
-      conditions.push(eq(silhouetteTemplates.categoryId, cat[0].id));
+      conditions.push(eq(silhouetteTemplates.garmentTypeId, gt[0].id));
     }
 
     // Fetch silhouettes
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         id: silhouetteTemplates.id,
         name: silhouetteTemplates.name,
         patternId: silhouetteTemplates.patternId,
-        categoryId: silhouetteTemplates.categoryId,
+        garmentTypeId: silhouetteTemplates.garmentTypeId,
         basePrice: silhouetteTemplates.basePrice,
         description: silhouetteTemplates.description,
       })
