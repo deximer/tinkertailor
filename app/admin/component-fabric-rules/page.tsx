@@ -263,13 +263,13 @@ export default function ComponentFabricRulesPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((comp) => (
+                {rows.map((comp, rowIdx) => (
                   <tr
                     key={comp.id}
-                    className="border-b border-gray-800 hover:bg-[#2a2a2a]"
+                    className={`border-b border-gray-800 hover:bg-[#2a2a2a] ${rowIdx % 2 === 1 ? "bg-[#1e1e1e]" : ""}`}
                   >
                     <td
-                      className="sticky left-0 bg-[#222] border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap"
+                      className={`sticky left-0 border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap ${rowIdx % 2 === 1 ? "bg-[#1e1e1e]" : "bg-[#222]"}`}
                       title={comp.assetCode}
                     >
                       {comp.name}
@@ -283,13 +283,22 @@ export default function ComponentFabricRulesPage() {
                           key={col.id}
                           className="border-l border-gray-800 px-2 py-1.5 text-center"
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isToggling}
-                            onChange={() => handleToggle(comp.id, col.id)}
-                            className="h-4 w-4 rounded border-gray-600 bg-[#1a1a1a] accent-white cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-                          />
+                          <label className={`inline-flex items-center justify-center ${isToggling ? "opacity-50 cursor-wait" : "cursor-pointer"}`}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isToggling}
+                              onChange={() => handleToggle(comp.id, col.id)}
+                              className="sr-only"
+                            />
+                            <span className={`h-4 w-4 rounded flex items-center justify-center border ${isChecked ? "bg-gray-300 border-gray-300" : "bg-[#333] border-gray-600"}`}>
+                              {isChecked && (
+                                <svg className="h-3 w-3 text-[#1a1a1a]" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="2,6 5,9 10,3" />
+                                </svg>
+                              )}
+                            </span>
+                          </label>
                         </td>
                       );
                     })}
