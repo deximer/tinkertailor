@@ -211,6 +211,13 @@
       "when": 1773091900000,
       "tag": "0029_drop_legacy_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1773092000000,
+      "tag": "0030_seed_complete_silhouette_parts",
+      "breakpoints": true
     }
   ]
 }

@@ -325,6 +325,69 @@ describe("Stage Gating", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test: Complete silhouette path (one-piece garments)
+// ---------------------------------------------------------------------------
+
+describe("Complete Silhouette Path", () => {
+  it("complete silhouette anchor returns decorative components, not structural", async () => {
+    const { getCompatibleComponents } = await import("../engine");
+
+    const dressSilhouette = makeMockComponent(
+      "ds1", "Dress Silhouette", "DS-1", "dress-silhouette", "dress-silhouette", "structural", true,
+    );
+    const embellishment = makeMockComponent(
+      "emb1", "Lace Trim", "LT-1", "lace-trim", "lace-overlay", "decorative", false,
+    );
+
+    const mockDb = createMockDb({
+      selectResults: {
+        // select-0: fetch selected components with type info
+        "select-0": [dressSilhouette],
+        // select-1: all components in allowed roles (decorative only — structural excluded)
+        "select-1": [embellishment],
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await getCompatibleComponents(mockDb as any, ["ds1"]);
+
+    // Phase should be embellishment (anchor selected, structural role present)
+    expect(result.designPhase).toBe("embellishment");
+    // Selected component returned
+    expect(result.selectedComponents).toHaveLength(1);
+    expect(result.selectedComponents[0].id).toBe("ds1");
+    // Available components should NOT include structural (bodice/skirt/sleeve)
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].partRoleSlug).toBe("decorative");
+  });
+
+  it("complete silhouette does not query compatibility graph", async () => {
+    const { getCompatibleComponents } = await import("../engine");
+
+    const topSilhouette = makeMockComponent(
+      "ts1", "Top Silhouette", "TS-1", "top-silhouette", "top-silhouette", "structural", true,
+    );
+
+    const mockDb = createMockDb({
+      selectResults: {
+        // select-0: fetch selected components
+        "select-0": [topSilhouette],
+        // select-1: all in allowed roles
+        "select-1": [],
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await getCompatibleComponents(mockDb as any, ["ts1"]);
+
+    // Only 2 select calls: fetch selected + fetch all in phase
+    // No bodice-skirt or bodice-sleeve edge queries
+    expect(mockDb.select).toHaveBeenCalledTimes(2);
+    expect(result.designPhase).toBe("embellishment");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
