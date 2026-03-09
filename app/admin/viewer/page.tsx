@@ -330,7 +330,7 @@ export default function ViewerPage() {
             </span>
           </div>
         )}
-        <AdminFabricViewer modelUrl={modelUrl} settings={settings} />
+        <AdminFabricViewer models={modelUrl ? [{ id: "single", url: modelUrl }] : []} settings={settings} />
       </div>
 
       {/* Right panel: fabrics & settings */}
