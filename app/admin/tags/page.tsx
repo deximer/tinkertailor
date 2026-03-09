@@ -113,7 +113,7 @@ function TagValueRow({
   }
 
   return (
-    <tr className="group/val border-b border-gray-800">
+    <tr className="group/val border-b border-gray-800 hover:bg-[#252525] transition-colors">
       <td className="py-2 text-white">{val.label}</td>
       <td className="py-2 text-gray-500">{val.slug}</td>
       <td className="py-2 text-gray-400">{val.displayOrder}</td>
