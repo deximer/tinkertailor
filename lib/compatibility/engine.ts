@@ -175,11 +175,9 @@ export async function getCompatibleComponents(
   // Determine current design phase
   const designPhase = determineDesignPhase(selectedComps);
 
-  // Get allowed part role slugs based on design phase
-  const allowedRoles = getAllowedRoles(designPhase);
-
   // If no selection, return all components in allowed roles
   if (selectedComponentIds.length === 0) {
+    const allowedRoles = getAllowedRoles(designPhase);
     const allComps = await componentWithTypeFrom(db)
       .where(inArray(partRoles.slug, allowedRoles));
 
@@ -197,20 +195,27 @@ export async function getCompatibleComponents(
   //   bodice ↔ sleeve (bodice_sleeve_compatibility)
   //   No direct skirt ↔ sleeve relationship.
   //
+  // Complete-silhouette parts (dress-silhouette, top-silhouette, etc.) are
+  // structural anchors that do NOT participate in the graph — selecting one
+  // skips straight to embellishment without showing bodice/skirt/sleeve tabs.
+  //
   // We collect constraints per garment-part type and intersect within each
   // type, so a skirt selection only constrains bodice choices, not sleeves.
   const bodiceConstraints: Set<string>[] = [];
   const skirtConstraints: Set<string>[] = [];
   const sleeveConstraints: Set<string>[] = [];
+  let hasGraphParticipant = false;
 
   for (const selId of selectedComponentIds) {
     const selComp = selectedComps.find((c) => c.id === selId);
     const gpSlug = selComp?.garmentPartSlug ?? null;
 
-    // Embellishment/finishing components don't participate in the typed graph
+    // Non-graph components (embellishment, finishing, complete-silhouette) skip
     if (!gpSlug || !["bodice", "skirt", "sleeve"].includes(gpSlug)) {
       continue;
     }
+
+    hasGraphParticipant = true;
 
     if (gpSlug === "bodice") {
       // Bodice constrains which skirts and sleeves are valid
@@ -241,6 +246,30 @@ export async function getCompatibleComponents(
         .where(eq(bodiceSleeveCompatibility.sleeveId, selId));
       bodiceConstraints.push(new Set(edges.map((e) => e.compatId)));
     }
+  }
+
+  // Compute allowed roles contextually:
+  // Complete-silhouette anchors (no graph participants) exclude "structural"
+  // so users see only decorative/finishing — not bodice/skirt/sleeve tabs.
+  const hasAnchor = selectedComps.some((c) => c.isAnchor === true);
+  const baseRoles = getAllowedRoles(designPhase);
+  const allowedRoles = (hasAnchor && !hasGraphParticipant)
+    ? baseRoles.filter((r) => r !== "structural")
+    : baseRoles;
+
+  // Complete-silhouette path: no graph constraints, return all phase-appropriate components
+  if (!hasGraphParticipant) {
+    const allInPhase = await componentWithTypeFrom(db)
+      .where(inArray(partRoles.slug, allowedRoles));
+
+    const selectedIdSet = new Set(selectedComponentIds);
+    const available = allInPhase.filter((c) => !selectedIdSet.has(c.id));
+
+    return {
+      designPhase,
+      components: available,
+      selectedComponents: selectedComps,
+    };
   }
 
   // Intersect constraint sets within each garment-part type

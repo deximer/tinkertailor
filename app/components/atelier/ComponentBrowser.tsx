@@ -159,23 +159,6 @@ export default function ComponentBrowser() {
     [selectedComponentIds, selectedComponentsData, setSelectedComponents],
   );
 
-  // Filter components by active type tab
-  const filteredComponents = activeTypeSlug
-    ? availableComponents.filter((c) => c.typeSlug === activeTypeSlug)
-    : availableComponents;
-
-  // Also include selected components for the active type (so they show as selected)
-  const selectedForType = activeTypeSlug
-    ? selectedComponentsData.filter((c) => c.typeSlug === activeTypeSlug)
-    : selectedComponentsData;
-
-  // Merge: selected components of this type + available (not selected)
-  const selectedIdSet = new Set(selectedComponentIds);
-  const displayComponents = [
-    ...selectedForType,
-    ...filteredComponents.filter((c) => !selectedIdSet.has(c.id)),
-  ];
-
   // Count available per type (for showing on tabs)
   const countByType = new Map<string, number>();
   for (const comp of availableComponents) {
@@ -188,6 +171,42 @@ export default function ComponentBrowser() {
     }
   }
 
+  // Hide tabs with zero available + zero selected (e.g. structural tabs after
+  // complete silhouette selection, where the engine excludes structural role)
+  const visibleTypes = componentTypes.filter((ct) => countByType.has(ct.slug));
+
+  // If the active tab was hidden (e.g. structural tab after complete
+  // silhouette selection), fall back to the first visible tab.
+  const effectiveActiveSlug = visibleTypes.some(
+    (ct) => ct.slug === activeTypeSlug,
+  )
+    ? activeTypeSlug
+    : visibleTypes[0]?.slug ?? null;
+
+  // Sync state when the effective slug diverges
+  useEffect(() => {
+    if (effectiveActiveSlug && effectiveActiveSlug !== activeTypeSlug) {
+      setActiveTypeSlug(effectiveActiveSlug);
+    }
+  }, [effectiveActiveSlug, activeTypeSlug]);
+
+  // Filter components by active type tab
+  const filteredComponents = effectiveActiveSlug
+    ? availableComponents.filter((c) => c.typeSlug === effectiveActiveSlug)
+    : availableComponents;
+
+  // Also include selected components for the active type (so they show as selected)
+  const selectedForType = effectiveActiveSlug
+    ? selectedComponentsData.filter((c) => c.typeSlug === effectiveActiveSlug)
+    : selectedComponentsData;
+
+  // Merge: selected components of this type + available (not selected)
+  const selectedIdSet = new Set(selectedComponentIds);
+  const displayComponents = [
+    ...selectedForType,
+    ...filteredComponents.filter((c) => !selectedIdSet.has(c.id)),
+  ];
+
   return (
     <div className="flex h-full flex-col">
       {/* Component type tabs */}
@@ -197,15 +216,15 @@ export default function ComponentBrowser() {
         className="flex gap-1 overflow-x-auto border-b border-gray-800 px-3 py-2"
         onKeyDown={(e) => {
           if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-          const idx = componentTypes.findIndex(
-            (ct) => ct.slug === activeTypeSlug,
+          const idx = visibleTypes.findIndex(
+            (ct) => ct.slug === effectiveActiveSlug,
           );
           if (idx === -1) return;
           const next =
             e.key === "ArrowRight"
-              ? (idx + 1) % componentTypes.length
-              : (idx - 1 + componentTypes.length) % componentTypes.length;
-          setActiveTypeSlug(componentTypes[next].slug);
+              ? (idx + 1) % visibleTypes.length
+              : (idx - 1 + visibleTypes.length) % visibleTypes.length;
+          setActiveTypeSlug(visibleTypes[next].slug);
           // Move focus to the newly active tab
           const container = e.currentTarget;
           const buttons = container.querySelectorAll<HTMLButtonElement>(
@@ -214,9 +233,9 @@ export default function ComponentBrowser() {
           buttons[next]?.focus();
         }}
       >
-        {componentTypes.map((ct) => {
+        {visibleTypes.map((ct) => {
           const count = countByType.get(ct.slug) ?? 0;
-          const isActive = activeTypeSlug === ct.slug;
+          const isActive = effectiveActiveSlug === ct.slug;
           const hasSelected = selectedComponentsData.some(
             (c) => c.typeSlug === ct.slug,
           );
