@@ -25,3 +25,4 @@ next-env.d.ts
 
 # local assets (not tracked in git)
 nogit/
+.npmrc
