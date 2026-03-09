@@ -7,7 +7,7 @@ import {
   silhouetteTags,
   products,
 } from "@/lib/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 
 const createSchema = z.object({
@@ -44,6 +44,8 @@ export async function GET() {
         description: silhouetteTemplates.description,
         isComposable: silhouetteTemplates.isComposable,
         createdAt: silhouetteTemplates.createdAt,
+        componentCount: sql<number>`(select count(*) from ${silhouetteComponents} where ${silhouetteComponents.silhouetteId} = ${silhouetteTemplates.id})::int`,
+        tagCount: sql<number>`(select count(*) from ${silhouetteTags} where ${silhouetteTags.silhouetteId} = ${silhouetteTemplates.id})::int`,
       })
       .from(silhouetteTemplates)
       .orderBy(silhouetteTemplates.name);

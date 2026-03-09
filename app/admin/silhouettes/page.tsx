@@ -11,6 +11,8 @@ interface Silhouette {
   isComposable: boolean;
   description: string | null;
   createdAt: string;
+  componentCount: number;
+  tagCount: number;
 }
 
 interface Category {
@@ -386,15 +388,14 @@ export default function AdminSilhouettesPage() {
   const categoryName = (catId: string) =>
     categories.find((c) => c.id === catId)?.name ?? catId;
 
-  const componentCount = (silId: string) => {
-    // Use the assigned components if this is the selected silhouette
-    if (silId === selectedId) return assignedComponents.length;
-    return "-";
+  const componentCount = (sil: Silhouette) => {
+    if (sil.id === selectedId) return assignedComponents.length;
+    return sil.componentCount;
   };
 
-  const tagCount = (silId: string) => {
-    if (silId === selectedId) return assignedTagIds.length;
-    return "-";
+  const tagCount = (sil: Silhouette) => {
+    if (sil.id === selectedId) return assignedTagIds.length;
+    return sil.tagCount;
   };
 
   const assignedComponentIds = new Set(
@@ -623,10 +624,10 @@ export default function AdminSilhouettesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2 text-gray-400">
-                        {componentCount(sil.id)}
+                        {componentCount(sil)}
                       </td>
                       <td className="px-4 py-2 text-gray-400">
-                        {tagCount(sil.id)}
+                        {tagCount(sil)}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <button
