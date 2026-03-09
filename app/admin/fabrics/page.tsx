@@ -721,7 +721,7 @@ export default function AdminFabricsPage() {
                   </thead>
                   <tbody>
                     {filteredSkins.map((skin) => (
-                      <tr key={skin.id} className="border-b border-gray-800">
+                      <tr key={skin.id} className="border-b border-gray-800 hover:bg-[#252525] transition-colors">
                         <td className="py-2 text-gray-400">
                           {skin.fabricCode}
                         </td>
@@ -802,7 +802,7 @@ export default function AdminFabricsPage() {
                             {catSkins.map((skin) => (
                               <tr
                                 key={skin.id}
-                                className="group border-b border-gray-800"
+                                className="group border-b border-gray-800 hover:bg-[#252525] transition-colors"
                               >
                                 {editingSkinId === skin.id ? (
                                   <>
