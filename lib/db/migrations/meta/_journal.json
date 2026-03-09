@@ -218,6 +218,20 @@
       "when": 1773092000000,
       "tag": "0030_seed_complete_silhouette_parts",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1773092100000,
+      "tag": "0031_compatibility_analysis",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1773092200000,
+      "tag": "0032_backfill_component_columns",
+      "breakpoints": true
     }
   ]
 }

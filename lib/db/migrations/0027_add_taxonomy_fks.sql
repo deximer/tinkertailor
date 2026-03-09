@@ -7,13 +7,21 @@ SET "garment_part_id" = gp."id"
 FROM "garment_parts" gp
 WHERE "component_types"."garment_part" = gp."slug";
 
--- For rows where garment_part was NULL, try to infer from design_stage
--- embellishment stage → embellishment part, finishing stage → finishing part
-UPDATE "component_types"
-SET "garment_part_id" = gp."id"
-FROM "garment_parts" gp
-WHERE "component_types"."garment_part_id" IS NULL
-  AND "component_types"."design_stage" = gp."slug";
+-- For rows where garment_part was NULL, try to infer from design_stage if it still exists
+-- (design_stage was dropped in an earlier migration on some DB instances)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'component_types' AND column_name = 'design_stage'
+  ) THEN
+    UPDATE "component_types"
+    SET "garment_part_id" = gp."id"
+    FROM "garment_parts" gp
+    WHERE "component_types"."garment_part_id" IS NULL
+      AND "component_types"."design_stage" = gp."slug";
+  END IF;
+END $$;
 
 -- Add FK constraint (garment_part_id should now be populated for all rows)
 ALTER TABLE "component_types"
