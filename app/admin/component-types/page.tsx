@@ -544,7 +544,7 @@ export default function ComponentTypesPage() {
                         return (
                           <tr
                             key={t.id}
-                            className="group border-b border-gray-800"
+                            className="group border-b border-gray-800 hover:bg-[#252525] transition-colors"
                           >
                             <td className="py-2 text-white">{t.name}</td>
                             <td className="py-2 text-gray-500">{t.slug}</td>
