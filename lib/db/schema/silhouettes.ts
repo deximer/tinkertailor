@@ -18,10 +18,8 @@ export const silhouetteTemplates = pgTable("silhouette_templates", {
   patternId: varchar("pattern_id", { length: 50 }).notNull().unique(),
   // New FK — canonical garment type reference
   garmentTypeId: uuid("garment_type_id").references(() => garmentTypes.id),
-  // Legacy column — kept during migration, dropped after API/UI updated
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => categories.id),
+  // Legacy column — nullable during migration, dropped after API/UI updated
+  categoryId: uuid("category_id").references(() => categories.id),
   basePrice: numeric("base_price", { precision: 10, scale: 2 })
     .notNull()
     .default("0"),

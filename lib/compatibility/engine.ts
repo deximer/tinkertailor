@@ -41,8 +41,8 @@ export interface ComponentWithType {
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
-  designStage: ComponentDesignStage;
-  isAnchor: boolean;
+  designStage: ComponentDesignStage | null;
+  isAnchor: boolean | null;
 }
 
 export interface CompatibleComponentsResult {
@@ -361,8 +361,8 @@ export async function getCompatibleFabrics(
 function determineDesignPhase(selectedComps: ComponentWithType[]): DesignPhase {
   if (selectedComps.length === 0) return "silhouette";
 
-  const stages = new Set(selectedComps.map((c) => c.designStage));
-  const hasAnchor = selectedComps.some((c) => c.isAnchor);
+  const stages = new Set(selectedComps.map((c) => c.designStage).filter(Boolean));
+  const hasAnchor = selectedComps.some((c) => c.isAnchor === true);
 
   // If no anchor component selected yet, still in silhouette phase
   if (!hasAnchor) return "silhouette";

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
-import { categories, componentTypes } from "@/lib/db/schema";
-import { eq, count } from "drizzle-orm";
+import { garmentTypes, garmentTypeParts, garmentParts } from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 import { slugify } from "@/lib/utils/slugify";
 
@@ -19,6 +19,52 @@ const deleteBodySchema = z.object({
   id: z.string().uuid(),
 });
 
+export async function GET() {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
+  try {
+    const types = await db
+      .select({
+        id: garmentTypes.id,
+        name: garmentTypes.name,
+        slug: garmentTypes.slug,
+      })
+      .from(garmentTypes)
+      .orderBy(asc(garmentTypes.name));
+
+    // Fetch associated parts for each garment type
+    const mappings = await db
+      .select({
+        garmentTypeId: garmentTypeParts.garmentTypeId,
+        garmentPartId: garmentTypeParts.garmentPartId,
+        partName: garmentParts.name,
+        partSlug: garmentParts.slug,
+      })
+      .from(garmentTypeParts)
+      .innerJoin(garmentParts, eq(garmentTypeParts.garmentPartId, garmentParts.id));
+
+    const result = types.map((t) => ({
+      ...t,
+      parts: mappings
+        .filter((m) => m.garmentTypeId === t.id)
+        .map((m) => ({
+          id: m.garmentPartId,
+          name: m.partName,
+          slug: m.partSlug,
+        })),
+    }));
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[admin/garment-types] DB error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -28,12 +74,12 @@ export async function POST(request: Request) {
     const slug = slugify(body.name);
 
     const [row] = await db
-      .insert(categories)
+      .insert(garmentTypes)
       .values({ name: body.name, slug })
       .returning({
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
+        id: garmentTypes.id,
+        name: garmentTypes.name,
+        slug: garmentTypes.slug,
       });
 
     return NextResponse.json(row, { status: 201 });
@@ -44,7 +90,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/categories] DB error:", err);
+    console.error("[admin/garment-types] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -61,18 +107,18 @@ export async function PUT(request: Request) {
     const slug = slugify(body.name);
 
     const [row] = await db
-      .update(categories)
+      .update(garmentTypes)
       .set({ name: body.name, slug })
-      .where(eq(categories.id, body.id))
+      .where(eq(garmentTypes.id, body.id))
       .returning({
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
+        id: garmentTypes.id,
+        name: garmentTypes.name,
+        slug: garmentTypes.slug,
       });
 
     if (!row) {
       return NextResponse.json(
-        { error: "Category not found" },
+        { error: "Garment type not found" },
         { status: 404 },
       );
     }
@@ -85,7 +131,7 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/categories] DB error:", err);
+    console.error("[admin/garment-types] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -106,29 +152,15 @@ export async function DELETE(request: Request) {
       id = body.id;
     }
 
-    const [linked] = await db
-      .select({ value: count() })
-      .from(componentTypes)
-      .where(eq(componentTypes.categoryId, id));
-
-    if (linked.value > 0) {
-      return NextResponse.json(
-        {
-          error: "Cannot delete category with linked component types",
-          linkedCount: linked.value,
-        },
-        { status: 409 },
-      );
-    }
-
+    // garment_type_parts cascade on delete, so no referential integrity check needed
     const [row] = await db
-      .delete(categories)
-      .where(eq(categories.id, id))
-      .returning({ id: categories.id });
+      .delete(garmentTypes)
+      .where(eq(garmentTypes.id, id))
+      .returning({ id: garmentTypes.id });
 
     if (!row) {
       return NextResponse.json(
-        { error: "Category not found" },
+        { error: "Garment type not found" },
         { status: 404 },
       );
     }
@@ -141,7 +173,7 @@ export async function DELETE(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/categories] DB error:", err);
+    console.error("[admin/garment-types] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

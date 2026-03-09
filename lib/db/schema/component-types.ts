@@ -15,12 +15,10 @@ export const componentTypes = pgTable("component_types", {
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   // New FK — canonical garment part reference
   garmentPartId: uuid("garment_part_id").references(() => garmentParts.id),
-  // Legacy columns — kept during migration, dropped after API/UI updated
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => categories.id),
-  designStage: varchar("design_stage", { length: 20 }).notNull().$type<ComponentDesignStage>(),
-  isAnchor: boolean("is_anchor").notNull().default(false),
+  // Legacy columns — nullable during migration, dropped after API/UI updated
+  categoryId: uuid("category_id").references(() => categories.id),
+  designStage: varchar("design_stage", { length: 20 }).$type<ComponentDesignStage>(),
+  isAnchor: boolean("is_anchor").default(false),
   garmentPart: varchar("garment_part", { length: 20 }).$type<GarmentPart>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
