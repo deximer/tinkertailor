@@ -21,6 +21,7 @@ interface MatrixData {
   rows: MatrixComponent[];
   cols: MatrixComponent[];
   edges: string[];
+  sleeveStyleCodes?: Record<string, string>;
 }
 
 export default function AdminCompatibilityPage() {
@@ -34,9 +35,15 @@ export default function AdminCompatibilityPage() {
 
   const [matrix, setMatrix] = useState<MatrixData | null>(null);
   const [edgeSet, setEdgeSet] = useState<Set<string>>(new Set());
+  // For bodice×sleeve pairs: maps "rowId:colId" → SleeveStyle code
+  const [sleeveStyleMap, setSleeveStyleMap] = useState<Map<string, string>>(new Map());
 
   // Track in-flight toggle requests to disable checkboxes during mutation
   const [toggling, setToggling] = useState<Set<string>>(new Set());
+
+  const isSleevePair =
+    componentTypes.find((ct) => ct.slug === typeASlug)?.garmentPartSlug === "sleeve" ||
+    componentTypes.find((ct) => ct.slug === typeBSlug)?.garmentPartSlug === "sleeve";
 
   // Fetch component types on mount
   useEffect(() => {
@@ -77,6 +84,7 @@ export default function AdminCompatibilityPage() {
     if (!typeASlug || !typeBSlug) {
       setMatrix(null);
       setEdgeSet(new Set());
+      setSleeveStyleMap(new Map());
       return;
     }
 
@@ -95,6 +103,7 @@ export default function AdminCompatibilityPage() {
           const data: MatrixData = await res.json();
           setMatrix(data);
           setEdgeSet(new Set(data.edges));
+          setSleeveStyleMap(new Map(Object.entries(data.sleeveStyleCodes ?? {})));
         } else {
           const data = await res.json();
           setErrorMsg(data.error ?? "Failed to load matrix");
@@ -119,17 +128,12 @@ export default function AdminCompatibilityPage() {
     const key = `${rowId}:${colId}`;
     const isCurrentlyCompatible = edgeSet.has(key);
 
-    // Mark as toggling
     setToggling((prev) => new Set(prev).add(key));
 
     // Optimistic update
     setEdgeSet((prev) => {
       const next = new Set(prev);
-      if (isCurrentlyCompatible) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (isCurrentlyCompatible) next.delete(key); else next.add(key);
       return next;
     });
 
@@ -137,45 +141,91 @@ export default function AdminCompatibilityPage() {
       const res = await fetch("/api/admin/compatibility", {
         method: isCurrentlyCompatible ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          componentAId: rowId,
-          componentBId: colId,
-        }),
+        body: JSON.stringify({ componentAId: rowId, componentBId: colId }),
       });
 
       if (!res.ok && res.status !== 204) {
-        // Revert optimistic update
         setEdgeSet((prev) => {
           const next = new Set(prev);
-          if (isCurrentlyCompatible) {
-            next.add(key);
-          } else {
-            next.delete(key);
-          }
+          if (isCurrentlyCompatible) next.add(key); else next.delete(key);
           return next;
         });
         const data = await res.json();
         setErrorMsg(data.error ?? "Failed to update compatibility");
       }
     } catch {
-      // Revert optimistic update
       setEdgeSet((prev) => {
         const next = new Set(prev);
-        if (isCurrentlyCompatible) {
-          next.add(key);
-        } else {
-          next.delete(key);
-        }
+        if (isCurrentlyCompatible) next.add(key); else next.delete(key);
         return next;
       });
       setErrorMsg("Failed to update compatibility");
     }
 
-    setToggling((prev) => {
+    setToggling((prev) => { const next = new Set(prev); next.delete(key); return next; });
+  };
+
+  // For bodice×sleeve cells: newStyle="" means delete, "ST"/"DS"/"OS" means upsert
+  const handleSleeveStyleChange = async (rowId: string, colId: string, newStyle: string) => {
+    const key = `${rowId}:${colId}`;
+    const prevStyle = sleeveStyleMap.get(key);
+    const wasCompatible = edgeSet.has(key);
+
+    setToggling((prev) => new Set(prev).add(key));
+
+    // Optimistic update
+    setEdgeSet((prev) => {
       const next = new Set(prev);
-      next.delete(key);
+      if (newStyle) next.add(key); else next.delete(key);
       return next;
     });
+    setSleeveStyleMap((prev) => {
+      const next = new Map(prev);
+      if (newStyle) next.set(key, newStyle); else next.delete(key);
+      return next;
+    });
+
+    try {
+      const res = await fetch("/api/admin/compatibility", {
+        method: newStyle ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          componentAId: rowId,
+          componentBId: colId,
+          ...(newStyle ? { sleeveStyleCode: newStyle } : {}),
+        }),
+      });
+
+      if (!res.ok && res.status !== 204) {
+        // Revert
+        setEdgeSet((prev) => {
+          const next = new Set(prev);
+          if (wasCompatible) next.add(key); else next.delete(key);
+          return next;
+        });
+        setSleeveStyleMap((prev) => {
+          const next = new Map(prev);
+          if (prevStyle) next.set(key, prevStyle); else next.delete(key);
+          return next;
+        });
+        const data = await res.json();
+        setErrorMsg(data.error ?? "Failed to update compatibility");
+      }
+    } catch {
+      setEdgeSet((prev) => {
+        const next = new Set(prev);
+        if (wasCompatible) next.add(key); else next.delete(key);
+        return next;
+      });
+      setSleeveStyleMap((prev) => {
+        const next = new Map(prev);
+        if (prevStyle) next.set(key, prevStyle); else next.delete(key);
+        return next;
+      });
+      setErrorMsg("Failed to update compatibility");
+    }
+
+    setToggling((prev) => { const next = new Set(prev); next.delete(key); return next; });
   };
 
   // Count compatible edges per row and per column
@@ -375,6 +425,25 @@ export default function AdminCompatibilityPage() {
                         const key = `${row.id}:${col.id}`;
                         const isChecked = edgeSet.has(key);
                         const isToggling = toggling.has(key);
+
+                        if (isSleevePair) {
+                          const currentStyle = sleeveStyleMap.get(key) ?? "";
+                          return (
+                            <td key={col.id} className="px-1 py-1 text-center">
+                              <select
+                                value={currentStyle}
+                                disabled={isToggling}
+                                onChange={(e) => handleSleeveStyleChange(row.id, col.id, e.target.value)}
+                                className={`w-16 rounded border text-xs px-1 py-0.5 ${isToggling ? "opacity-50 cursor-wait" : ""} ${currentStyle ? "bg-gray-300 border-gray-300 text-[#1a1a1a] font-medium" : "bg-[#333] border-gray-600 text-gray-400"}`}
+                              >
+                                <option value="">—</option>
+                                <option value="ST">ST</option>
+                                <option value="DS">DS</option>
+                                <option value="OS">OS</option>
+                              </select>
+                            </td>
+                          );
+                        }
 
                         return (
                           <td

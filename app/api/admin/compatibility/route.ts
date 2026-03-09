@@ -115,24 +115,13 @@ export async function POST(request: Request) {
       const sleeveId = compA.garmentPartSlug === "sleeve" ? compA.id : compB.id;
       const sleeveStyleCode = body.sleeveStyleCode ?? null;
 
-      const [existing] = await db
-        .select({ bodiceId: bodiceSleeveCompatibility.bodiceId })
-        .from(bodiceSleeveCompatibility)
-        .where(
-          and(
-            eq(bodiceSleeveCompatibility.bodiceId, bodiceId),
-            eq(bodiceSleeveCompatibility.sleeveId, sleeveId),
-          ),
-        )
-        .limit(1);
-
-      if (existing) {
-        return NextResponse.json({ bodiceId, sleeveId }, { status: 200 });
-      }
-
       const [row] = await db
         .insert(bodiceSleeveCompatibility)
         .values({ bodiceId, sleeveId, sleeveStyleCode })
+        .onConflictDoUpdate({
+          target: [bodiceSleeveCompatibility.bodiceId, bodiceSleeveCompatibility.sleeveId],
+          set: { sleeveStyleCode },
+        })
         .returning({
           bodiceId: bodiceSleeveCompatibility.bodiceId,
           sleeveId: bodiceSleeveCompatibility.sleeveId,
@@ -330,6 +319,7 @@ export async function GET(request: Request) {
           .select({
             bodiceId: bodiceSleeveCompatibility.bodiceId,
             sleeveId: bodiceSleeveCompatibility.sleeveId,
+            sleeveStyleCode: bodiceSleeveCompatibility.sleeveStyleCode,
           })
           .from(bodiceSleeveCompatibility)
           .where(
@@ -339,11 +329,21 @@ export async function GET(request: Request) {
             ),
           );
 
-        edges = edgeRows.map((e) =>
-          rowIsBodice
+        const sleeveStyleCodes: Record<string, string> = {};
+        edges = edgeRows.map((e) => {
+          const key = rowIsBodice
             ? `${e.bodiceId}:${e.sleeveId}`
-            : `${e.sleeveId}:${e.bodiceId}`,
-        );
+            : `${e.sleeveId}:${e.bodiceId}`;
+          if (e.sleeveStyleCode) sleeveStyleCodes[key] = e.sleeveStyleCode;
+          return key;
+        });
+
+        return NextResponse.json({
+          rows: rowComponents,
+          cols: colComponents,
+          edges,
+          sleeveStyleCodes,
+        });
       }
     }
 
