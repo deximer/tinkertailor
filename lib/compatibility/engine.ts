@@ -5,12 +5,12 @@
  * Used by both Atelier (real-time filtering) and TARA (validation).
  *
  * Key rules (from legacy app):
- * 1. If a component's type has is_anchor=true, selecting it clears all
+ * 1. If a component's garment part has is_anchor=true, selecting it clears all
  *    other selected components.
  * 2. Otherwise, selecting a component deselects only other components of the
  *    same type.
- * 3. Stage sequencing: silhouette must complete before embellishment,
- *    embellishment before finishing.
+ * 3. Stage sequencing: structural (silhouette) must complete before decorative
+ *    (embellishment), decorative before finishing.
  * 4. Fabric filtering: intersect compatible_skin_categories across selected
  *    components; show only fabrics from the anchor component's categories.
  */
@@ -20,13 +20,14 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   components,
   componentTypes,
+  garmentParts,
+  partRoles,
   bodiceSkirtCompatibility,
   bodiceSleeveCompatibility,
   fabricCategories,
   fabrics,
   componentFabricRules,
 } from "../db/schema";
-import type { ComponentDesignStage } from "../db/schema/component-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,8 +42,9 @@ export interface ComponentWithType {
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
-  designStage: ComponentDesignStage | null;
+  partRoleSlug: string | null;
   isAnchor: boolean | null;
+  garmentPartSlug: string | null;
 }
 
 export interface CompatibleComponentsResult {
@@ -64,6 +66,39 @@ export interface FabricCategoryWithSkins {
   }[];
 }
 
+// Part role slugs map to legacy design stages:
+// structural → silhouette, decorative → embellishment, finishing → finishing
+const ROLE_TO_STAGE: Record<string, DesignPhase> = {
+  structural: "silhouette",
+  decorative: "embellishment",
+  finishing: "finishing",
+};
+
+// ---------------------------------------------------------------------------
+// Shared query helper — selects component + type + garmentPart + partRole
+// ---------------------------------------------------------------------------
+
+const componentWithTypeSelect = {
+  id: components.id,
+  name: components.name,
+  assetCode: components.assetCode,
+  componentTypeId: components.componentTypeId,
+  typeName: componentTypes.name,
+  typeSlug: componentTypes.slug,
+  partRoleSlug: partRoles.slug,
+  isAnchor: garmentParts.isAnchor,
+  garmentPartSlug: garmentParts.slug,
+};
+
+function componentWithTypeFrom(db: PostgresJsDatabase) {
+  return db
+    .select(componentWithTypeSelect)
+    .from(components)
+    .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+    .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
+    .leftJoin(partRoles, eq(garmentParts.partRoleId, partRoles.id));
+}
+
 // ---------------------------------------------------------------------------
 // Selection logic
 // ---------------------------------------------------------------------------
@@ -83,10 +118,11 @@ export async function applySelectionRules(
     .select({
       id: components.id,
       typeId: componentTypes.id,
-      isAnchor: componentTypes.isAnchor,
+      isAnchor: garmentParts.isAnchor,
     })
     .from(components)
     .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+    .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
     .where(eq(components.id, newComponentId))
     .limit(1);
 
@@ -132,44 +168,20 @@ export async function getCompatibleComponents(
   // Get selected components with type info
   let selectedComps: ComponentWithType[] = [];
   if (selectedComponentIds.length > 0) {
-    selectedComps = await db
-      .select({
-        id: components.id,
-        name: components.name,
-        assetCode: components.assetCode,
-        componentTypeId: components.componentTypeId,
-        typeName: componentTypes.name,
-        typeSlug: componentTypes.slug,
-        designStage: componentTypes.designStage,
-        isAnchor: componentTypes.isAnchor,
-      })
-      .from(components)
-      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+    selectedComps = await componentWithTypeFrom(db)
       .where(inArray(components.id, selectedComponentIds));
   }
 
   // Determine current design phase
   const designPhase = determineDesignPhase(selectedComps);
 
-  // Get allowed stages based on design phase
-  const allowedStages = getAllowedStages(designPhase);
+  // Get allowed part role slugs based on design phase
+  const allowedRoles = getAllowedRoles(designPhase);
 
-  // If no selection, return all components in allowed stages
+  // If no selection, return all components in allowed roles
   if (selectedComponentIds.length === 0) {
-    const allComps = await db
-      .select({
-        id: components.id,
-        name: components.name,
-        assetCode: components.assetCode,
-        componentTypeId: components.componentTypeId,
-        typeName: componentTypes.name,
-        typeSlug: componentTypes.slug,
-        designStage: componentTypes.designStage,
-        isAnchor: componentTypes.isAnchor,
-      })
-      .from(components)
-      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
-      .where(inArray(componentTypes.designStage, allowedStages));
+    const allComps = await componentWithTypeFrom(db)
+      .where(inArray(partRoles.slug, allowedRoles));
 
     return {
       designPhase,
@@ -178,22 +190,30 @@ export async function getCompatibleComponents(
     };
   }
 
-  // Find components compatible with ALL selected components
-  // For each selected component, get its compatible set, then intersect
-  let compatibleIds: Set<string> | null = null;
+  // Find components compatible with ALL selected components.
+  //
+  // The compatibility graph is star-shaped around bodice:
+  //   bodice ↔ skirt  (bodice_skirt_compatibility)
+  //   bodice ↔ sleeve (bodice_sleeve_compatibility)
+  //   No direct skirt ↔ sleeve relationship.
+  //
+  // We collect constraints per garment-part type and intersect within each
+  // type, so a skirt selection only constrains bodice choices, not sleeves.
+  const bodiceConstraints: Set<string>[] = [];
+  const skirtConstraints: Set<string>[] = [];
+  const sleeveConstraints: Set<string>[] = [];
 
   for (const selId of selectedComponentIds) {
     const selComp = selectedComps.find((c) => c.id === selId);
-    const garmentPart = (selComp as unknown as { garmentPart?: string | null })?.garmentPart ?? null;
+    const gpSlug = selComp?.garmentPartSlug ?? null;
 
     // Embellishment/finishing components don't participate in the typed graph
-    if (!garmentPart || !["bodice", "skirt", "sleeve"].includes(garmentPart)) {
+    if (!gpSlug || !["bodice", "skirt", "sleeve"].includes(gpSlug)) {
       continue;
     }
 
-    const thisSet = new Set<string>();
-
-    if (garmentPart === "bodice") {
+    if (gpSlug === "bodice") {
+      // Bodice constrains which skirts and sleeves are valid
       const [skirtEdges, sleeveEdges] = await Promise.all([
         db
           .select({ compatId: bodiceSkirtCompatibility.skirtId })
@@ -204,60 +224,56 @@ export async function getCompatibleComponents(
           .from(bodiceSleeveCompatibility)
           .where(eq(bodiceSleeveCompatibility.bodiceId, selId)),
       ]);
-      for (const e of [...skirtEdges, ...sleeveEdges]) thisSet.add(e.compatId);
-    } else if (garmentPart === "skirt") {
+      skirtConstraints.push(new Set(skirtEdges.map((e) => e.compatId)));
+      sleeveConstraints.push(new Set(sleeveEdges.map((e) => e.compatId)));
+    } else if (gpSlug === "skirt") {
+      // Skirt constrains which bodices are valid
       const edges = await db
         .select({ compatId: bodiceSkirtCompatibility.bodiceId })
         .from(bodiceSkirtCompatibility)
         .where(eq(bodiceSkirtCompatibility.skirtId, selId));
-      for (const e of edges) thisSet.add(e.compatId);
-    } else if (garmentPart === "sleeve") {
+      bodiceConstraints.push(new Set(edges.map((e) => e.compatId)));
+    } else if (gpSlug === "sleeve") {
+      // Sleeve constrains which bodices are valid
       const edges = await db
         .select({ compatId: bodiceSleeveCompatibility.bodiceId })
         .from(bodiceSleeveCompatibility)
         .where(eq(bodiceSleeveCompatibility.sleeveId, selId));
-      for (const e of edges) thisSet.add(e.compatId);
-    }
-
-    if (compatibleIds === null) {
-      compatibleIds = thisSet;
-    } else {
-      // Intersect — use temp to preserve TypeScript narrowing across reassignment
-      const current: Set<string> = compatibleIds;
-      compatibleIds = new Set<string>(
-        [...current].filter((id) => thisSet.has(id)),
-      );
+      bodiceConstraints.push(new Set(edges.map((e) => e.compatId)));
     }
   }
 
-  // Also include the selected components themselves
-  const resultIds = compatibleIds ?? new Set<string>();
-  for (const id of selectedComponentIds) {
-    resultIds.add(id);
+  // Intersect constraint sets within each garment-part type
+  function intersectSets(sets: Set<string>[]): Set<string> | null {
+    if (sets.length === 0) return null;
+    let result = sets[0];
+    for (let i = 1; i < sets.length; i++) {
+      result = new Set([...result].filter((id) => sets[i].has(id)));
+    }
+    return result;
   }
+
+  const validBodices = intersectSets(bodiceConstraints);
+  const validSkirts = intersectSets(skirtConstraints);
+  const validSleeves = intersectSets(sleeveConstraints);
+
+  // Combine all valid IDs + selected components
+  const resultIds = new Set<string>();
+  if (validBodices) for (const id of validBodices) resultIds.add(id);
+  if (validSkirts) for (const id of validSkirts) resultIds.add(id);
+  if (validSleeves) for (const id of validSleeves) resultIds.add(id);
+  for (const id of selectedComponentIds) resultIds.add(id);
 
   if (resultIds.size === 0) {
     return { designPhase, components: [], selectedComponents: selectedComps };
   }
 
-  // Fetch full component data, filtered by allowed stages
-  const compatComps = await db
-    .select({
-      id: components.id,
-      name: components.name,
-      assetCode: components.assetCode,
-      componentTypeId: components.componentTypeId,
-      typeName: componentTypes.name,
-      typeSlug: componentTypes.slug,
-      designStage: componentTypes.designStage,
-      isAnchor: componentTypes.isAnchor,
-    })
-    .from(components)
-    .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+  // Fetch full component data, filtered by allowed roles
+  const compatComps = await componentWithTypeFrom(db)
     .where(
       and(
         inArray(components.id, [...resultIds]),
-        inArray(componentTypes.designStage, allowedStages),
+        inArray(partRoles.slug, allowedRoles),
       ),
     );
 
@@ -292,10 +308,11 @@ export async function getCompatibleFabrics(
   const selectedWithTypes = await db
     .select({
       compId: components.id,
-      isAnchor: componentTypes.isAnchor,
+      isAnchor: garmentParts.isAnchor,
     })
     .from(components)
     .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+    .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
     .where(inArray(components.id, selectedComponentIds));
 
   const anchor = selectedWithTypes.find((c) => c.isAnchor);
@@ -361,7 +378,11 @@ export async function getCompatibleFabrics(
 function determineDesignPhase(selectedComps: ComponentWithType[]): DesignPhase {
   if (selectedComps.length === 0) return "silhouette";
 
-  const stages = new Set(selectedComps.map((c) => c.designStage).filter(Boolean));
+  const stages = new Set(
+    selectedComps
+      .map((c) => c.partRoleSlug ? ROLE_TO_STAGE[c.partRoleSlug] : null)
+      .filter(Boolean),
+  );
   const hasAnchor = selectedComps.some((c) => c.isAnchor === true);
 
   // If no anchor component selected yet, still in silhouette phase
@@ -378,15 +399,15 @@ function determineDesignPhase(selectedComps: ComponentWithType[]): DesignPhase {
   return "embellishment";
 }
 
-function getAllowedStages(phase: DesignPhase): ComponentDesignStage[] {
+function getAllowedRoles(phase: DesignPhase): string[] {
   switch (phase) {
     case "silhouette":
-      return ["silhouette"];
+      return ["structural"];
     case "embellishment":
-      return ["silhouette", "embellishment"];
+      return ["structural", "decorative"];
     case "finishing":
-      return ["silhouette", "embellishment", "finishing"];
+      return ["structural", "decorative", "finishing"];
     case "complete":
-      return ["silhouette", "embellishment", "finishing"];
+      return ["structural", "decorative", "finishing"];
   }
 }

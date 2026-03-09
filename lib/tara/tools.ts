@@ -164,14 +164,14 @@ export const getCompatibleComponentsTool = tool({
         name: c.name,
         assetCode: c.assetCode,
         type: c.typeName,
-        designStage: c.designStage,
+        partRole: c.partRoleSlug,
       })),
       selectedComponents: result.selectedComponents.map((c) => ({
         id: c.id,
         name: c.name,
         assetCode: c.assetCode,
         type: c.typeName,
-        designStage: c.designStage,
+        partRole: c.partRoleSlug,
       })),
     };
   },

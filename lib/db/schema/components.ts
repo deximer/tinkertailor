@@ -1,6 +1,7 @@
 import { pgTable, uuid, varchar, timestamp } from "drizzle-orm/pg-core";
 import { componentTypes } from "./component-types";
-import type { GarmentPart } from "./component-types";
+
+export type GarmentPart = "bodice" | "skirt" | "sleeve" | null;
 
 export const components = pgTable("components", {
   id: uuid("id").defaultRandom().primaryKey(),

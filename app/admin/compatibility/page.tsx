@@ -6,10 +6,9 @@ interface ComponentType {
   id: string;
   name: string;
   slug: string;
-  categoryId: string;
-  designStage: string;
-  isAnchor: boolean;
-  garmentPart: string | null;
+  garmentPartId: string | null;
+  garmentPartName: string | null;
+  garmentPartSlug: string | null;
 }
 
 interface MatrixComponent {
@@ -47,12 +46,12 @@ export default function AdminCompatibilityPage() {
         if (res.ok) {
           const types: ComponentType[] = await res.json();
           // Only show types that participate in compatibility (have a garmentPart)
-          const compatibleTypes = types.filter((t) => t.garmentPart != null);
+          const compatibleTypes = types.filter((t) => t.garmentPartSlug != null);
           setComponentTypes(compatibleTypes);
 
           // Default to bodice + skirt if available, otherwise first two compatible types
-          const bodice = compatibleTypes.find((t) => t.garmentPart === "bodice");
-          const skirt = compatibleTypes.find((t) => t.garmentPart === "skirt");
+          const bodice = compatibleTypes.find((t) => t.garmentPartSlug === "bodice");
+          const skirt = compatibleTypes.find((t) => t.garmentPartSlug === "skirt");
           if (bodice && skirt) {
             setTypeASlug(bodice.slug);
             setTypeBSlug(skirt.slug);

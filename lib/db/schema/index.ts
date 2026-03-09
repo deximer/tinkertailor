@@ -1,4 +1,3 @@
-export * from "./categories";
 export * from "./part-roles";
 export * from "./garment-types";
 export * from "./garment-parts";

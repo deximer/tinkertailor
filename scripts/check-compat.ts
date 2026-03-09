@@ -1,13 +1,14 @@
 import { db } from "@/lib/db";
-import { componentTypes, bodiceSkirtCompatibility, bodiceSleeveCompatibility } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
+import { componentTypes, garmentParts, bodiceSkirtCompatibility, bodiceSleeveCompatibility } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 async function main() {
   const types = await db.select({
     name: componentTypes.name,
     slug: componentTypes.slug,
-    garmentPart: componentTypes.garmentPart,
-  }).from(componentTypes);
+    garmentPartSlug: garmentParts.slug,
+  }).from(componentTypes)
+    .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id));
   console.log("Component types:", JSON.stringify(types, null, 2));
 
   const [bsk] = await db.select({ count: sql<number>`count(*)` }).from(bodiceSkirtCompatibility);

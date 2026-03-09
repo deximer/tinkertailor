@@ -20,7 +20,6 @@ import ExcelJS from "exceljs";
 import path from "path";
 import fs from "fs";
 import {
-  categories,
   componentTypes,
   components,
   bodiceSkirtCompatibility,
@@ -93,59 +92,15 @@ async function upsertByCode(
 }
 
 // ---------------------------------------------------------------------------
-// Step 1: Categories
+// Step 1: Component Types (categories removed — now use garment_parts table)
 // ---------------------------------------------------------------------------
 
-async function seedCategories() {
-  console.log("Seeding categories...");
-  const cats = [
-    { name: "Dress", slug: "dress" },
-    { name: "Top", slug: "top" },
-    { name: "Skirt", slug: "skirt" },
-  ];
-
-  const result: Record<string, string> = {};
-  for (const cat of cats) {
-    const row = await upsertBySlug(
-      categories,
-      categories.slug,
-      cat.slug,
-      cat,
-    );
-    result[cat.slug] = row.id;
-  }
-  console.log(`  ${Object.keys(result).length} categories seeded.`);
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Step 2: Component Types
-// ---------------------------------------------------------------------------
-
-async function seedComponentTypes(categoryIds: Record<string, string>) {
+async function seedComponentTypes() {
   console.log("Seeding component types...");
   const types = [
-    {
-      name: "Bodice",
-      slug: "bodice",
-      categoryId: categoryIds.dress,
-      designStage: "silhouette" as const,
-      isAnchor: true,
-    },
-    {
-      name: "Skirt Section",
-      slug: "skirt-section",
-      categoryId: categoryIds.dress,
-      designStage: "silhouette" as const,
-      isAnchor: false,
-    },
-    {
-      name: "Sleeve",
-      slug: "sleeve",
-      categoryId: categoryIds.dress,
-      designStage: "silhouette" as const,
-      isAnchor: false,
-    },
+    { name: "Bodice", slug: "bodice" },
+    { name: "Skirt Section", slug: "skirt-section" },
+    { name: "Sleeve", slug: "sleeve" },
   ];
 
   const result: Record<string, string> = {};
@@ -253,25 +208,6 @@ async function seedComponentsFromSpreadsheet(
   console.log(`  ${sleeveCodes.length} sleeves seeded.`);
 
   return { componentMap, bodiceCodes, skirtCodes, sleeveCodes, wb };
-}
-
-// ---------------------------------------------------------------------------
-// Step 4b: Update garment_part on existing component types (idempotent)
-// ---------------------------------------------------------------------------
-
-async function ensureGarmentParts() {
-  const updates: { slug: string; garmentPart: string }[] = [
-    { slug: "bodice", garmentPart: "bodice" },
-    { slug: "skirt-section", garmentPart: "skirt" },
-    { slug: "sleeve", garmentPart: "sleeve" },
-  ];
-  for (const { slug, garmentPart } of updates) {
-    await db
-      .update(componentTypes)
-      .set({ garmentPart: garmentPart as "bodice" | "skirt" | "sleeve" })
-      .where(eq(componentTypes.slug, slug));
-  }
-  console.log("  garment_part values ensured on component types.");
 }
 
 // ---------------------------------------------------------------------------
@@ -654,9 +590,7 @@ async function seedExtraComponentsFromJson(
 async function main() {
   console.log("=== Seed Components & Compatibility ===\n");
 
-  const categoryIds = await seedCategories();
-  const typeIds = await seedComponentTypes(categoryIds);
-  await ensureGarmentParts();
+  const typeIds = await seedComponentTypes();
   const { componentMap, bodiceCodes, skirtCodes, sleeveCodes, wb } =
     await seedComponentsFromSpreadsheet(typeIds);
   await seedExtraComponentsFromJson(typeIds, componentMap);
