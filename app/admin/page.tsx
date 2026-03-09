@@ -5,7 +5,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV_LINKS = [
-  { href: "/admin/component-types", label: "Component Types & Categories" },
+  { href: "/admin/part-roles", label: "Part Roles" },
+  { href: "/admin/garment-parts", label: "Garment Parts" },
+  { href: "/admin/garment-types", label: "Garment Types" },
+  { href: "/admin/component-types", label: "Component Types" },
   { href: "/admin/components", label: "Components" },
   { href: "/admin/compatibility", label: "Compatibility Graph" },
   { href: "/admin/fabrics", label: "Fabric Catalog" },
