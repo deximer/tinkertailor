@@ -1,4 +1,8 @@
 export * from "./categories";
+export * from "./part-roles";
+export * from "./garment-types";
+export * from "./garment-parts";
+export * from "./garment-type-parts";
 export * from "./component-types";
 export * from "./components";
 export * from "./component-meshes";
@@ -12,4 +16,3 @@ export * from "./creator-applications";
 export * from "./products";
 export * from "./orders";
 export * from "./attribution";
-export * from "./component-meshes";
