@@ -16,7 +16,7 @@ import postgres from "postgres";
 import mammoth from "mammoth";
 import path from "path";
 import {
-  categories,
+  garmentTypes,
   tagDimensions,
   tagValues,
   silhouetteTemplates,
@@ -403,16 +403,16 @@ async function seedSilhouettes(
 ) {
   console.log(`Seeding ${parsed.length} silhouettes...`);
 
-  // Get dress category ID
-  const dressCat = await db
+  // Get dress garment type ID (replaces old categories)
+  const dressType = await db
     .select()
-    .from(categories)
-    .where(eq(categories.slug, "dress"))
+    .from(garmentTypes)
+    .where(eq(garmentTypes.slug, "dress"))
     .limit(1);
-  if (dressCat.length === 0) {
-    throw new Error("Dress category not found. Run seed-components.ts first.");
+  if (dressType.length === 0) {
+    throw new Error("Dress garment type not found. Run seed-taxonomy.ts first.");
   }
-  const dressId = dressCat[0].id;
+  const dressId = dressType[0].id;
 
   let silCount = 0;
   let tagCount = 0;
@@ -434,7 +434,7 @@ async function seedSilhouettes(
         .values({
           name: sil.name,
           patternId: sil.patternId,
-          categoryId: dressId,
+          garmentTypeId: dressId,
           basePrice: "0",
           description: null,
         })

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { components, componentTypes, componentMeshes } from "@/lib/db/schema";
+import { components, componentTypes, garmentParts, partRoles, componentMeshes } from "@/lib/db/schema";
 import { eq, and, inArray, type SQL } from "drizzle-orm";
 import { getCompatibleComponents } from "@/lib/compatibility";
 
@@ -76,11 +76,13 @@ export async function GET(request: Request) {
         componentTypeId: components.componentTypeId,
         typeName: componentTypes.name,
         typeSlug: componentTypes.slug,
-        designStage: componentTypes.designStage,
-        isAnchor: componentTypes.isAnchor,
+        partRoleSlug: partRoles.slug,
+        isAnchor: garmentParts.isAnchor,
       })
       .from(components)
       .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+      .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
+      .leftJoin(partRoles, eq(garmentParts.partRoleId, partRoles.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     return NextResponse.json(rows);

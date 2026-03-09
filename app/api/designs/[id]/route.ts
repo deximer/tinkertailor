@@ -6,6 +6,8 @@ import {
   productComponents,
   components,
   componentTypes,
+  garmentParts,
+  partRoles,
   fabrics,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -48,7 +50,7 @@ export async function GET(
         componentAssetCode: components.assetCode,
         componentTypeName: componentTypes.name,
         componentTypeSlug: componentTypes.slug,
-        componentDesignStage: componentTypes.designStage,
+        partRoleSlug: partRoles.slug,
         fabricName: fabrics.name,
         fabricCode: fabrics.fabricCode,
         fabricPriceMarkup: fabrics.priceMarkup,
@@ -59,6 +61,8 @@ export async function GET(
         componentTypes,
         eq(components.componentTypeId, componentTypes.id),
       )
+      .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
+      .leftJoin(partRoles, eq(garmentParts.partRoleId, partRoles.id))
       .leftJoin(fabrics, eq(productComponents.fabricId, fabrics.id))
       .where(eq(productComponents.productId, id))
       .orderBy(productComponents.displayOrder);
@@ -76,7 +80,7 @@ export async function GET(
         assetCode: c.componentAssetCode,
         typeName: c.componentTypeName,
         typeSlug: c.componentTypeSlug,
-        designStage: c.componentDesignStage,
+        partRoleSlug: c.partRoleSlug,
         fabricId: c.fabricId,
         fabricName: c.fabricName,
         fabricCode: c.fabricCode,

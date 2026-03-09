@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { categories } from "@/lib/db/schema";
+import { garmentParts, partRoles } from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 
 export async function GET() {
   const supabase = await createClient();
@@ -15,15 +16,21 @@ export async function GET() {
   try {
     const rows = await db
       .select({
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
+        id: garmentParts.id,
+        name: garmentParts.name,
+        slug: garmentParts.slug,
+        partRoleId: garmentParts.partRoleId,
+        partRoleName: partRoles.name,
+        partRoleSlug: partRoles.slug,
+        isAnchor: garmentParts.isAnchor,
       })
-      .from(categories);
+      .from(garmentParts)
+      .innerJoin(partRoles, eq(garmentParts.partRoleId, partRoles.id))
+      .orderBy(asc(partRoles.sortOrder), asc(garmentParts.name));
 
     return NextResponse.json(rows);
   } catch (err) {
-    console.error("[categories] DB error:", err);
+    console.error("[garment-parts] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

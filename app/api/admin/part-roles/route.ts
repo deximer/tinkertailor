@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
-import { componentTypes, components, garmentParts } from "@/lib/db/schema";
+import { partRoles, garmentParts } from "@/lib/db/schema";
 import { eq, count, asc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/guards";
 import { slugify } from "@/lib/utils/slugify";
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
-  garmentPartId: z.string().uuid(),
+  sortOrder: z.number().int().optional(),
 });
 
 const updateSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100).optional(),
-  garmentPartId: z.string().uuid().optional(),
+  sortOrder: z.number().int().optional(),
 });
 
 const deleteBodySchema = z.object({
@@ -28,20 +28,17 @@ export async function GET() {
   try {
     const rows = await db
       .select({
-        id: componentTypes.id,
-        name: componentTypes.name,
-        slug: componentTypes.slug,
-        garmentPartId: componentTypes.garmentPartId,
-        garmentPartName: garmentParts.name,
-        garmentPartSlug: garmentParts.slug,
+        id: partRoles.id,
+        name: partRoles.name,
+        slug: partRoles.slug,
+        sortOrder: partRoles.sortOrder,
       })
-      .from(componentTypes)
-      .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
-      .orderBy(asc(componentTypes.name));
+      .from(partRoles)
+      .orderBy(asc(partRoles.sortOrder));
 
     return NextResponse.json(rows);
   } catch (err) {
-    console.error("[admin/component-types] DB error:", err);
+    console.error("[admin/part-roles] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -58,17 +55,17 @@ export async function POST(request: Request) {
     const slug = slugify(body.name);
 
     const [row] = await db
-      .insert(componentTypes)
+      .insert(partRoles)
       .values({
         name: body.name,
         slug,
-        garmentPartId: body.garmentPartId,
+        sortOrder: body.sortOrder ?? 0,
       })
       .returning({
-        id: componentTypes.id,
-        name: componentTypes.name,
-        slug: componentTypes.slug,
-        garmentPartId: componentTypes.garmentPartId,
+        id: partRoles.id,
+        name: partRoles.name,
+        slug: partRoles.slug,
+        sortOrder: partRoles.sortOrder,
       });
 
     return NextResponse.json(row, { status: 201 });
@@ -79,7 +76,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/component-types] DB error:", err);
+    console.error("[admin/part-roles] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -99,7 +96,7 @@ export async function PUT(request: Request) {
       updates.name = body.name;
       updates.slug = slugify(body.name);
     }
-    if (body.garmentPartId !== undefined) updates.garmentPartId = body.garmentPartId;
+    if (body.sortOrder !== undefined) updates.sortOrder = body.sortOrder;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -109,19 +106,19 @@ export async function PUT(request: Request) {
     }
 
     const [row] = await db
-      .update(componentTypes)
+      .update(partRoles)
       .set(updates)
-      .where(eq(componentTypes.id, body.id))
+      .where(eq(partRoles.id, body.id))
       .returning({
-        id: componentTypes.id,
-        name: componentTypes.name,
-        slug: componentTypes.slug,
-        garmentPartId: componentTypes.garmentPartId,
+        id: partRoles.id,
+        name: partRoles.name,
+        slug: partRoles.slug,
+        sortOrder: partRoles.sortOrder,
       });
 
     if (!row) {
       return NextResponse.json(
-        { error: "Component type not found" },
+        { error: "Part role not found" },
         { status: 404 },
       );
     }
@@ -134,7 +131,7 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/component-types] DB error:", err);
+    console.error("[admin/part-roles] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -157,13 +154,13 @@ export async function DELETE(request: Request) {
 
     const [linked] = await db
       .select({ value: count() })
-      .from(components)
-      .where(eq(components.componentTypeId, id));
+      .from(garmentParts)
+      .where(eq(garmentParts.partRoleId, id));
 
     if (linked.value > 0) {
       return NextResponse.json(
         {
-          error: "Cannot delete component type with linked components",
+          error: "Cannot delete part role with linked garment parts",
           linkedCount: linked.value,
         },
         { status: 409 },
@@ -171,13 +168,13 @@ export async function DELETE(request: Request) {
     }
 
     const [row] = await db
-      .delete(componentTypes)
-      .where(eq(componentTypes.id, id))
-      .returning({ id: componentTypes.id });
+      .delete(partRoles)
+      .where(eq(partRoles.id, id))
+      .returning({ id: partRoles.id });
 
     if (!row) {
       return NextResponse.json(
-        { error: "Component type not found" },
+        { error: "Part role not found" },
         { status: 404 },
       );
     }
@@ -190,7 +187,7 @@ export async function DELETE(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[admin/component-types] DB error:", err);
+    console.error("[admin/part-roles] DB error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

@@ -21,7 +21,7 @@ import postgres from "postgres";
 import fs from "fs";
 import path from "path";
 import {
-  categories,
+  garmentTypes,
   components,
   silhouetteTemplates,
   silhouetteComponents,
@@ -64,20 +64,20 @@ async function main() {
     bodices: { code: string; name: string }[];
   };
 
-  // Resolve category IDs
-  const [dressCat] = await db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(eq(categories.slug, "dress"))
+  // Resolve garment type IDs (replaces old categories)
+  const [dressType] = await db
+    .select({ id: garmentTypes.id })
+    .from(garmentTypes)
+    .where(eq(garmentTypes.slug, "dress"))
     .limit(1);
-  const [topCat] = await db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(eq(categories.slug, "top"))
+  const [topType] = await db
+    .select({ id: garmentTypes.id })
+    .from(garmentTypes)
+    .where(eq(garmentTypes.slug, "top"))
     .limit(1);
 
-  if (!dressCat || !topCat) {
-    throw new Error("Categories not found — run seed-components.ts first");
+  if (!dressType || !topType) {
+    throw new Error("Garment types not found — run seed-taxonomy.ts first");
   }
 
   // Get all bodices with mesh files from the DB
@@ -108,7 +108,7 @@ async function main() {
   for (const bodice of dbBodices) {
     const patternId = toPatternId(bodice.assetCode!);
     const hasSkirts = bodiceIdsWithSkirts.has(bodice.id);
-    const categoryId = hasSkirts ? dressCat.id : topCat.id;
+    const garmentTypeId = hasSkirts ? dressType.id : topType.id;
     const silhouetteName = hasSkirts
       ? `${bodice.name} Dress`
       : `${bodice.name} Top`;
@@ -131,7 +131,7 @@ async function main() {
         .values({
           name: silhouetteName,
           patternId,
-          categoryId,
+          garmentTypeId,
           basePrice: "0",
           isComposable: true,
         })

@@ -19,7 +19,6 @@ interface Component {
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
-  designStage: string;
 }
 
 interface Mesh {

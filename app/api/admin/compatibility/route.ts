@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import {
   components,
   componentTypes,
+  garmentParts,
   bodiceSkirtCompatibility,
   bodiceSleeveCompatibility,
 } from "@/lib/db/schema";
@@ -28,6 +29,19 @@ const edgeSchema = z.object({
   sleeveStyleCode: z.enum(["ST", "DS", "OS"]).nullable().optional(),
 });
 
+/** Look up component id + garment part slug via the join chain. */
+async function lookupComponentParts(ids: string[]) {
+  return db
+    .select({
+      id: components.id,
+      garmentPartSlug: garmentParts.slug,
+    })
+    .from(components)
+    .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
+    .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
+    .where(inArray(components.id, ids));
+}
+
 export async function POST(request: Request) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -42,15 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch both components with their garment parts
-    const found = await db
-      .select({
-        id: components.id,
-        garmentPart: componentTypes.garmentPart,
-      })
-      .from(components)
-      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
-      .where(inArray(components.id, [body.componentAId, body.componentBId]));
+    const found = await lookupComponentParts([body.componentAId, body.componentBId]);
 
     if (found.length < 2) {
       const foundIds = new Set(found.map((r) => r.id));
@@ -65,7 +71,7 @@ export async function POST(request: Request) {
 
     const compA = found.find((r) => r.id === body.componentAId)!;
     const compB = found.find((r) => r.id === body.componentBId)!;
-    const edgeType = resolveEdgeType(compA.garmentPart, compB.garmentPart);
+    const edgeType = resolveEdgeType(compA.garmentPartSlug, compB.garmentPartSlug);
 
     if (!edgeType) {
       return NextResponse.json(
@@ -75,8 +81,8 @@ export async function POST(request: Request) {
     }
 
     if (edgeType === "bodice_skirt") {
-      const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
-      const skirtId = compA.garmentPart === "skirt" ? compA.id : compB.id;
+      const bodiceId = compA.garmentPartSlug === "bodice" ? compA.id : compB.id;
+      const skirtId = compA.garmentPartSlug === "skirt" ? compA.id : compB.id;
 
       const [existing] = await db
         .select({ bodiceId: bodiceSkirtCompatibility.bodiceId })
@@ -105,8 +111,8 @@ export async function POST(request: Request) {
       return NextResponse.json(row, { status: 201 });
     } else {
       // bodice_sleeve
-      const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
-      const sleeveId = compA.garmentPart === "sleeve" ? compA.id : compB.id;
+      const bodiceId = compA.garmentPartSlug === "bodice" ? compA.id : compB.id;
+      const sleeveId = compA.garmentPartSlug === "sleeve" ? compA.id : compB.id;
       const sleeveStyleCode = body.sleeveStyleCode ?? null;
 
       const [existing] = await db
@@ -158,25 +164,17 @@ export async function DELETE(request: Request) {
   try {
     const body = edgeSchema.parse(await request.json());
 
-    // Fetch both components with garment parts
-    const found = await db
-      .select({
-        id: components.id,
-        garmentPart: componentTypes.garmentPart,
-      })
-      .from(components)
-      .innerJoin(componentTypes, eq(components.componentTypeId, componentTypes.id))
-      .where(inArray(components.id, [body.componentAId, body.componentBId]));
+    const found = await lookupComponentParts([body.componentAId, body.componentBId]);
 
     const compA = found.find((r) => r.id === body.componentAId);
     const compB = found.find((r) => r.id === body.componentBId);
 
     if (compA && compB) {
-      const edgeType = resolveEdgeType(compA.garmentPart, compB.garmentPart);
+      const edgeType = resolveEdgeType(compA.garmentPartSlug, compB.garmentPartSlug);
 
       if (edgeType === "bodice_skirt") {
-        const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
-        const skirtId = compA.garmentPart === "skirt" ? compA.id : compB.id;
+        const bodiceId = compA.garmentPartSlug === "bodice" ? compA.id : compB.id;
+        const skirtId = compA.garmentPartSlug === "skirt" ? compA.id : compB.id;
         await db
           .delete(bodiceSkirtCompatibility)
           .where(
@@ -186,8 +184,8 @@ export async function DELETE(request: Request) {
             ),
           );
       } else if (edgeType === "bodice_sleeve") {
-        const bodiceId = compA.garmentPart === "bodice" ? compA.id : compB.id;
-        const sleeveId = compA.garmentPart === "sleeve" ? compA.id : compB.id;
+        const bodiceId = compA.garmentPartSlug === "bodice" ? compA.id : compB.id;
+        const sleeveId = compA.garmentPartSlug === "sleeve" ? compA.id : compB.id;
         await db
           .delete(bodiceSleeveCompatibility)
           .where(
@@ -231,16 +229,18 @@ export async function GET(request: Request) {
       );
     }
 
-    // Resolve type slugs to IDs and garment parts
+    // Resolve type slugs to IDs and garment part slugs
     const [typeARows, typeBRows] = await Promise.all([
       db
-        .select({ id: componentTypes.id, garmentPart: componentTypes.garmentPart })
+        .select({ id: componentTypes.id, garmentPartSlug: garmentParts.slug })
         .from(componentTypes)
+        .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
         .where(eq(componentTypes.slug, typeASlug))
         .limit(1),
       db
-        .select({ id: componentTypes.id, garmentPart: componentTypes.garmentPart })
+        .select({ id: componentTypes.id, garmentPartSlug: garmentParts.slug })
         .from(componentTypes)
+        .leftJoin(garmentParts, eq(componentTypes.garmentPartId, garmentParts.id))
         .where(eq(componentTypes.slug, typeBSlug))
         .limit(1),
     ]);
@@ -260,7 +260,7 @@ export async function GET(request: Request) {
 
     const typeA = typeARows[0];
     const typeB = typeBRows[0];
-    const edgeType = resolveEdgeType(typeA.garmentPart, typeB.garmentPart);
+    const edgeType = resolveEdgeType(typeA.garmentPartSlug, typeB.garmentPartSlug);
 
     if (!edgeType) {
       return NextResponse.json(
@@ -297,7 +297,7 @@ export async function GET(request: Request) {
     let edges: string[] = [];
 
     if (rowIds.length > 0 && colIds.length > 0) {
-      const rowIsBodice = typeA.garmentPart === "bodice";
+      const rowIsBodice = typeA.garmentPartSlug === "bodice";
 
       if (edgeType === "bodice_skirt") {
         const bodiceIds = rowIsBodice ? rowIds : colIds;

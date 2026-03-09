@@ -7,7 +7,7 @@ import {
   timestamp,
   primaryKey,
 } from "drizzle-orm/pg-core";
-import { categories } from "./categories";
+import { garmentTypes } from "./garment-types";
 import { components } from "./components";
 import { fabrics } from "./fabrics";
 
@@ -15,9 +15,7 @@ export const silhouetteTemplates = pgTable("silhouette_templates", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   patternId: varchar("pattern_id", { length: 50 }).notNull().unique(),
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => categories.id),
+  garmentTypeId: uuid("garment_type_id").references(() => garmentTypes.id),
   basePrice: numeric("base_price", { precision: 10, scale: 2 })
     .notNull()
     .default("0"),

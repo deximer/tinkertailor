@@ -11,8 +11,10 @@ interface ComponentType {
   id: string;
   name: string;
   slug: string;
-  designStage: "silhouette" | "embellishment" | "finishing";
-  isAnchor: boolean;
+  garmentPartId: string | null;
+  garmentPartSlug: string | null;
+  partRoleSlug: string | null;
+  partRoleSortOrder: number | null;
 }
 
 interface ComponentData {
@@ -22,8 +24,8 @@ interface ComponentData {
   componentTypeId: string;
   typeName: string;
   typeSlug: string;
-  designStage: "silhouette" | "embellishment" | "finishing";
-  isAnchor: boolean;
+  partRoleSlug: string | null;
+  isAnchor: boolean | null;
 }
 
 interface CompatibleResponse {
@@ -31,13 +33,6 @@ interface CompatibleResponse {
   components: ComponentData[];
   selectedComponents: ComponentData[];
 }
-
-// Stage order for tab sorting
-const STAGE_ORDER: Record<string, number> = {
-  silhouette: 0,
-  embellishment: 1,
-  finishing: 2,
-};
 
 // ---------------------------------------------------------------------------
 // ComponentBrowser
@@ -71,10 +66,10 @@ export default function ComponentBrowser() {
           return;
         }
         const types: ComponentType[] = await res.json();
-        // Sort by stage order, then alphabetically
+        // Sort by part role sort order, then alphabetically
         types.sort(
           (a, b) =>
-            (STAGE_ORDER[a.designStage] ?? 99) - (STAGE_ORDER[b.designStage] ?? 99) ||
+            (a.partRoleSortOrder ?? 99) - (b.partRoleSortOrder ?? 99) ||
             a.name.localeCompare(b.name),
         );
         setComponentTypes(types);
@@ -146,7 +141,7 @@ export default function ComponentBrowser() {
         return;
       }
 
-      if (component.isAnchor) {
+      if (component.isAnchor === true) {
         // Anchor selection: clear all, keep only this
         setSelectedComponents([component.id]);
       } else {
