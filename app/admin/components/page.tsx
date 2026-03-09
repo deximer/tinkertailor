@@ -356,7 +356,7 @@ export default function AdminComponentsPage() {
                           <>
                             <tr
                               key={comp.id}
-                              className="border-b border-gray-800"
+                              className="border-b border-gray-800 hover:bg-[#252525] transition-colors"
                             >
                               {editingId === comp.id ? (
                                 <>
