@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type View = "launch" | "running" | "review";
 
@@ -52,6 +52,7 @@ export default function AdminCompatibilityAnalyzePage() {
     skipped: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Fetch past runs on mount
   useEffect(() => {
@@ -78,6 +79,9 @@ export default function AdminCompatibilityAnalyzePage() {
     setProgress({ processed: 0, total: 0 });
     setView("running");
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const res = await fetch("/api/admin/compatibility/analyze", {
         method: "POST",
@@ -87,6 +91,7 @@ export default function AdminCompatibilityAnalyzePage() {
           confidenceThreshold,
           onlyUnmatched,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -139,9 +144,15 @@ export default function AdminCompatibilityAnalyzePage() {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // User cancelled — no error to show
+        return;
+      }
       setError("Connection lost during analysis");
       setView("launch");
+    } finally {
+      abortRef.current = null;
     }
   }
 
@@ -498,6 +509,7 @@ export default function AdminCompatibilityAnalyzePage() {
             {/* Cancel */}
             <button
               onClick={() => {
+                abortRef.current?.abort();
                 setView("launch");
               }}
               className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 hover:bg-[#2a2a2a] transition-colors"
