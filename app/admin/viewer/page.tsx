@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import type { ModelEntry } from "@/app/components/AdminFabricViewer";
 import type { ViewerSettings, TextureType } from "@/lib/three/textures";
 
 const AdminFabricViewer = dynamic(
@@ -76,9 +77,14 @@ const DEFAULT_SETTINGS: ViewerSettings = {
 export default function ViewerPage() {
   const [components, setComponents] = useState<Component[]>([]);
   const [activeTab, setActiveTab] = useState<string>("Bodice");
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [meshes, setMeshes] = useState<Mesh[]>([]);
   const [selectedWeight, setSelectedWeight] = useState<string>("heavy");
+
+  // Three-part composition selection
+  const [selectedBodiceId, setSelectedBodiceId] = useState<string | null>(null);
+  const [selectedSkirtId, setSelectedSkirtId] = useState<string | null>(null);
+  const [selectedSleeveId, setSelectedSleeveId] = useState<string | null>(null);
+  const [compatibleIds, setCompatibleIds] = useState<Set<string>>(new Set());
+  const [composedModels, setComposedModels] = useState<ModelEntry[]>([]);
 
   const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
   const [meshIdsLoading, setMeshIdsLoading] = useState(true);
@@ -92,11 +98,18 @@ export default function ViewerPage() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  const [modelUrl, setModelUrl] = useState<string | null>(null);
-
   // Fabric filter state
   const [filterToComponent, setFilterToComponent] = useState(false);
   const [componentFabricCategoryIds, setComponentFabricCategoryIds] = useState<Set<string> | null>(null);
+
+  // Derived selection state
+  const selectedIdForTab: Record<string, string | null> = {
+    Bodice: selectedBodiceId,
+    Skirt: selectedSkirtId,
+    Sleeve: selectedSleeveId,
+  };
+  const activeSelectedId = selectedIdForTab[activeTab] ?? null;
+  const hasAnySelection = selectedBodiceId !== null || selectedSkirtId !== null || selectedSleeveId !== null;
 
   // ── Data fetching ──
 
@@ -118,60 +131,70 @@ export default function ViewerPage() {
       .finally(() => setMeshIdsLoading(false));
   }, []);
 
-  // Load meshes for selected component; auto-select first available weight
+  // Fetch compatible parts when bodice is selected
   useEffect(() => {
-    if (!selectedComponentId) {
-      setMeshes([]);
-      setModelUrl(null);
+    if (!selectedBodiceId) {
+      setCompatibleIds(new Set());
       return;
     }
-    fetch(`/api/admin/component-meshes?componentId=${selectedComponentId}`)
+    fetch(`/api/components?compatible_with=${selectedBodiceId}`)
       .then((r) => r.json())
-      .then((data: Mesh[]) => {
-        setMeshes(data);
-        // Default to heavy weight, fall back to first available
-        const hasHeavy = data.some((m) => m.fabricWeight === "heavy");
-        if (!hasHeavy && data.length > 0) {
-          setSelectedWeight(data[0].fabricWeight);
-        } else {
-          setSelectedWeight("heavy");
-        }
+      .then((data: { components: Component[] }) => {
+        setCompatibleIds(new Set(data.components.map((c) => c.id)));
       })
-      .catch(() => setMeshes([]));
-  }, [selectedComponentId]);
+      .catch(() => setCompatibleIds(new Set()));
+  }, [selectedBodiceId]);
 
-  // Fetch allowed fabric category IDs for the selected component when filter is on
+  // Fetch allowed fabric category IDs for the bodice (anchor) when filter is on
   useEffect(() => {
-    if (!filterToComponent || !selectedComponentId) {
+    if (!filterToComponent || !selectedBodiceId) {
       setComponentFabricCategoryIds(null);
       return;
     }
-    fetch(`/api/admin/component-fabric-rules?componentId=${selectedComponentId}`)
+    fetch(`/api/admin/component-fabric-rules?componentId=${selectedBodiceId}`)
       .then((r) => r.json())
       .then((ids: string[]) => setComponentFabricCategoryIds(new Set(ids)))
       .catch(() => setComponentFabricCategoryIds(null));
-  }, [filterToComponent, selectedComponentId]);
+  }, [filterToComponent, selectedBodiceId]);
 
-  // Resolve signed URL whenever selected weight or meshes change
+  // Resolve model URLs for all selected parts
   useEffect(() => {
-    const mesh = meshes.find((m) => m.fabricWeight === selectedWeight) ?? meshes[0];
-    const storagePath = mesh?.storagePath ?? null;
+    const selections = [
+      { id: "bodice", componentId: selectedBodiceId },
+      { id: "skirt", componentId: selectedSkirtId },
+      { id: "sleeve", componentId: selectedSleeveId },
+    ].filter((s): s is { id: string; componentId: string } => s.componentId !== null);
 
-    if (!storagePath) {
-      setModelUrl(null);
+    if (selections.length === 0) {
+      setComposedModels([]);
       return;
     }
-    fetch(`/api/models/signed-url?name=${encodeURIComponent(storagePath)}`)
-      .then((r) => {
-        if (!r.ok) {
-          console.error("[viewer] signed-url failed", r.status, storagePath);
-          return null;
-        }
-        return r.json();
+
+    let cancelled = false;
+
+    Promise.all(
+      selections.map(async (sel) => {
+        const meshRes = await fetch(`/api/admin/component-meshes?componentId=${sel.componentId}`);
+        const meshData: Mesh[] = await meshRes.json();
+        const mesh = meshData.find((m) => m.fabricWeight === selectedWeight) ?? meshData[0];
+        if (!mesh) return null;
+
+        const urlRes = await fetch(`/api/models/signed-url?name=${encodeURIComponent(mesh.storagePath)}`);
+        if (!urlRes.ok) return null;
+        const data = await urlRes.json();
+        return data?.url ? { id: sel.id, url: data.url as string } : null;
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        setComposedModels(results.filter((r): r is ModelEntry => r !== null));
       })
-      .then((data) => setModelUrl(data?.url ?? null))
-      .catch((err) => { console.error("[viewer] signed-url error", err); setModelUrl(null); });
-  }, [meshes, selectedWeight]);
+      .catch(() => {
+        if (!cancelled) setComposedModels([]);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedBodiceId, selectedSkirtId, selectedSleeveId, selectedWeight]);
 
   const isDirty =
     selectedFabricId !== null &&
@@ -184,9 +207,26 @@ export default function ViewerPage() {
 
   const filteredComponents = meshIdsLoading
     ? []
-    : components.filter(
-        (c) => c.typeSlug === TAB_SLUG[activeTab] && (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
-      );
+    : components.filter((c) => {
+        if (c.typeSlug !== TAB_SLUG[activeTab]) return false;
+        if (componentIdsWithMeshes !== null && !componentIdsWithMeshes.has(c.id)) return false;
+        // When a bodice is selected, filter skirt/sleeve tabs to compatible only
+        if (selectedBodiceId && activeTab !== "Bodice" && compatibleIds.size > 0) {
+          return compatibleIds.has(c.id);
+        }
+        return true;
+      });
+
+  const compatibleCountForTab = (tab: string): number | null => {
+    if (!selectedBodiceId || tab === "Bodice" || compatibleIds.size === 0) return null;
+    const slug = TAB_SLUG[tab];
+    return components.filter(
+      (c) =>
+        c.typeSlug === slug &&
+        compatibleIds.has(c.id) &&
+        (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
+    ).length;
+  };
 
   // ── Handlers ──
 
@@ -231,6 +271,25 @@ export default function ViewerPage() {
     }
   }, [selectedFabricId, settings, saving]);
 
+  const handleComponentClick = useCallback(
+    (componentId: string) => {
+      if (activeTab === "Bodice") {
+        setSelectedBodiceId((prev) => {
+          const next = prev === componentId ? null : componentId;
+          // Clear sub-selections when bodice changes
+          setSelectedSkirtId(null);
+          setSelectedSleeveId(null);
+          return next;
+        });
+      } else if (activeTab === "Skirt") {
+        setSelectedSkirtId((prev) => (prev === componentId ? null : componentId));
+      } else if (activeTab === "Sleeve") {
+        setSelectedSleeveId((prev) => (prev === componentId ? null : componentId));
+      }
+    },
+    [activeTab],
+  );
+
   const updateSetting = <K extends keyof ViewerSettings>(key: K, value: ViewerSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
@@ -250,19 +309,25 @@ export default function ViewerPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-700">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
-                activeTab === tab
-                  ? "border-b-2 border-white text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {TABS.map((tab) => {
+            const count = compatibleCountForTab(tab);
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 px-2 py-2 text-xs font-medium transition-colors ${
+                  activeTab === tab
+                    ? "border-b-2 border-white text-white"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {tab}
+                {count !== null && (
+                  <span className="ml-1 text-[10px] text-gray-500">({count})</span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Component list */}
@@ -278,9 +343,9 @@ export default function ViewerPage() {
           {filteredComponents.map((c) => (
             <button
               key={c.id}
-              onClick={() => setSelectedComponentId(c.id)}
+              onClick={() => handleComponentClick(c.id)}
               className={`flex w-full items-center px-3 py-2 text-left text-sm transition-colors ${
-                selectedComponentId === c.id
+                activeSelectedId === c.id
                   ? "bg-[#2a2a2a] text-white"
                   : "text-gray-300 hover:bg-[#222]"
               }`}
@@ -290,30 +355,24 @@ export default function ViewerPage() {
           ))}
         </div>
 
-        {/* Variant toggle — only shown when multiple weights are available */}
-        {meshes.length > 1 && (
+        {/* Fabric weight toggle — shown when any component is selected */}
+        {hasAnySelection && (
           <div className="border-t border-gray-700 px-3 py-2">
             <p className="mb-1 text-xs text-gray-500">Fabric Weight</p>
             <div className="flex gap-1">
-              {FABRIC_WEIGHTS.map((v) => {
-                const available = meshes.some((m) => m.fabricWeight === v);
-                return (
-                  <button
-                    key={v}
-                    disabled={!available}
-                    onClick={() => setSelectedWeight(v)}
-                    className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
-                      selectedWeight === v
-                        ? "bg-white text-black"
-                        : available
-                          ? "bg-[#333] text-gray-300 hover:bg-[#444]"
-                          : "bg-[#222] text-gray-600 cursor-not-allowed"
-                    }`}
-                  >
-                    {v}
-                  </button>
-                );
-              })}
+              {FABRIC_WEIGHTS.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setSelectedWeight(v)}
+                  className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
+                    selectedWeight === v
+                      ? "bg-white text-black"
+                      : "bg-[#333] text-gray-300 hover:bg-[#444]"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -321,16 +380,16 @@ export default function ViewerPage() {
 
       {/* Center panel: 3D viewer */}
       <div className="relative flex-1">
-        {!modelUrl && (
+        {composedModels.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <span className="text-sm text-gray-500">
-              {selectedComponentId
+              {hasAnySelection
                 ? "No model file found for this component"
                 : "Select a component to preview"}
             </span>
           </div>
         )}
-        <AdminFabricViewer models={modelUrl ? [{ id: "single", url: modelUrl }] : []} settings={settings} />
+        <AdminFabricViewer models={composedModels} settings={settings} />
       </div>
 
       {/* Right panel: fabrics & settings */}
@@ -341,7 +400,7 @@ export default function ViewerPage() {
             <input
               type="checkbox"
               checked={filterToComponent}
-              disabled={!selectedComponentId}
+              disabled={!selectedBodiceId}
               onChange={(e) => setFilterToComponent(e.target.checked)}
               className="accent-white"
             />
