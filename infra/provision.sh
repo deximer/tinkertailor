@@ -81,8 +81,8 @@ done < <(grep -E '^NEXT_PUBLIC_[^=]+=.+' "$SECRETS_FILE")
 flyctl deploy --config "$FLY_TOML" --app "$APP_NAME" "${BUILD_ARGS[@]}"
 
 # Step 4: Scale
-echo "==> Scaling to ${MACHINE_COUNT} x ${MACHINE_SIZE}"
+echo "==> Scaling to ${MACHINE_COUNT} x ${MACHINE_SIZE} / ${MACHINE_MEMORY_MB:-default}MB"
 flyctl scale count "$MACHINE_COUNT" --app "$APP_NAME" --yes
-flyctl scale vm "$MACHINE_SIZE" --app "$APP_NAME"
+flyctl scale vm "$MACHINE_SIZE" ${MACHINE_MEMORY_MB:+--memory "$MACHINE_MEMORY_MB"} --app "$APP_NAME"
 
 echo "==> Done. ${APP_NAME} is live."
