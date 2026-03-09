@@ -9,3 +9,19 @@ export type {
   CompatibleComponentsResult,
   FabricCategoryWithSkins,
 } from "./engine";
+
+export {
+  parseObjBoundaryLoops,
+  classifyLoops,
+  normalizeLoop,
+  computeSimilarity,
+  classifySleeveStyle,
+} from "./mesh-analysis";
+export type {
+  Vec3,
+  BoundaryLoop,
+  LoopRole,
+  ClassifiedLoop,
+  SleeveStyle,
+  ComponentRole,
+} from "./mesh-analysis";

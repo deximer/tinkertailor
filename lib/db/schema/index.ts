@@ -15,3 +15,4 @@ export * from "./creator-applications";
 export * from "./products";
 export * from "./orders";
 export * from "./attribution";
+export * from "./compatibility-analysis";
