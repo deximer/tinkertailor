@@ -263,13 +263,13 @@ export default function ComponentFabricRulesPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((comp, rowIdx) => (
+                {rows.map((comp) => (
                   <tr
                     key={comp.id}
-                    className={`border-b border-gray-800 hover:bg-[#2a2a2a] ${rowIdx % 2 === 1 ? "bg-[#1e1e1e]" : ""}`}
+                    className="border-b border-gray-800 hover:bg-[#2a2a2a]"
                   >
                     <td
-                      className={`sticky left-0 border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap ${rowIdx % 2 === 1 ? "bg-[#1e1e1e]" : "bg-[#222]"}`}
+                      className="sticky left-0 bg-[#222] border-r border-gray-700 px-3 py-1.5 text-xs text-white font-medium whitespace-nowrap"
                       title={comp.assetCode}
                     >
                       {comp.name}
