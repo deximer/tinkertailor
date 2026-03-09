@@ -594,13 +594,15 @@ export default function AdminSilhouettesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {silhouettes.map((sil) => (
+                  {silhouettes.map((sil, rowIdx) => (
                     <tr
                       key={sil.id}
                       onClick={() => selectSilhouette(sil)}
                       className={`border-b border-gray-800 cursor-pointer transition-colors ${
                         selectedId === sil.id
                           ? "bg-[#2a2a2a]"
+                          : rowIdx % 2 === 1
+                          ? "bg-[#1e1e1e] hover:bg-[#252525]"
                           : "hover:bg-[#252525]"
                       }`}
                     >
