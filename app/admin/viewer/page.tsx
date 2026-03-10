@@ -84,7 +84,9 @@ export default function ViewerPage() {
   const [selectedSkirtId, setSelectedSkirtId] = useState<string | null>(null);
   const [selectedSleeveId, setSelectedSleeveId] = useState<string | null>(null);
   const [compatibleIds, setCompatibleIds] = useState<Set<string>>(new Set());
+  const [compatibilityLoaded, setCompatibilityLoaded] = useState(false);
   const [composedModels, setComposedModels] = useState<ModelEntry[]>([]);
+  const [availableWeights, setAvailableWeights] = useState<Set<string>>(new Set(FABRIC_WEIGHTS));
 
   const [componentIdsWithMeshes, setComponentIdsWithMeshes] = useState<Set<string> | null>(null);
   const [meshIdsLoading, setMeshIdsLoading] = useState(true);
@@ -135,14 +137,20 @@ export default function ViewerPage() {
   useEffect(() => {
     if (!selectedBodiceId) {
       setCompatibleIds(new Set());
+      setCompatibilityLoaded(false);
       return;
     }
+    setCompatibilityLoaded(false);
     fetch(`/api/components?compatible_with=${selectedBodiceId}`)
       .then((r) => r.json())
       .then((data: { components: Component[] }) => {
         setCompatibleIds(new Set(data.components.map((c) => c.id)));
+        setCompatibilityLoaded(true);
       })
-      .catch(() => setCompatibleIds(new Set()));
+      .catch(() => {
+        setCompatibleIds(new Set());
+        setCompatibilityLoaded(true);
+      });
   }, [selectedBodiceId]);
 
   // Fetch allowed fabric category IDs for the bodice (anchor) when filter is on
@@ -167,6 +175,7 @@ export default function ViewerPage() {
 
     if (selections.length === 0) {
       setComposedModels([]);
+      setAvailableWeights(new Set(FABRIC_WEIGHTS));
       return;
     }
 
@@ -176,18 +185,28 @@ export default function ViewerPage() {
       selections.map(async (sel) => {
         const meshRes = await fetch(`/api/admin/component-meshes?componentId=${sel.componentId}`);
         const meshData: Mesh[] = await meshRes.json();
+        const weights = new Set(meshData.map((m) => m.fabricWeight));
         const mesh = meshData.find((m) => m.fabricWeight === selectedWeight) ?? meshData[0];
-        if (!mesh) return null;
+        if (!mesh) return { model: null, weights };
 
         const urlRes = await fetch(`/api/models/signed-url?name=${encodeURIComponent(mesh.storagePath)}`);
-        if (!urlRes.ok) return null;
+        if (!urlRes.ok) return { model: null, weights };
         const data = await urlRes.json();
-        return data?.url ? { id: sel.id, url: data.url as string } : null;
+        const model = data?.url ? { id: sel.id, url: data.url as string } : null;
+        return { model, weights };
       }),
     )
       .then((results) => {
         if (cancelled) return;
-        setComposedModels(results.filter((r): r is ModelEntry => r !== null));
+        setComposedModels(results.map((r) => r.model).filter((r): r is ModelEntry => r !== null));
+        // Available weights = intersection of weights across all selected parts
+        const weightSets = results.map((r) => r.weights);
+        if (weightSets.length > 0) {
+          const intersection = new Set(
+            [...weightSets[0]].filter((w) => weightSets.every((s) => s.has(w))),
+          );
+          setAvailableWeights(intersection);
+        }
       })
       .catch(() => {
         if (!cancelled) setComposedModels([]);
@@ -210,15 +229,15 @@ export default function ViewerPage() {
     : components.filter((c) => {
         if (c.typeSlug !== TAB_SLUG[activeTab]) return false;
         if (componentIdsWithMeshes !== null && !componentIdsWithMeshes.has(c.id)) return false;
-        // When a bodice is selected, filter skirt/sleeve tabs to compatible only
-        if (selectedBodiceId && activeTab !== "Bodice" && compatibleIds.size > 0) {
+        // When a bodice is selected and compatibility data is loaded, filter to compatible only
+        if (selectedBodiceId && activeTab !== "Bodice" && compatibilityLoaded) {
           return compatibleIds.has(c.id);
         }
         return true;
       });
 
   const compatibleCountForTab = (tab: string): number | null => {
-    if (!selectedBodiceId || tab === "Bodice" || compatibleIds.size === 0) return null;
+    if (!selectedBodiceId || tab === "Bodice" || !compatibilityLoaded) return null;
     const slug = TAB_SLUG[tab];
     return components.filter(
       (c) =>
@@ -360,19 +379,25 @@ export default function ViewerPage() {
           <div className="border-t border-gray-700 px-3 py-2">
             <p className="mb-1 text-xs text-gray-500">Fabric Weight</p>
             <div className="flex gap-1">
-              {FABRIC_WEIGHTS.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setSelectedWeight(v)}
-                  className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
-                    selectedWeight === v
-                      ? "bg-white text-black"
-                      : "bg-[#333] text-gray-300 hover:bg-[#444]"
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
+              {FABRIC_WEIGHTS.map((v) => {
+                const available = availableWeights.has(v);
+                return (
+                  <button
+                    key={v}
+                    disabled={!available}
+                    onClick={() => setSelectedWeight(v)}
+                    className={`flex-1 rounded px-2 py-1 text-xs capitalize transition-colors ${
+                      selectedWeight === v
+                        ? "bg-white text-black"
+                        : available
+                          ? "bg-[#333] text-gray-300 hover:bg-[#444]"
+                          : "bg-[#222] text-gray-600 cursor-not-allowed"
+                    }`}
+                  >
+                    {v}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
