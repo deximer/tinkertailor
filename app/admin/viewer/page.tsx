@@ -85,6 +85,7 @@ export default function ViewerPage() {
   const [selectedSleeveId, setSelectedSleeveId] = useState<string | null>(null);
   const [compatibleIds, setCompatibleIds] = useState<Set<string>>(new Set());
   const [compatibilityLoaded, setCompatibilityLoaded] = useState(false);
+  const [compatCounts, setCompatCounts] = useState<Record<string, { skirts: number; sleeves: number }>>({});
   const [composedModels, setComposedModels] = useState<ModelEntry[]>([]);
   const [availableWeights, setAvailableWeights] = useState<Set<string>>(new Set(FABRIC_WEIGHTS));
 
@@ -131,6 +132,11 @@ export default function ViewerPage() {
       .then((ids: string[]) => setComponentIdsWithMeshes(new Set(ids)))
       .catch(console.error)
       .finally(() => setMeshIdsLoading(false));
+
+    fetch("/api/admin/compatibility/counts")
+      .then((r) => r.json())
+      .then((data: Record<string, { skirts: number; sleeves: number }>) => setCompatCounts(data))
+      .catch(console.error);
   }, []);
 
   // Fetch compatible parts when bodice is selected
@@ -224,27 +230,26 @@ export default function ViewerPage() {
       ? fabrics.filter((f) => componentFabricCategoryIds.has(f.categoryId))
       : fabrics;
 
+  const inCompatibleMode = (tab: string) =>
+    selectedBodiceId !== null && tab !== "Bodice" && compatibilityLoaded;
+
   const filteredComponents = meshIdsLoading
     ? []
     : components.filter((c) => {
         if (c.typeSlug !== TAB_SLUG[activeTab]) return false;
-        if (componentIdsWithMeshes !== null && !componentIdsWithMeshes.has(c.id)) return false;
-        // When a bodice is selected and compatibility data is loaded, filter to compatible only
-        if (selectedBodiceId && activeTab !== "Bodice" && compatibilityLoaded) {
+        if (inCompatibleMode(activeTab)) {
+          // Show ALL compatible components — even those without meshes (greyed below)
           return compatibleIds.has(c.id);
         }
+        // Default: only show components that have meshes
+        if (componentIdsWithMeshes !== null && !componentIdsWithMeshes.has(c.id)) return false;
         return true;
       });
 
   const compatibleCountForTab = (tab: string): number | null => {
     if (!selectedBodiceId || tab === "Bodice" || !compatibilityLoaded) return null;
     const slug = TAB_SLUG[tab];
-    return components.filter(
-      (c) =>
-        c.typeSlug === slug &&
-        compatibleIds.has(c.id) &&
-        (componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id)),
-    ).length;
+    return components.filter((c) => c.typeSlug === slug && compatibleIds.has(c.id)).length;
   };
 
   // ── Handlers ──
@@ -356,22 +361,44 @@ export default function ViewerPage() {
           )}
           {!meshIdsLoading && filteredComponents.length === 0 && (
             <p className="px-3 py-4 text-xs text-gray-500">
-              {componentIdsWithMeshes?.size === 0 ? "No models uploaded yet" : "No components found"}
+              {inCompatibleMode(activeTab)
+                ? "No compatible components"
+                : componentIdsWithMeshes?.size === 0
+                  ? "No models uploaded yet"
+                  : "No components found"}
             </p>
           )}
-          {filteredComponents.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => handleComponentClick(c.id)}
-              className={`flex w-full items-center px-3 py-2 text-left text-sm transition-colors ${
-                activeSelectedId === c.id
-                  ? "bg-[#2a2a2a] text-white"
-                  : "text-gray-300 hover:bg-[#222]"
-              }`}
-            >
-              <span className="truncate">{c.name}</span>
-            </button>
-          ))}
+          {filteredComponents.map((c) => {
+            const hasMesh = componentIdsWithMeshes === null || componentIdsWithMeshes.has(c.id);
+            const isSelected = activeSelectedId === c.id;
+            const counts = activeTab === "Bodice" ? compatCounts[c.id] : null;
+            const compatTotal = counts ? counts.skirts + counts.sleeves : 0;
+            return (
+              <button
+                key={c.id}
+                onClick={() => handleComponentClick(c.id)}
+                className={`flex w-full items-center gap-1 px-3 py-2 text-left text-sm transition-colors ${
+                  isSelected
+                    ? "bg-[#2a2a2a] text-white"
+                    : hasMesh
+                      ? "text-gray-300 hover:bg-[#222]"
+                      : "text-gray-600 hover:bg-[#1e1e1e]"
+                }`}
+              >
+                <span className="flex-1 truncate">{c.name}</span>
+                {!hasMesh && inCompatibleMode(activeTab) && (
+                  <span className="shrink-0 text-[10px] text-gray-600">no mesh</span>
+                )}
+                {counts && compatTotal > 0 && (
+                  <span className="shrink-0 rounded bg-[#2a2a2a] px-1.5 py-0.5 text-[10px] text-gray-400">
+                    {counts.skirts > 0 && `${counts.skirts}S`}
+                    {counts.skirts > 0 && counts.sleeves > 0 && " "}
+                    {counts.sleeves > 0 && `${counts.sleeves}L`}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Fabric weight toggle — shown when any component is selected */}
