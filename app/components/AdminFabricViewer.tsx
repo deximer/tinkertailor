@@ -137,6 +137,7 @@ export default function AdminFabricViewer({
     for (const [id, entry] of loaded) {
       if (!desired.has(id)) {
         scene.remove(entry.group);
+        disposeGroup(entry.group, materialRef.current);
         loaded.delete(id);
       }
     }
@@ -149,6 +150,7 @@ export default function AdminFabricViewer({
       // URL changed — remove old group first
       if (existing) {
         scene.remove(existing.group);
+        disposeGroup(existing.group, materialRef.current);
         loaded.delete(model.id);
       }
       toLoad.push(model);
@@ -196,10 +198,18 @@ export default function AdminFabricViewer({
         }
       };
 
+      const onError = () => {
+        console.error(`[AdminFabricViewer] Failed to load model: ${url}`);
+        remaining--;
+        if (remaining === 0 && loaded.size > 0) {
+          refitCamera(loaded, cameraRef, controlsRef);
+        }
+      };
+
       if (isGlb) {
-        new GLTFLoader().load(url, (gltf) => onLoad(gltf.scene));
+        new GLTFLoader().load(url, (gltf) => onLoad(gltf.scene), undefined, onError);
       } else {
-        new OBJLoader().load(url, onLoad);
+        new OBJLoader().load(url, onLoad, undefined, onError);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -325,6 +335,25 @@ function refitCamera(
   camera.far = dist * 10;
   camera.updateProjectionMatrix();
   controls.update();
+}
+
+function disposeGroup(
+  group: THREE.Group,
+  sharedMaterial: THREE.Material | null,
+) {
+  group.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.geometry.dispose();
+    // Dispose mesh-local materials but not the shared one
+    const mat = child.material;
+    if (mat && mat !== sharedMaterial) {
+      if (Array.isArray(mat)) {
+        mat.forEach((m) => { if (m !== sharedMaterial) m.dispose(); });
+      } else {
+        mat.dispose();
+      }
+    }
+  });
 }
 
 function buildMaterial(
